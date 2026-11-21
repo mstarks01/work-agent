@@ -28,8 +28,8 @@ one fault of one shape (:data:`FaultShape`) on one draft:
 
 The round's own check must name exactly the problems :data:`PROBLEMS_BY_SHAPE` gives
 the shape, or the command refuses the view before the call. The re-ask request
-is :func:`~analysis_service.critic_round.recritic_request` over the round's
-:class:`~analysis_service.critic_round.Reask`, and the answer is merged and
+is :func:`~katra.critic_round.recritic_request` over the round's
+:class:`~katra.critic_round.Reask`, and the answer is merged and
 checked by the round, as the graph's second look does.
 ``tests/test_evals_recritic_replay.py`` holds the rebuilt request against the
 one a real graph run sent, for each shape a STRIDE case can carry.
@@ -53,32 +53,6 @@ from google.adk.utils._schema_utils import validate_schema
 from google.genai import types
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from analysis_service.claims import (
-    Claim,
-    ControlRowRef,
-    FrameworkName,
-    RefusedControl,
-    Ruling,
-    UnknownRef,
-    UnreconciledKind,
-    VerdictStatus,
-)
-from analysis_service.critic_round import (
-    Accepted,
-    CriticRound,
-    Reask,
-    recritic_request,
-)
-from analysis_service.deployment import Deployment
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.graph import RECRITIC_ROLE, FrameworkNodes, claims_of
-from analysis_service.job_controls import AppliedControl
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.system_model import (
-    SystemModel,
-    all_attribute_names,
-    attribute_names,
-)
 from evals.harness.artifact import ProvenanceError, load_artifact, repo_commit
 from evals.harness.assembly import ArchivedRulingError, rulings_from_report
 from evals.harness.bundle import check_out
@@ -93,6 +67,32 @@ from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
+from katra.claims import (
+    Claim,
+    ControlRowRef,
+    FrameworkName,
+    RefusedControl,
+    Ruling,
+    UnknownRef,
+    UnreconciledKind,
+    VerdictStatus,
+)
+from katra.critic_round import (
+    Accepted,
+    CriticRound,
+    Reask,
+    recritic_request,
+)
+from katra.deployment import Deployment
+from katra.frameworks import PACKAGES, schemas_for
+from katra.graph import RECRITIC_ROLE, FrameworkNodes, claims_of
+from katra.job_controls import AppliedControl
+from katra.markdown_loader import MarkdownLoader
+from katra.system_model import (
+    SystemModel,
+    all_attribute_names,
+    attribute_names,
+)
 
 #: One fault each. The shapes in :data:`NEEDS_A_REFUSED_ROW` put a Control row fault on
 #: a ruling, either rejected for ``control`` or not. The others are the other

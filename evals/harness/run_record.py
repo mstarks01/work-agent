@@ -15,10 +15,10 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import FrameworkName
-from analysis_service.markdown_loader import MarkdownLoader
 from evals.harness.bundle import reports_dir
 from evals.harness.provenance import checkout_state
+from katra.claims import FrameworkName
+from katra.markdown_loader import MarkdownLoader
 
 #: The selections read on one input file, by name, each a framework's options.
 Selections = Mapping[str, Mapping[FrameworkName, Mapping[str, Any]]]

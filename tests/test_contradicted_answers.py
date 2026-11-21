@@ -10,7 +10,7 @@ across a resumed run, so the answer survives it.
 
 from __future__ import annotations
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     UNKNOWN,
     Assertion,
@@ -22,15 +22,15 @@ from analysis_service.assertions import (
     place_identity,
     support_span,
 )
-from analysis_service.claims import FrameworkAnalysis, UnknownRef, Verdict
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.fact_writes import check_fact_answers, fact_rows
-from analysis_service.jobs import Checkpoint
-from analysis_service.open_facts import open_attribute, source_states
-from analysis_service.questions import fact_questions
-from analysis_service.report_conditions import conditions, corrected_findings
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import SystemModel
+from katra.claims import FrameworkAnalysis, UnknownRef, Verdict
+from katra.fact_answers import FactAnswer
+from katra.fact_writes import check_fact_answers, fact_rows
+from katra.jobs import Checkpoint
+from katra.open_facts import open_attribute, source_states
+from katra.questions import fact_questions
+from katra.report_conditions import conditions, corrected_findings
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import SystemModel
 from tests.factories import sample_analysis, sample_threat, valid_model
 from tests.test_questions import PRINCIPAL, resume
 

@@ -14,9 +14,9 @@ from typing import Any
 
 import pytest
 
-from analysis_service.controls import MAX_CONTROL_EVIDENCE_TOTAL_BYTES, ControlLimits
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.resilience import (
+from katra.controls import MAX_CONTROL_EVIDENCE_TOTAL_BYTES, ControlLimits
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.resilience import (
     ATTEMPTS_VAR,
     ENV_OVERRIDES,
     JOB_DEADLINE_MS_CEILING,
@@ -36,7 +36,7 @@ from analysis_service.resilience import (
     load_resilience,
     numeric_bounds,
 )
-from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
+from katra.sources import MAX_SOURCE_BYTES_CEILING
 from tests.factories import secret_env, translator_of
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -286,19 +286,19 @@ def test_the_timeout_reaching_litellm_is_the_one_the_file_states(
     from google.adk.models.llm_request import LlmRequest
     from google.genai import types
 
-    from analysis_service.binding import build_tier_adapters
-    from analysis_service.model_tiers import load_model_tiers
-    from analysis_service.sampling import load_sampling
+    from katra.binding import build_tier_adapters
+    from katra.model_tiers import load_model_tiers
+    from katra.sampling import load_sampling
 
     resilience = load_resilience(CONFIG_PATH, env={})
     env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-        "ANALYSIS_MODEL_BASE_MODEL": "gpt-4o-2024-08-06",
-        "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
-        "ANALYSIS_MODEL_STRONG_MODEL": "gpt-5.6",
-        "ANALYSIS_MODEL_REVIEW_VENDOR": "openai",
-        "ANALYSIS_MODEL_REVIEW_MODEL": "gpt-5.6",
-        **secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "not-a-real-key"),
+        "KATRA_MODEL_BASE_VENDOR": "openai",
+        "KATRA_MODEL_BASE_MODEL": "gpt-4o-2024-08-06",
+        "KATRA_MODEL_STRONG_VENDOR": "openai",
+        "KATRA_MODEL_STRONG_MODEL": "gpt-5.6",
+        "KATRA_MODEL_REVIEW_VENDOR": "openai",
+        "KATRA_MODEL_REVIEW_MODEL": "gpt-5.6",
+        **secret_env("KATRA_OPENAI_API_KEY_FILE", "not-a-real-key"),
     }
     adapter = build_tier_adapters(
         load_model_tiers(PROJECT_ROOT / "config" / "model_tiers.toml", env=env),
@@ -339,7 +339,7 @@ class _StopBeforeTheRequest(Exception):
 
 
 def test_the_backoff_knobs_stay_out_of_the_schema():
-    # The backoff curve is pinned in analysis_service.retry, because it does
+    # The backoff curve is pinned in katra.retry, because it does
     # not vary by deployment. What varies is retry_budget_ratio.
     for knob in ("initial_delay", "max_delay", "exp_base", "jitter"):
         with pytest.raises(ValueError):

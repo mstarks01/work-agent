@@ -25,7 +25,7 @@
 
 `ZonedElement.trust_zone` is a plain string, so the **schema** already accepts
 a component whose zone is the unknown sentinel. Two readers refuse it.
-:func:`~analysis_service.validation.validate` reports `invalid-reference`,
+:func:`~katra.validation.validate` reports `invalid-reference`,
 because the field must name a **Trust Boundary** the model holds; and
 `factbundle._place` drops the component before the gate sees it, reporting
 `unplaced`, so the resolver never builds a model the gate would refuse.
@@ -51,7 +51,7 @@ Four rules, and the first three are already how the tree behaves.
 
 **1. An unstated zone is inferred, and the inference is marked.** ADR 0032 is
 the convention: the model places the component, records an
-:class:`~analysis_service.system_model.Assumption` on `trust_zone`, and every
+:class:`~katra.system_model.Assumption` on `trust_zone`, and every
 derived crossing names the endpoint whose zone was assumed. A reader who needs
 to know whether a placement was stated reads the assumption, not the zone.
 

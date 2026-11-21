@@ -58,11 +58,6 @@ from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from analysis_service.claims import FrameworkName
-from analysis_service.config_files import xdg_dir
-from analysis_service.errors import error_place
-from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.system_model import ModelIndex
 from evals import build_review_docs as docs
 from evals.harness.fingerprint import (
     SUPPORTED_VERSIONS,
@@ -81,6 +76,11 @@ from evals.harness.reference import (
     load_corpus,
     read_digest,
 )
+from katra.claims import FrameworkName
+from katra.config_files import xdg_dir
+from katra.errors import error_place
+from katra.markdown_loader import RESOLVE_ERRORS
+from katra.system_model import ModelIndex
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_DIR = REPO_ROOT / "evals" / "corpus"
@@ -238,7 +238,7 @@ def draft_root() -> Path:
     """Where drafts live when a caller names nowhere else.
 
     ``sittings`` in the state directory of
-    :func:`~analysis_service.config_files.xdg_dir`: under ``XDG_STATE_HOME``,
+    :func:`~katra.config_files.xdg_dir`: under ``XDG_STATE_HOME``,
     else under ``~/.local/state``. A function rather than a constant, so
     importing this module resolves no home directory and a test can pass a
     temporary one instead.
@@ -327,7 +327,7 @@ def first_problem(error: ValidationError) -> str:
     The whole report names every field at once and reads as a stack trace.
     The reader's next step is to open the file this message already names, so
     one field and one reason is what carries them there. The place comes from
-    :func:`~analysis_service.errors.error_place`, because a sitting route
+    :func:`~katra.errors.error_place`, because a sitting route
     returns this message, and the place stops before an extra field that the
     caller made up. The place does name a key of a declared mapping, such as
     the fingerprint that keys a mark, because that key names the entry that is

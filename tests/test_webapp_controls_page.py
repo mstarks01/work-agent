@@ -17,9 +17,9 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import PACKAGES, Report
-from analysis_service.api import max_body_bytes, max_control_body_bytes
-from analysis_service.claims import (
+from katra import PACKAGES, Report
+from katra.api import max_body_bytes, max_control_body_bytes
+from katra.claims import (
     UNKNOWN_KEY_FIELDS,
     ControlRowRef,
     RefusedControl,
@@ -27,7 +27,7 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.controls import (
+from katra.controls import (
     ALIASES_FULL,
     CONTROL_ROW_FIELD_MAX_CHARS,
     MAX_CONTROL_ALIASES,
@@ -41,14 +41,14 @@ from analysis_service.controls import (
     evidence_full,
     scope_phrase,
 )
-from analysis_service.fact_answers import FACT_VALUE_MAX_CHARS
-from analysis_service.frameworks import lane_of
-from analysis_service.frameworks.asvs.catalog import requirement_text
-from analysis_service.job_controls import FACT_MEANINGS, MATCH_MEANINGS
-from analysis_service.jobs import PipelineCompleted
-from analysis_service.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
-from analysis_service.sources import MAX_LABEL_CHARS
-from analysis_service.system_model import ELEMENT_ID_MAX_CHARS, ELEMENT_TYPE_NOUNS
+from katra.fact_answers import FACT_VALUE_MAX_CHARS
+from katra.frameworks import lane_of
+from katra.frameworks.asvs.catalog import requirement_text
+from katra.job_controls import FACT_MEANINGS, MATCH_MEANINGS
+from katra.jobs import PipelineCompleted
+from katra.owner_files import NO_TEXT, NOT_PLAIN_TEXT, NOT_UTF_8
+from katra.sources import MAX_LABEL_CHARS
+from katra.system_model import ELEMENT_ID_MAX_CHARS, ELEMENT_TYPE_NOUNS
 from tests import test_webapp
 from tests.factories import sample_analysis
 from tests.source_tree import REPO_ROOT
@@ -763,12 +763,12 @@ class TestTheReportSection:
     def test_the_markdown_export_gives_each_outcome_its_version_and_sentence(
         self, ruled
     ):
-        """A row of each :data:`~analysis_service.job_controls.RowOutcome`
+        """A row of each :data:`~katra.job_controls.RowOutcome`
         shows in the Markdown export with its version, its counts and the
         sentence the page shows."""
         from typing import get_args
 
-        from analysis_service.job_controls import (
+        from katra.job_controls import (
             RowOutcome,
             RowRuling,
             SectionEntry,
@@ -822,7 +822,7 @@ class TestTheReportSection:
         assert "(version " not in script + inspect.getsource(controls_markdown)
 
     def test_the_page_and_the_export_show_one_summary_of_each_stage(self, ruled):
-        from analysis_service.job_controls import SectionEntry, section_summary
+        from katra.job_controls import SectionEntry, section_summary
 
         owner, child, _ = ruled
         sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
@@ -844,7 +844,7 @@ class TestTheReportSection:
         ) in markdown
 
     def test_a_stage_with_no_count_says_none(self, ruled):
-        from analysis_service.job_controls import SectionEntry, section_summary
+        from katra.job_controls import SectionEntry, section_summary
 
         owner, child, _ = ruled
         sent = owner.client.get(f"/report/{child}/export.json").json()["controls"]
@@ -917,7 +917,7 @@ class TestTheReportSection:
     def test_the_page_reads_the_state_words_and_the_ruling_lists(self, ruled):
         """The page gets the words of each state and the name of each ruling
         list from the tables that the Markdown export reads."""
-        from analysis_service.job_controls import RESOLUTION_WORDS, RULING_LISTS
+        from katra.job_controls import RESOLUTION_WORDS, RULING_LISTS
 
         owner, child, _ = ruled
         page = owner.client.get(f"/report/{child}").text
@@ -1136,7 +1136,7 @@ class TestTheTables:
     def test_no_page_script_copies_a_sentence_of_a_service_table(self):
         """The pause, the reopened analysis, the report page and the Controls
         page read these sentences from the service, so no script holds one."""
-        from analysis_service.job_controls import (
+        from katra.job_controls import (
             COVER_MEANINGS,
             RULING_LISTS,
             USED_STATE_WORDS,
@@ -1162,7 +1162,7 @@ class TestTheTables:
         """The section formats every meaning with the row's version, its
         framework and the version the analysis ran, so no meaning holds a
         brace that the format reads."""
-        from analysis_service.job_controls import ROW_MEANINGS
+        from katra.job_controls import ROW_MEANINGS
 
         for meaning in ROW_MEANINGS.values():
             meaning.format(version="v", framework="f", ran="r")
@@ -1170,8 +1170,8 @@ class TestTheTables:
     def test_the_page_tables_name_each_member(self):
         from typing import get_args
 
-        from analysis_service.controls import ScopeType
-        from analysis_service.job_controls import (
+        from katra.controls import ScopeType
+        from katra.job_controls import (
             COVER_MEANINGS,
             FACT_COUNT_WORDS,
             LEFT_OUT_MEANINGS,
@@ -1188,7 +1188,7 @@ class TestTheTables:
             RowVerdict,
             UsedState,
         )
-        from analysis_service.sources import EvidenceClass
+        from katra.sources import EvidenceClass
         from webapp.controls_page import EVIDENCE_LABELS, SCOPE_HINTS
 
         assert set(SCOPE_HINTS) == set(get_args(ScopeType))
@@ -1210,7 +1210,7 @@ class TestTheTables:
         GLOSSARY.md term."""
         from typing import get_args
 
-        from analysis_service.system_model import ElementPrefix
+        from katra.system_model import ElementPrefix
 
         assert set(ELEMENT_TYPE_NOUNS) == set(get_args(ElementPrefix))
         glossary = (REPO_ROOT / "GLOSSARY.md").read_text(encoding="utf-8")
@@ -1246,7 +1246,7 @@ class TestTheTables:
     def test_the_fact_kind_tables_name_each_scope_and_kind(self):
         from typing import get_args
 
-        from analysis_service.controls import (
+        from katra.controls import (
             SCOPE_FACT_KINDS,
             SCOPE_FACT_REFUSALS,
             ControlFactKind,
@@ -1275,7 +1275,7 @@ class TestTheTables:
     def test_each_statement_the_page_offers_is_one_the_document_keeps(self):
         # The page and the document read the protective answer from two
         # places, so each tick must save.
-        from analysis_service.controls import ControlDocument
+        from katra.controls import ControlDocument
         from webapp.controls_page import scope_types
 
         for scope_row in scope_types():
@@ -1322,7 +1322,7 @@ EVIDENCE = (
     ],
 )
 def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines):
-    from analysis_service.job_controls import CopiedEvidence, _quoted
+    from katra.job_controls import CopiedEvidence, _quoted
 
     file = CopiedEvidence.model_validate(
         {
@@ -1340,7 +1340,7 @@ def test_an_evidence_line_counts_only_where_a_quotation_quotes_it(reason, lines)
 def test_a_quoted_line_counts_each_line_end_a_text_may_hold(end):
     """Each line end that ``text_refusal`` lets through starts a line, as it
     does in an editor."""
-    from analysis_service.job_controls import CopiedEvidence, _quoted
+    from katra.job_controls import CopiedEvidence, _quoted
 
     file = CopiedEvidence.model_validate(
         {

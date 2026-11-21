@@ -10,26 +10,26 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_forms import (
+from katra.answer_forms import (
     CONTROL_SUGGESTIONS,
     answer_choices,
     answer_form,
     answer_suggestions,
 )
-from analysis_service.assertions import (
+from katra.assertions import (
     REGISTRY,
     catalog_issues,
     parse_predicate,
     quarantine,
 )
-from analysis_service.capabilities import CAPABILITIES, parse_capability_key
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FactAnswer, answer_facets
-from analysis_service.open_facts import group_of, label_of
-from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import CapabilityStatement, SystemModel
-from analysis_service.validation import validate
+from katra.capabilities import CAPABILITIES, parse_capability_key
+from katra.claims import UnknownRef
+from katra.fact_answers import FactAnswer, answer_facets
+from katra.open_facts import group_of, label_of
+from katra.question_kinds import QUESTION_KINDS, parse_question_kind
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import CapabilityStatement, SystemModel
+from katra.validation import validate
 from tests.test_assertions import FLOW, SOURCES, catalog, gate_model, stated
 
 ELEMENT = "process:storefront-api"

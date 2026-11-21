@@ -19,12 +19,12 @@ model calls:
 flowchart TD
     start([text in]) --> extract["extract<br/>(base)"]
     extract --> validate{{validate}}
-    validate -- valid --> capabilities["capabilities<br/>(base, ANALYSIS_CAPABILITY_READER)"]
+    validate -- valid --> capabilities["capabilities<br/>(base, KATRA_CAPABILITY_READER)"]
     validate -- invalid --> repair["repair<br/>(base)"]
     repair --> revalidate{{revalidate}}
     revalidate -- valid --> capabilities
     capabilities --> stated[stated]
-    stated --> assert["assert<br/>(base, ANALYSIS_ASSERTIONS)"]
+    stated --> assert["assert<br/>(base, KATRA_ASSERTIONS)"]
     revalidate -- invalid --> reject([rejected])
     assert --> prepare[prepare]
 
@@ -59,8 +59,8 @@ Purple nodes are model calls. Everything else is a deterministic `FunctionNode`:
 blue ones do work, amber ones only choose an edge, and the rounded ends are the
 run's three outcomes. `capabilities` and `stated` are in the graph where a
 selected framework reads capabilities, unless the deployment sets
-`ANALYSIS_CAPABILITY_READER=false`. `assert` is in the graph unless the deployment sets
-`ANALYSIS_ASSERTIONS=false`. A pass that is not in the graph is skipped, and a
+`KATRA_CAPABILITY_READER=false`. `assert` is in the graph unless the deployment sets
+`KATRA_ASSERTIONS=false`. A pass that is not in the graph is skipped, and a
 valid model goes on to the next node.
 
 - **extract** turns the untrusted text into a canonical system model (five DFD
@@ -133,7 +133,7 @@ the same `SystemModel` before the validity gate runs.
 | Transport | What `extract` writes | Selected by |
 | --- | --- | --- |
 | full | a `SystemModel` | the default |
-| compact-v4 | a compact wire form, expanded in code | `ANALYSIS_COMPACT_EXTRACTION` |
+| compact-v4 | a compact wire form, expanded in code | `KATRA_COMPACT_EXTRACTION` |
 
 Nothing downstream of the gate can tell the two apart, which is the point and
 also the reason the report records which one ran, in
@@ -177,13 +177,13 @@ one variable and a restart.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
+| `KATRA_COMPACT_EXTRACTION` | Ask `extract` for the compact wire form. Off by default. |
 
 ## The assertion pass
 
 The assertion pass puts one more `base`-tier call into every job, between
 the validity gate and `prepare`. It runs by default (ADR 0075), and
-`ANALYSIS_ASSERTIONS=false` turns it off. The `assert` node reads the sources against
+`KATRA_ASSERTIONS=false` turns it off. The `assert` node reads the sources against
 the validated model and proposes one row per statement the sources make: a
 subject, a predicate from the service's registry, a value, a scope and the
 quote that says so. `prepare` resolves the proposal in code, once, and parks
@@ -203,7 +203,7 @@ every other field it carried before.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_ASSERTIONS` | Run the assertion pass on every job. On by default; `false` turns it off. |
+| `KATRA_ASSERTIONS` | Run the assertion pass on every job. On by default; `false` turns it off. |
 
 Required-fact recall is scored on the catalog, and no lane writes one, so the
 eval harness carries a **head-only** entry: `run.py run --mode heads` runs the
@@ -216,7 +216,7 @@ roughly seventeen times as much for findings the endpoint never reads.
 
 The capability reader puts one more `base`-tier call into a job whose selected
 framework applies its units by a rule over capabilities. It runs by default
-(ADR 0087), and `ANALYSIS_CAPABILITY_READER=false` turns it off. The `capabilities` node
+(ADR 0087), and `KATRA_CAPABILITY_READER=false` turns it off. The `capabilities` node
 reads the sources and the capability table, and proposes each capability the
 text says the application has, with the source's own words. The `stated` node
 then checks each row in code: the key must be in the table, the label must
@@ -233,7 +233,7 @@ node does.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_CAPABILITY_READER` | Run the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off. |
+| `KATRA_CAPABILITY_READER` | Run the capability reader on every job whose selection reads capabilities. On by default; `false` turns it off. |
 
 ## Models
 
@@ -322,7 +322,7 @@ marking the first revise path in production uncertified on a technicality.
 The list is **deployment-local**. This project can never ship a run that already
 counts as certified, because a repo-level blessing plus a local one could only
 resolve as one silently overriding the other.
-`ANALYSIS_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
+`KATRA_BLESSED_FINGERPRINTS` chooses *which* single file is read — it does not
 layer a second one on top.
 
 The service checks every completed job against the deployment's fingerprint
@@ -333,7 +333,7 @@ the findings or the input.
 | State | Meaning | Effect on `GET /v1/jobs/{id}/report` |
 | --- | --- | --- |
 | certified | Every observed fingerprint is blessed | Served |
-| uncertified | At least one is not | Served **unless** `ANALYSIS_REQUIRE_CERTIFIED` |
+| uncertified | At least one is not | Served **unless** `KATRA_REQUIRE_CERTIFIED` |
 | unexercised | A tier the graph declares presented no fingerprint at all | **Always** withheld |
 
 The lists ship **empty**, so until you promote a measured baseline every run
@@ -368,7 +368,7 @@ sweep and an `analysis` sweep beside its `end-to-end` sweep.
 
 | Variable | Effect |
 | --- | --- |
-| `ANALYSIS_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
+| `KATRA_REQUIRE_CERTIFIED` | Withhold the report when the run is uncertified. Off by default. |
 
 ## Outcomes
 
@@ -471,7 +471,7 @@ credentials, opens the network connections, and is the only code between a
 node's request and a provider's answer.
 
 A **provider seam** sits between the graph and that translator:
-`analysis_service.provider` defines one bounded request that goes out, one
+`katra.provider` defines one bounded request that goes out, one
 result that comes back, and a failure as a value rather than as an exception
 object. Everything the service asks of a provider crosses it.
 
@@ -499,7 +499,7 @@ hands the translator, and where each comes from:
 | What crosses | Where it comes from |
 | --- | --- |
 | the model route | `Vendor.route()` — a registry entry, in code |
-| the credential kwargs | the vendor's own table, read from declared `ANALYSIS_*` variables |
+| the credential kwargs | the vendor's own table, read from declared `KATRA_*` variables |
 | the decoding params | `sampling.toml` plus an explicit env allowlist |
 | `num_retries=0` | a literal |
 
@@ -524,7 +524,7 @@ resolver, because the environment is a path no kwarg lint can see.
 **Only a declared credential authenticates a run.** LiteLLM reads a key out of
 the process environment on its own, so a machine that ever ran another tool
 against a provider carries a key this deployment never declared.
-`Vendor.credential_kwargs` reads the `ANALYSIS_*` variable instead and fails the
+`Vendor.credential_kwargs` reads the `KATRA_*` variable instead and fails the
 build closed when it is absent, so no adapter that could fall back is ever
 built. `tests/test_transport_conformance.py` holds both halves against the
 bytes: the declared key beats an ambient one, and an ambient one alone builds
@@ -544,11 +544,11 @@ whole graph runs offline against scripted models:
 | Seam | Interface | Default | Status |
 | --- | --- | --- | --- |
 | Pipeline execution | `PipelineRunner` | `AdkPipelineRunner` (real graph) / `StubPipelineRunner` (tests) | Complete |
-| Job persistence | `JobStore` | none: `ANALYSIS_JOB_STORE` is required | Two backends, each a row of `JOB_STORES`: the non-durable `memory` store, and the `sql` store, which keeps jobs across a restart. The `sql` store runs on SQLite or PostgreSQL, with a filesystem or `s3` object store. See [Job storage](HTTP-API.md#job-storage) |
+| Job persistence | `JobStore` | none: `KATRA_JOB_STORE` is required | Two backends, each a row of `JOB_STORES`: the non-durable `memory` store, and the `sql` store, which keeps jobs across a restart. The `sql` store runs on SQLite or PostgreSQL, with a filesystem or `s3` object store. See [Job storage](HTTP-API.md#job-storage) |
 | ADK sessions | `BaseSessionService` | `InMemorySessionService` | In-memory only; a `session_service_uri` backend is unwired |
 
 The in-memory defaults are enough to get a report in process. The `JobStore`
-backend is a deploy-time choice (`ANALYSIS_JOB_STORE`, which stops startup on an
+backend is a deploy-time choice (`KATRA_JOB_STORE`, which stops startup on an
 unset or unknown value rather than quietly falling back), and the `sql` store
 keeps jobs across a restart. Out of scope for the current work: a store shared
 by more than one instance, a session backend, deployment
@@ -558,34 +558,34 @@ packaging (container, Cloud Run), and observability.
 
 | Module | Responsibility |
 | --- | --- |
-| `analysis_service.engine` | In-process `Engine` facade. |
-| `analysis_service.api` | The `/v1` FastAPI app. |
-| `analysis_service.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores the answers, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
-| `analysis_service.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
-| `analysis_service.store_backends` | The job store backends (`JOB_STORES`, `build_store`), the one delete (`audited_delete`), the retention and orphan sweeps, and the start-up an app runs over its store. |
-| `analysis_service.store_settings` | The reader of a closed store setting and `StoreConfigError`. It imports nothing from the stores. |
-| `analysis_service.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
-| `analysis_service.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
-| `analysis_service.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
-| `analysis_service.execution` | Drives a built graph, stamps each node execution, and turns the finished run into its report or its rejection. Shared by the service and the eval harness. |
-| `analysis_service.graph` | Topology and node functions. |
-| `analysis_service.system_model` | Canonical model + validity helpers. |
-| `analysis_service.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
-| `analysis_service.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
-| `analysis_service.domains` | Which `domains/` packs a model earns, decided from its own technology fields. |
-| `analysis_service.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
-| `analysis_service.claims` | The neutral `Claim`, its grounds, the proposal and ruling wrappers, the marks, the severity model and the `FrameworkAnalysis` block. |
-| `analysis_service.report` | The `Report` envelope: the job, the input, the node runs and the blocks. |
-| `analysis_service.frameworks` | The framework-package contract, its registry and its deployment gate. |
-| `analysis_service.validation` | The mechanical validity gate. |
-| `analysis_service.fan_in` | One framework's lane batches merged into the drafts its critic reads: evidence resolution, the whole-set checks, and every mark the service records about a draft, behind one call. |
-| `analysis_service.critic` | The mechanical checks around the critic's ruling — the ones no model should be asked to perform — and the view a critic reads. |
-| `analysis_service.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
-| `analysis_service.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
-| `analysis_service.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
-| `analysis_service.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
-| `analysis_service.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
-| `analysis_service.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
-| `analysis_service.auth` | Bearer-token (OIDC JWT) verification: it returns the token's issuer and `sub`. |
-| `analysis_service.principals` | The **Principal** of an issuer and a `sub`, and the random owner ID that owns each of its jobs (ADR 0064). |
-| `analysis_service.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |
+| `katra.engine` | In-process `Engine` facade. |
+| `katra.api` | The `/v1` FastAPI app. |
+| `katra.job_answers` | The one writer of a job's answers and the one starter of the job they start. It reads the job from the store, builds the Answer State, stores the answers, a draft or a correction, or admits and starts the Resumed Job, and raises typed refusals each driver maps to its transport. |
+| `katra.jobs` | Job lifecycle, `JobStore`, `PipelineRunner` seams. |
+| `katra.store_backends` | The job store backends (`JOB_STORES`, `build_store`), the one delete (`audited_delete`), the retention and orphan sweeps, and the start-up an app runs over its store. |
+| `katra.store_settings` | The reader of a closed store setting and `StoreConfigError`. It imports nothing from the stores. |
+| `katra.sources` | `Source`: the untrusted text a job is built from, the per-deployment bounds both entry points enforce, and the fenced render that is the only way caller bytes reach a model (OWASP LLM01). |
+| `katra.deployment` | One installation's config, resolved once: the files, the graph they configure, its runner and its certification gate. |
+| `katra.pipeline` | `AdkPipelineRunner`: one job's identity, input digest and certification around a Graph Run. |
+| `katra.execution` | Drives a built graph, stamps each node execution, and turns the finished run into its report or its rejection. Shared by the service and the eval harness. |
+| `katra.graph` | Topology and node functions. |
+| `katra.system_model` | Canonical model + validity helpers. |
+| `katra.analysis` | Deterministic traversal of a validated model: flows, reachability, paths, unknown controls. No security claims. |
+| `katra.candidates` | The rule table. Structural conditions an agent should investigate — leads, never findings, never evidence. |
+| `katra.domains` | Which `domains/` packs a model earns, decided from its own technology fields. |
+| `katra.coverage` | Per-lane accounting: what each agent was offered, and what its drafts cite. |
+| `katra.claims` | The neutral `Claim`, its grounds, the proposal and ruling wrappers, the marks, the severity model and the `FrameworkAnalysis` block. |
+| `katra.report` | The `Report` envelope: the job, the input, the node runs and the blocks. |
+| `katra.frameworks` | The framework-package contract, its registry and its deployment gate. |
+| `katra.validation` | The mechanical validity gate. |
+| `katra.fan_in` | One framework's lane batches merged into the drafts its critic reads: evidence resolution, the whole-set checks, and every mark the service records about a draft, behind one call. |
+| `katra.critic` | The mechanical checks around the critic's ruling — the ones no model should be asked to perform — and the view a critic reads. |
+| `katra.skills` / `.prompts` / `.markdown_loader` | Skill/prompt loading and composition. |
+| `katra.model_tiers` / `.sampling` / `.resilience` | Config loaders. |
+| `katra.vendors` | The vendor registry: each vendor's router prefix, credential mode, and model-name rules. |
+| `katra.binding` | Builds one adapter per tier from `(vendor, model, sampling, resilience)`, and the `NodeBinding` the graph binds onto its LLM nodes. |
+| `katra.model_gate` | The startup check that asks the provider library whether a tier's parameters are actually supported. |
+| `katra.certification` | Compares a run's fingerprints against the deployment's blessed manifest. |
+| `katra.auth` | Bearer-token (OIDC JWT) verification: it returns the token's issuer and `sub`. |
+| `katra.principals` | The **Principal** of an issuer and a `sub`, and the random owner ID that owns each of its jobs (ADR 0064). |
+| `katra.errors` | `ConfigError`, the base every fail-closed config loader raises — so a caller can handle "this deployment cannot run" without enumerating which knob was wrong. |

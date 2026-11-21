@@ -12,16 +12,6 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.claims import (
-    FrameworkAnalysis,
-    Ground,
-    GroundKind,
-    Mitigation,
-    Severity,
-    UnknownRef,
-    Verdict,
-)
-from analysis_service.frameworks import PACKAGES
 from evals.harness.content import (
     PROSE_FIELDS,
     PROSE_PREFIX,
@@ -35,6 +25,16 @@ from evals.harness.content import (
     structural,
     version_of,
 )
+from katra.claims import (
+    FrameworkAnalysis,
+    Ground,
+    GroundKind,
+    Mitigation,
+    Severity,
+    UnknownRef,
+    Verdict,
+)
+from katra.frameworks import PACKAGES
 from tests.eval_factories import produced_threat
 from tests.test_asvs import sample_asvs_claim
 
@@ -255,7 +255,7 @@ def _is_shared_judgement(annotation) -> bool:
     """Is this field one of the judgement types ``claims.py`` defines?"""
     text = str(annotation)
     return any(
-        f"analysis_service.claims.{shared.__name__}" in text
+        f"katra.claims.{shared.__name__}" in text
         for shared in (Verdict, Severity, Mitigation)
     )
 

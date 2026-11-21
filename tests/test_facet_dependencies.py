@@ -9,10 +9,10 @@ conditions, the critic's prompt and the answer's line.
 
 from __future__ import annotations
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import question_set
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import (
+from katra.answer_sets import AnswerSet
+from katra.answer_state import question_set
+from katra.claims import UnknownRef
+from katra.fact_answers import (
     FactAnswer,
     asked_facets,
     covers,
@@ -21,10 +21,10 @@ from analysis_service.fact_answers import (
     needed_facets,
     needs_of,
 )
-from analysis_service.fact_writes import answered_model
-from analysis_service.prompts import render_question_kinds
-from analysis_service.questions import fact_questions, follow_up_needs
-from analysis_service.report_conditions import conditions
+from katra.fact_writes import answered_model
+from katra.prompts import render_question_kinds
+from katra.questions import fact_questions, follow_up_needs
+from katra.report_conditions import conditions
 from tests.factories import asking_threat, sample_analysis, sample_threat, valid_model
 
 STORE = "store:orders-db"
@@ -188,7 +188,7 @@ class TestTheDetail:
         assert "except the status endpoint" in statement.source_excerpt
 
     def test_a_changed_detail_is_new_information_for_the_follow_up(self):
-        from analysis_service.answer_state import _adds_information
+        from katra.answer_state import _adds_information
 
         before = FactAnswer(key=("", "", "", "", "", "authentication"), value="yes")
         after = before.model_copy(update={"detail": "except the status endpoint"})
@@ -202,7 +202,7 @@ class TestAFacetTwoFrameworksShare:
     need a different facet of it (#1542 Package E, checkpoint review a4)."""
 
     def analyses(self):
-        from analysis_service.claims import Verdict
+        from katra.claims import Verdict
         from tests.test_asvs import _block, sample_asvs_claim
 
         protected = WHOLE.model_copy(update={"facets": ["record-protected"]})

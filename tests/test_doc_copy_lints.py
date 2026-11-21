@@ -25,73 +25,73 @@ import pytest
 from fastapi.routing import APIRoute
 from pydantic import TypeAdapter
 
-from analysis_service import deployment, resilience
-from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.answer_forms import max_length_of
-from analysis_service.answer_state import EARLY_RULES, POLICY_VERSION
-from analysis_service.api import MAX_EVENT_STREAMS_PER_OWNER, max_body_bytes
-from analysis_service.assertions import Basis
-from analysis_service.auth import (
+from evals.harness.early_rounds import paused_state
+from evals.harness.instruments import INSTRUMENTS
+from katra import deployment, resilience
+from katra.analysis import CONTROL_ATTRIBUTES
+from katra.answer_forms import max_length_of
+from katra.answer_state import EARLY_RULES, POLICY_VERSION
+from katra.api import MAX_EVENT_STREAMS_PER_OWNER, max_body_bytes
+from katra.assertions import Basis
+from katra.auth import (
     ALLOWED_ALGORITHMS,
     DEFAULT_ALGORITHMS,
     AuthConfigError,
     build_verifier,
 )
-from analysis_service.claims import (
+from katra.claims import (
     GROUND_TEXT_MAX_CHARS,
     GroundKind,
     RuledClaim,
     Spelling,
     UnknownKey,
 )
-from analysis_service.config_files import MAX_VALUE_CHARS
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.controls import (
+from katra.config_files import MAX_VALUE_CHARS
+from katra.conformance import REFERENCE_MODELS
+from katra.controls import (
     MAX_CONTROL_ALIASES,
     MAX_CONTROL_EVIDENCE_TOTAL_BYTES,
     MAX_CONTROL_ROWS,
 )
-from analysis_service.deployment import ConfigPaths
-from analysis_service.diagrams import _install_argv
-from analysis_service.fact_answers import (
+from katra.deployment import ConfigPaths
+from katra.diagrams import _install_argv
+from katra.fact_answers import (
     MAX_DETAIL_CHARS,
     MAX_FACT_ANSWERS,
     FactAnswer,
     FactStatus,
     fact_kind,
 )
-from analysis_service.fan_in import BOUND_HOPS
-from analysis_service.frameworks import SCHEMAS
-from analysis_service.jobs import TERMINAL_STATUSES
-from analysis_service.ladder import Rung
-from analysis_service.links import MAX_LINK_ANSWERS
-from analysis_service.model_tiers import (
+from katra.fan_in import BOUND_HOPS
+from katra.frameworks import SCHEMAS
+from katra.jobs import TERMINAL_STATUSES
+from katra.ladder import Rung
+from katra.links import MAX_LINK_ANSWERS
+from katra.model_tiers import (
     LLM_NODES,
     SUPPORTED_VERSION,
     TIER_NAMES,
     tiers_in_use,
 )
-from analysis_service.resilience import ResilienceConfig, load_resilience
-from analysis_service.sampling import (
+from katra.resilience import ResilienceConfig, load_resilience
+from katra.sampling import (
     OFFERED_PARAMS,
     TierSampling,
     env_var_for,
     load_sampling,
 )
-from analysis_service.sources import (
+from katra.sources import (
     DIAGRAM_TYPES,
     FORMATS,
     MAX_LABEL_CHARS,
     MAX_SYSTEM_NAME_CHARS,
     SourceKind,
 )
-from analysis_service.sql_store import _ADMISSION_LOCK_KEY
-from analysis_service.store_backends import MAX_RETENTION_DAYS
-from analysis_service.system_model import EXCERPT_MAX_CHARS, ElementPrefix, _Element
-from analysis_service.validation import MAX_ELEMENTS
-from analysis_service.vendors import VENDORS, CredentialMode
-from evals.harness.early_rounds import paused_state
-from evals.harness.instruments import INSTRUMENTS
+from katra.sql_store import _ADMISSION_LOCK_KEY
+from katra.store_backends import MAX_RETENTION_DAYS
+from katra.system_model import EXCERPT_MAX_CHARS, ElementPrefix, _Element
+from katra.validation import MAX_ELEMENTS
+from katra.vendors import VENDORS, CredentialMode
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT, guide_files
 from tests.test_api import make_client
@@ -189,7 +189,7 @@ def pinned_values(cell: str) -> dict[str, str]:
     return stated
 
 
-# Resilience: config/resilience.toml as analysis_service.resilience loads it.
+# Resilience: config/resilience.toml as katra.resilience loads it.
 
 
 def test_the_resilience_section_states_every_shipped_value():
@@ -305,7 +305,7 @@ def test_the_resilience_override_table_is_every_variable_the_loader_reads():
         assert overridden != SHIPPED_RESILIENCE, f"{var} changes nothing"
 
 
-# Sampling: config/sampling.toml as analysis_service.sampling loads it.
+# Sampling: config/sampling.toml as katra.sampling loads it.
 
 
 def test_the_sampling_table_is_the_param_surface_and_the_shipped_values():
@@ -342,7 +342,7 @@ def test_the_sampling_section_states_the_shipped_version():
 def test_the_sampling_override_table_is_the_offered_params():
     text = section(CONFIGURATION, "### Sampling overrides")
     documented = {
-        backticked(row[0])[0].removeprefix("ANALYSIS_SAMPLING_{TIER}_").lower()
+        backticked(row[0])[0].removeprefix("KATRA_SAMPLING_{TIER}_").lower()
         for row in table(text, "Variable", "Effect")
     }
     tiers = re.search(r"`\{TIER\}` is ([^.]+)\.", flat(text))
@@ -350,10 +350,10 @@ def test_the_sampling_override_table_is_the_offered_params():
     assert documented == set(OFFERED_PARAMS)
     assert tiers, "the sentence that names the tiers is gone"
     assert backticked(tiers[1]) == [tier.upper() for tier in TIER_NAMES]
-    assert env_var_for("base", "seed") == "ANALYSIS_SAMPLING_BASE_SEED"
+    assert env_var_for("base", "seed") == "KATRA_SAMPLING_BASE_SEED"
 
 
-# Vendors: the credential modes and variables in analysis_service.vendors.
+# Vendors: the credential modes and variables in katra.vendors.
 
 
 def test_the_credential_table_is_the_vendor_registry():
@@ -400,14 +400,14 @@ def test_the_config_path_table_is_every_config_path():
     assert set(moved) == set(vars(SHIPPED_PATHS))
 
 
-# Auth: analysis_service.auth.
+# Auth: katra.auth.
 
 
 _OIDC_REQUIRED = {
-    "ANALYSIS_AUTH_PROVIDER": "oidc",
-    "ANALYSIS_OIDC_ISSUER": "https://issuer.example",
-    "ANALYSIS_OIDC_AUDIENCE": "api",
-    "ANALYSIS_OIDC_JWKS_URL": "https://issuer.example/jwks",
+    "KATRA_AUTH_PROVIDER": "oidc",
+    "KATRA_OIDC_ISSUER": "https://issuer.example",
+    "KATRA_OIDC_AUDIENCE": "api",
+    "KATRA_OIDC_JWKS_URL": "https://issuer.example/jwks",
 }
 
 
@@ -421,10 +421,10 @@ def test_the_oidc_table_is_the_settings_the_verifier_reads():
     optional = [var for var, purpose in oidc.items() if "*Optional.*" in purpose]
 
     with pytest.raises(AuthConfigError) as missing:
-        build_verifier({"ANALYSIS_AUTH_PROVIDER": "oidc"})
-    named = set(re.findall(r"ANALYSIS_\w+", str(missing.value)))
+        build_verifier({"KATRA_AUTH_PROVIDER": "oidc"})
+    named = set(re.findall(r"KATRA_\w+", str(missing.value)))
     assert set(oidc) - set(optional) == named
-    assert [backticked(row[0])[0] for row in provider] == ["ANALYSIS_AUTH_PROVIDER"]
+    assert [backticked(row[0])[0] for row in provider] == ["KATRA_AUTH_PROVIDER"]
 
     (algorithms,) = optional
     build_verifier(_OIDC_REQUIRED | {algorithms: "ES256"})
@@ -535,7 +535,7 @@ def test_the_question_limits_are_the_early_rules():
 
 def test_the_early_entry_names_every_key_the_service_sends():
     """The documented keys of an ``early_questions`` entry are the keys of a
-    served one: :meth:`~analysis_service.early_questions.EarlyQuestion.to_json`
+    served one: :meth:`~katra.early_questions.EarlyQuestion.to_json`
     and what the question set adds beside it."""
     text = flat(HTTP_API.read_text(encoding="utf-8"))
     entry = re.search(
@@ -641,7 +641,7 @@ def _paragraphs(path: Path) -> list[str]:
 def test_each_list_of_diagram_types_is_every_diagram_type():
     """A paragraph that names `architecture-beta` lists the diagram types that
     the reader reads, so it names each one of
-    :data:`~analysis_service.sources.DIAGRAM_TYPES`."""
+    :data:`~katra.sources.DIAGRAM_TYPES`."""
     lists = [
         (path, paragraph)
         for path in GUIDES
@@ -660,7 +660,7 @@ def test_each_list_of_diagram_types_is_every_diagram_type():
 
 def test_each_list_of_upload_extensions_is_its_whole_format_row():
     """A paragraph that names two extensions of one
-    :data:`~analysis_service.sources.FORMATS` row copies the row, so it names
+    :data:`~katra.sources.FORMATS` row copies the row, so it names
     every extension of that row."""
     copies = [
         (path, paragraph, row.extensions)

@@ -11,22 +11,22 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
     Subject,
     assertion_id,
 )
-from analysis_service.claims import Ground
-from analysis_service.fixes import (
+from katra.claims import Ground
+from katra.fixes import (
     fixes,
     fixes_by_framework,
     label_of,
     missing_controls,
     missing_rows,
 )
-from analysis_service.report import Report
+from katra.report import Report
 from tests.factories import sample_threat, valid_model
 
 REPORTS = sorted(

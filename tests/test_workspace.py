@@ -7,8 +7,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.jobs import InMemoryJobStore
-from analysis_service.sources import MAX_SYSTEM_NAME_CHARS
+from katra.jobs import InMemoryJobStore
+from katra.sources import MAX_SYSTEM_NAME_CHARS
 from tests import test_webapp_questions as web
 from tests.test_webapp import BREAKOUT, LOOPBACK, SAME_ORIGIN, posted
 from webapp.main import DEFAULT_NAME
@@ -157,9 +157,7 @@ class TestTheDelete:
         with client:
             paused, child = _paused_with_child(client)
             other = web._completed(client)
-            with caplog.at_level(
-                logging.INFO, logger="analysis_service.store_backends"
-            ):
+            with caplog.at_level(logging.INFO, logger="katra.store_backends"):
                 deleted = client.delete(
                     f"/workspace/runs/{paused}", headers=SAME_ORIGIN
                 )
@@ -473,7 +471,7 @@ class RefusesTheSecondDelete:
         return getattr(self._store, name)
 
     async def delete(self, job_id, owner_id, **cutoff):
-        from analysis_service.jobs import DeleteRefusal
+        from katra.jobs import DeleteRefusal
 
         self._calls += 1
         if self._calls == 2:

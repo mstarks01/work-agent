@@ -2,7 +2,7 @@
 
 The extraction replay compares each scored attribute of a paired element with
 the signed (blessed) model, after
-:func:`~analysis_service.compact.parse_extraction` has turned the raw emission
+:func:`~katra.compact.parse_extraction` has turned the raw emission
 into a model. That parse is deterministic code. So a wrong fact can come from
 two places: ``extract`` emitted it, or the parse changed a value that arrived
 right. This module reads the raw value of each check from the emission's
@@ -10,10 +10,10 @@ right. This module reads the raw value of each check from the emission's
 the scorer's own reduction.
 
 **A raw entry is paired with its parsed element by position, never by ID.**
-:func:`~analysis_service.validation.parse_and_validate` derives each ID again
+:func:`~katra.validation.parse_and_validate` derives each ID again
 from the element's name, so an emitted ID is only a link, and two entries can
 carry one ID. The parse keeps the walk order, so the entry at one position of
-one :data:`~analysis_service.system_model.ELEMENT_GROUPS` list is the element at
+one :data:`~katra.system_model.ELEMENT_GROUPS` list is the element at
 that position of the parsed model's list, which is how the parse pairs its own
 two walks. A group whose two lists differ in length pairs nothing.
 
@@ -45,10 +45,10 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal, cast, get_args
 
-from analysis_service.analysis import ControlState
-from analysis_service.system_model import ELEMENT_GROUPS, SystemModel, duplicate_ids
 from evals.harness.alignment import Alignment, ProtocolState
 from evals.harness.modes import STATE_REDUCED, AttributeCheck, reduce_attribute
+from katra.analysis import ControlState
+from katra.system_model import ELEMENT_GROUPS, SystemModel, duplicate_ids
 
 #: Where a check's value went wrong, if it did. The module docstring defines
 #: each stage.
@@ -78,7 +78,7 @@ Certainty = Literal[
 CERTAINTIES: tuple[Certainty, ...] = get_args(Certainty)
 
 #: The states the scorer reduces a control attribute or a protocol to, as
-#: :func:`~analysis_service.analysis.control_state` and
+#: :func:`~katra.analysis.control_state` and
 #: :func:`~evals.harness.alignment.protocol_state` return them.
 State = Literal[ControlState, ProtocolState]
 

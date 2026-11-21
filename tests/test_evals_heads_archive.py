@@ -14,14 +14,14 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import (
+from evals.harness import modes, replay
+from evals.harness.bundle import FINISHED_KINDS, reports_dir, write_assertions
+from katra.assertions import (
     Assertion,
     AssertionCatalog,
     AssertionRecord,
     Subject,
 )
-from evals.harness import modes, replay
-from evals.harness.bundle import FINISHED_KINDS, reports_dir, write_assertions
 
 
 def result(case_id: str = "01-payments-checkout", **overrides) -> modes.AssertionResult:

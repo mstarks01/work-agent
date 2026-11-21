@@ -50,16 +50,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from analysis_service.budgets import retried_prompt_tokens
-from analysis_service.markdown_loader import RESOLVE_ERRORS
-from analysis_service.report import (
-    NodeRun,
-    TokenUsage,
-)
 from evals.harness import baseline
 from evals.harness.artifact import load_artifact
 from evals.harness.prices import UnitPrices, price_calls, unit_prices
 from evals.harness.rates import mean
+from katra.budgets import retried_prompt_tokens
+from katra.markdown_loader import RESOLVE_ERRORS
+from katra.report import (
+    NodeRun,
+    TokenUsage,
+)
 
 Label = Literal["recorded", "estimated", "unpriced"]
 
@@ -99,7 +99,7 @@ def _calls_of(executions: Sequence[NodeRun]) -> list[tuple[str, str, TokenUsage]
     """The billable calls in a set of node runs, ready for pricing.
 
     **A retried node bills more than its usage says**, and this asks
-    :func:`~analysis_service.budgets.retried_prompt_tokens` rather than
+    :func:`~katra.budgets.retried_prompt_tokens` rather than
     answering for itself. Pricing the failed attempts at nothing while
     `measured_tokens` charges them would offer a contributor $9.75 against a
     $25.35 bill at the shipped `attempts = 3`. The number a person types back to

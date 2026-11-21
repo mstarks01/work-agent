@@ -17,15 +17,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import LANE_CLOSING_DOC, PACKAGES
-from analysis_service.frameworks.stride.record import (
-    ArchivedThreatProposals,
-    DraftThreat,
-)
-from analysis_service.graph import FrameworkNodes
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import lane_closing
-from analysis_service.system_model import ModelIndex
 from evals.harness import lane_replay
 from evals.harness.bundle import case_file, reports_dir, write_reports
 from evals.harness.descendants import lane_must_finds
@@ -37,6 +28,15 @@ from evals.harness.reference import DEFAULT_CORPUS
 from evals.harness.run_record import loaded
 from evals.harness.scorer import score_case
 from evals.reference_facts import load_facts
+from katra.frameworks import LANE_CLOSING_DOC, PACKAGES
+from katra.frameworks.stride.record import (
+    ArchivedThreatProposals,
+    DraftThreat,
+)
+from katra.graph import FrameworkNodes
+from katra.markdown_loader import MarkdownLoader
+from katra.prompts import lane_closing
+from katra.system_model import ModelIndex
 from tests import test_evals_run_grounds as grounds
 from tests.eval_factories import write_emission_sweep
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)

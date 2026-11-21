@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.certification import (
+from katra.certification import (
     MANIFEST_VERSION,
     CertificationError,
     CertificationGate,
@@ -17,8 +17,8 @@ from analysis_service.certification import (
     fingerprints_of,
     load_manifest,
 )
-from analysis_service.model_tiers import TierName
-from analysis_service.report import NodeRun
+from katra.model_tiers import TierName
+from katra.report import NodeRun
 from tests.factories import blessed_manifest
 
 FP_A = "a" * 64
@@ -260,7 +260,7 @@ class TestGatePolicy:
 
 
 def test_a_run_no_gate_checked_adds_nothing_to_a_combined_verdict():
-    from analysis_service.certification import CertifyResult, combined
+    from katra.certification import CertifyResult, combined
 
     verdict = CertifyResult(certified=False, unexercised=("strong",))
     assert combined(None, verdict) == verdict

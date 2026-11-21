@@ -21,8 +21,8 @@ from typing import ClassVar
 
 import pytest
 
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.model_gate import (
+from katra.conformance import REFERENCE_MODELS
+from katra.model_gate import (
     ModelGateError,
     assert_kwarg_supported,
     check_supported,
@@ -31,7 +31,7 @@ from analysis_service.model_gate import (
     output_ceiling,
     takes_thinking,
 )
-from analysis_service.vendors import VENDORS, vendor_for
+from katra.vendors import VENDORS, vendor_for
 
 GEMINI = "gemini-2.5-pro"
 VERTEX_CLAUDE = "claude-sonnet-4-6"
@@ -84,7 +84,7 @@ class TestValueConstraintsAreCaught:
         """Only ``UnsupportedParamsError`` is a refusal. Any other error
         propagates, so the conformance matrix never reads a fault as
         ``UNSUPPORTED`` and its sweep test sees a new type."""
-        from analysis_service.model_gate import _litellm
+        from katra.model_gate import _litellm
 
         def broken(**params):
             raise RuntimeError("internal litellm fault")
@@ -296,7 +296,7 @@ class TestAModelThatRefusesTheParameterAtAll:
         from litellm import model_cost
         from litellm.exceptions import UnsupportedParamsError
 
-        from analysis_service.vendors import VENDORS
+        from katra.vendors import VENDORS
 
         prefixes = {v.litellm_provider: v for v in VENDORS.values()}
         pairs = [
@@ -326,9 +326,9 @@ class TestAModelThatRefusesTheParameterAtAll:
         these models gets a plain refusal, not ``UnsupportedParamsError`` out
         of the library. Under ``native`` the answer is a refusal too.
         """
-        from analysis_service.ladder import rungs_for
-        from analysis_service.model_gate import ModelGateError
-        from analysis_service.sampling import TierSampling
+        from katra.ladder import rungs_for
+        from katra.model_gate import ModelGateError
+        from katra.sampling import TierSampling
 
         with pytest.raises(ModelGateError, match="cannot constrain"):
             rungs_for(
@@ -340,8 +340,8 @@ class TestAModelThatRefusesTheParameterAtAll:
 
     def test_auto_states_the_schema_in_the_request_instead(self):
         """ADR 0058: the lowest rung takes every model, so ``auto`` builds."""
-        from analysis_service.ladder import rungs_for
-        from analysis_service.sampling import TierSampling
+        from katra.ladder import rungs_for
+        from katra.sampling import TierSampling
 
         ladder = rungs_for(
             vendor_for("bedrock"),
@@ -364,12 +364,12 @@ class TestAModelThatRefusesTheParameterAtAll:
 
         The matrix may print what the map says. The gate may not act on it.
         """
-        from analysis_service.ladder import rungs_for
-        from analysis_service.model_gate import (
+        from katra.ladder import rungs_for
+        from katra.model_gate import (
             library_sends_no_native_schema,
             native_structured_output,
         )
-        from analysis_service.sampling import TierSampling
+        from katra.sampling import TierSampling
 
         vendor, model = vendor_for("openai"), "gpt-5.5-pro"
 
@@ -382,7 +382,7 @@ class TestAModelThatRefusesTheParameterAtAll:
         assert rungs_for(vendor, model, native, "tiers.strong") == ("native",)
 
     def test_the_matrix_renders_a_cell_rather_than_failing(self):
-        from analysis_service.conformance import ProviderCapability, profile
+        from katra.conformance import ProviderCapability, profile
 
         entry = profile(vendor_for("bedrock"), self.REFUSING)
         assert entry.structured_output is ProviderCapability.UNSUPPORTED
@@ -399,8 +399,8 @@ class TestAModelThatRefusesTheParameterAtAll:
         """
         from litellm import model_cost
 
-        from analysis_service.conformance import profile
-        from analysis_service.vendors import VENDORS
+        from katra.conformance import profile
+        from katra.vendors import VENDORS
 
         by_prefix = {vendor.prefix: vendor for vendor in VENDORS.values()}
         probed = 0
@@ -449,7 +449,7 @@ class TestOutputCeiling:
         assert output_ceiling(vendor_for("openai"), "gpt-6-unreleased") is None
 
     def test_an_unmapped_model_raises_the_type_model_info_catches(self):
-        from analysis_service.model_gate import _litellm
+        from katra.model_gate import _litellm
 
         with pytest.raises(_litellm.exceptions.ModelNotMappedError):
             _litellm.get_model_info(
@@ -459,7 +459,7 @@ class TestOutputCeiling:
     def test_an_entry_guessed_from_a_family_rule_is_unmapped(self):
         # The second shape: litellm answers from a rule instead of raising, so
         # without the key check the conformance matrix calls the model known.
-        from analysis_service.model_gate import _litellm, model_info
+        from katra.model_gate import _litellm, model_info
 
         guessed = _litellm.get_model_info(
             model="gpt-6-unreleased", custom_llm_provider="openai"
@@ -472,7 +472,7 @@ class TestOutputCeiling:
         # The third shape: litellm turns any internal error into a bare
         # Exception with the not-mapped message, which model_info must not
         # read as an unmapped model.
-        from analysis_service.model_gate import _litellm, model_info
+        from katra.model_gate import _litellm, model_info
 
         def broken(*args, **kwargs):
             raise RuntimeError("corrupt map entry")
@@ -509,7 +509,7 @@ class TestRetryLayering:
 
         from litellm.llms.openai.openai import OpenAIChatCompletion
 
-        from analysis_service.model_gate import _litellm
+        from katra.model_gate import _litellm
 
         built: list[int] = []
 
@@ -567,7 +567,7 @@ class TestHermeticImport:
         # the ordering held for this process rather than merely that the
         # variable is set now.
         assert "litellm" in sys.modules
-        assert "analysis_service.model_gate" in sys.modules
+        assert "katra.model_gate" in sys.modules
 
 
 class TestErrorsPointAtTheKnob:
@@ -601,7 +601,7 @@ def test_every_documented_vendor_passes_the_gate_on_shipped_sampling(
     """
     from pathlib import Path
 
-    from analysis_service.sampling import load_sampling
+    from katra.sampling import load_sampling
     from tests.factories import tiers_for
 
     root = Path(__file__).resolve().parents[1]
@@ -635,7 +635,7 @@ def test_every_local_only_switch_litellm_defines_is_set():
     """
     import litellm
 
-    from analysis_service.model_gate import LITELLM_LOCAL_SWITCHES
+    from katra.model_gate import LITELLM_LOCAL_SWITCHES
 
     root = Path(litellm.__file__).parent
     defined = set()
@@ -737,7 +737,7 @@ class TestTheBedrockFormRuleAgainstThePinnedMap:
         )
 
     def test_the_family_rule_catches_every_claude_and_nothing_else(self):
-        from analysis_service.vendors import _BEDROCK_CLAUDE_RULE
+        from katra.vendors import _BEDROCK_CLAUDE_RULE
 
         bedrock = vendor_for("bedrock")
         for key in self.keys():
@@ -752,7 +752,7 @@ class TestTheBedrockFormRuleAgainstThePinnedMap:
         parse could not read would silence the temperature floor on exactly the
         models that floor exists for.
         """
-        from analysis_service.vendors import _BEDROCK_CLAUDE_RULE, claude_generation
+        from katra.vendors import _BEDROCK_CLAUDE_RULE, claude_generation
 
         bedrock = vendor_for("bedrock")
         unread = []
@@ -771,7 +771,7 @@ class TestTheBedrockFormRuleAgainstThePinnedMap:
         )
 
     def test_no_non_claude_key_parses_as_a_claude(self):
-        from analysis_service.vendors import claude_generation
+        from katra.vendors import claude_generation
 
         false_positives = [
             key

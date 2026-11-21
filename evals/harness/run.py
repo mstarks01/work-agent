@@ -46,22 +46,6 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, TypeVar
 
-from analysis_service.actions import VerbError
-from analysis_service.assertions import CatalogProposal
-from analysis_service.certification import CertificationError, CertifyResult, certify
-from analysis_service.claim_identity import report_rows
-from analysis_service.claims import (
-    FrameworkName,
-)
-from analysis_service.critic import CriticOutputError
-from analysis_service.deployment import Deployment
-from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import Pipeline
-from analysis_service.identity import build_identity
-from analysis_service.model_tiers import ModelTierConfig, TierSelection
-from analysis_service.questions import question_fallback
-from analysis_service.report import NodeRun, TokenUsage
-from analysis_service.retry import RefusedCompletionError, UnfinishedCompletionError
 from evals.harness import (
     assembly,
     assertion_use,
@@ -202,6 +186,22 @@ from evals.harness.withheld import (
     withheld_case,
 )
 from evals.reference_facts import load_facts, signed_proposal
+from katra.actions import VerbError
+from katra.assertions import CatalogProposal
+from katra.certification import CertificationError, CertifyResult, certify
+from katra.claim_identity import report_rows
+from katra.claims import (
+    FrameworkName,
+)
+from katra.critic import CriticOutputError
+from katra.deployment import Deployment
+from katra.frameworks import PACKAGES
+from katra.graph import Pipeline
+from katra.identity import build_identity
+from katra.model_tiers import ModelTierConfig, TierSelection
+from katra.questions import question_fallback
+from katra.report import NodeRun, TokenUsage
+from katra.retry import RefusedCompletionError, UnfinishedCompletionError
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CORPUS_DIR = EVALS_ROOT / "corpus"
@@ -269,7 +269,7 @@ class _CaseOutcome:
     issues: tuple[Any, ...] = ()
     error: Exception | None = None
     #: What the session held when a graph node raised, from ``state`` on
-    #: :class:`~analysis_service.execution.GraphFailed`. Empty where the
+    #: :class:`~katra.execution.GraphFailed`. Empty where the
     #: case finished or failed outside a graph.
     state: Mapping[str, Any] = field(default_factory=dict)
 
@@ -1308,7 +1308,7 @@ def _print_certification(result: CertifyResult) -> None:
     """Surface the gate verdict, always — and never claim more than it checked.
 
     ``certified`` is narrow by design (see
-    :mod:`analysis_service.certification`): it means no *observed* fingerprint
+    :mod:`katra.certification`): it means no *observed* fingerprint
     went unblessed, which is vacuously true of a sweep that observed none.
     Printed alone, it would announce that every fingerprint was blessed for a
     run that certified nothing, so completeness is reported first and the

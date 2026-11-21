@@ -2,7 +2,7 @@
 
 This is a separate number from finding recall, and it answers a much narrower
 question. For each reference claim the corpus says a working tool must report,
-it asks whether :mod:`analysis_service.candidates` fired a rule in that claim's
+it asks whether :mod:`katra.candidates` fired a rule in that claim's
 lane, on at least one of the elements it is about. It says nothing about whether
 the agent then found the claim. That is finding recall, and the harness scores
 it elsewhere over produced reports.
@@ -52,16 +52,16 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
-from analysis_service.candidates import CandidateSet, generate_candidates
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import package_for
-from analysis_service.graph import FrameworkNodes, LaneInputs, framework_lane_inputs
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.rates import ratio, rounded_figure
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceClaim
+from katra.candidates import CandidateSet, generate_candidates
+from katra.claims import FrameworkName
+from katra.frameworks import package_for
+from katra.graph import FrameworkNodes, LaneInputs, framework_lane_inputs
+from katra.markdown_loader import MarkdownLoader
+from katra.report import Report
+from katra.system_model import SystemModel
 
 __all__ = [
     "CaseTriggerRecall",
@@ -203,7 +203,7 @@ def rebuilt_lane_inputs(
 
     The model and the catalog are the run's own, from ``report``, and
     ``options`` are the case's. The inputs come from
-    :func:`~analysis_service.graph.framework_lane_inputs`, the reader of what a
+    :func:`~katra.graph.framework_lane_inputs`, the reader of what a
     lane is given. A report with no assertion record passes no catalog, as a
     job with no assertion pass does.
     """

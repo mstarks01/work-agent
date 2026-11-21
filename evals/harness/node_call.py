@@ -5,7 +5,7 @@ to reach the provider in the shape the graph gives it, or the replay measures
 a different request: the node's own tier adapter, the tier's sampling, the
 node's output schema as ``response_schema``, and the instruction as the system
 instruction. ADK builds all four from the ``LlmAgent``; this builds the same
-four from the deployment, through :meth:`~analysis_service.deployment.Deployment.tier_of`,
+four from the deployment, through :meth:`~katra.deployment.Deployment.tier_of`,
 which is the one reader of the walk from a graph node to its tier.
 
 The user turn is the caller's, because it differs by node: a lane receives
@@ -22,9 +22,9 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.charges import CHARGE_METADATA_KEY
-from analysis_service.deployment import Deployment
+from katra.binding import build_tier_adapters
+from katra.charges import CHARGE_METADATA_KEY
+from katra.deployment import Deployment
 
 #: One call: the instruction and the user turn in, the model's raw text out.
 NodeCall = Callable[[str, types.Content], Awaitable[str]]
@@ -41,7 +41,7 @@ def node_call(
 
     ``spent`` receives the charge the provider reported for each call, or
     ``None`` where it reported none, read off the stamp
-    :mod:`analysis_service.charges` puts on the response. A replay is a paid
+    :mod:`katra.charges` puts on the response. A replay is a paid
     call, and its caller states what it spent rather than an estimate.
     ``seen`` receives, for each call, the answer text, why the provider
     stopped and the tokens it counted, so a replay that parses to nothing can

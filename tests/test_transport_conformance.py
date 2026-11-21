@@ -7,7 +7,7 @@ one ``build_tier_adapters`` builds, the sampling is the one
 ``config/sampling.toml`` holds, and the schema is a node's own.
 
 **Why the wire and not the kwargs.** ``tests/test_translator_seam.py`` holds
-what crosses into the translator, and ``analysis_service.model_gate`` holds what
+what crosses into the translator, and ``katra.model_gate`` holds what
 LiteLLM says it would map. Neither says what the provider receives. The
 capability lookup and the mapped params can disagree for a model, and only the
 request settles which is right (#259). A claim about the wire that nothing
@@ -37,12 +37,12 @@ import pytest
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import TierSampling, load_sampling
-from analysis_service.system_model import SystemModel
-from analysis_service.vendors import ProviderAuthError, VendorName, vendor_for
+from katra.binding import build_tier_adapters
+from katra.conformance import REFERENCE_MODELS
+from katra.resilience import load_resilience
+from katra.sampling import TierSampling, load_sampling
+from katra.system_model import SystemModel
+from katra.vendors import ProviderAuthError, VendorName, vendor_for
 from tests.factories import (
     AMBIENT_KEY_VARS,
     PROJECT_ROOT,
@@ -145,7 +145,7 @@ def _adapter(wire: _Wire, base: TierSampling | None = None):
         tiers_for(VENDOR),
         sampling,
         load_resilience(CONFIG / "resilience.toml", env={}),
-        env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", FAKE_KEY),
+        env=secret_env("KATRA_OPENAI_API_KEY_FILE", FAKE_KEY),
     )
     adapter = adapters["base"]
     inject_transport(adapter, VENDOR, wire.handle)

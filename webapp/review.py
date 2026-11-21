@@ -75,9 +75,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from analysis_service.claim_identity import report_rows
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
 from evals import verify_corpus
 from evals.harness import baseline, bundle
 from evals.harness import queue as review_queue
@@ -102,6 +99,9 @@ from evals.harness.reference import (
     flows_by_case,
     load_corpus,
 )
+from katra.claim_identity import report_rows
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
 from webapp.page import (
     LOOPBACK_HOSTS,
     Grants,

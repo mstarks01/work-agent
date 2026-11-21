@@ -11,7 +11,7 @@ corruption is applied to it — a fact flipped, a control copied onto another
 subject, a flow relabelled, a span removed — and the probe declares what the two
 instruments must then say:
 
-* **the gate** (:meth:`~analysis_service.assertions.AssertionRecord.over`,
+* **the gate** (:meth:`~katra.assertions.AssertionRecord.over`,
   the one reader of "does this catalog pass") refuses the row, by code, in
   any of its rounds; or
 * **the endpoint** (:attr:`~evals.harness.replay.AssertionReplay.recovered`,
@@ -37,24 +37,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Literal, get_args
 
-from analysis_service.assertions import (
-    Assertion,
-    AssertionCatalog,
-    AssertionRecord,
-    Subject,
-    assertion_id,
-    uncontradicted,
-)
-from analysis_service.assertions import without as retracted
-from analysis_service.evidence import lead_topics, prepared_view
-from analysis_service.execution import source_texts
-from analysis_service.system_model import (
-    SystemModel,
-    flow_id_version,
-    flow_label,
-    make_flow_id,
-    parse_flow_id,
-)
 from evals.harness.alignment import align
 from evals.harness.modes import AssertionResult
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
@@ -65,6 +47,24 @@ from evals.harness.replay import (
     required_rows,
     signed_reference,
     unsigned_reason,
+)
+from katra.assertions import (
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    Subject,
+    assertion_id,
+    uncontradicted,
+)
+from katra.assertions import without as retracted
+from katra.evidence import lead_topics, prepared_view
+from katra.execution import source_texts
+from katra.system_model import (
+    SystemModel,
+    flow_id_version,
+    flow_label,
+    make_flow_id,
+    parse_flow_id,
 )
 
 #: Every line of #926's "Falsification and positive-control fixtures" list,
@@ -267,7 +267,7 @@ def _find(
     """The one signed row a probe names, or a refusal saying what it asked for.
 
     ``flow`` matches a **Data Flow** subject by its label, read with
-    :func:`~analysis_service.system_model.flow_label` rather than by splitting
+    :func:`~katra.system_model.flow_label` rather than by splitting
     the ID.
     """
     for entry in reference.entries:
@@ -287,7 +287,7 @@ def _find(
 def _label(subject: str) -> str:
     """One flow subject's label, or ``""`` for a subject that is not a flow.
 
-    :func:`~analysis_service.system_model.flow_label` is the one reader of what
+    :func:`~katra.system_model.flow_label` is the one reader of what
     a flow calls itself, so this asks it rather than splitting the ID.
     """
     try:

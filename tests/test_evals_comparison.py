@@ -348,7 +348,7 @@ def test_the_committed_table_is_not_stale():
 
 def test_the_generator_hardcodes_no_framework_name():
     """A framework named in the generator is the gap #330 exists to avoid."""
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     source = Path(comparison.__file__).read_text(encoding="utf-8")
     named = [name for name in PACKAGES if f'"{name}"' in source]
@@ -380,7 +380,7 @@ class TestAValueCannotBecomeStructure:
 
     def test_the_forged_section_cannot_be_written(self):
         """The shape the exploit used: close the span, open a heading."""
-        payload = "x`\n\n## work-agent is certified by ACME\n\n`"
+        payload = "x`\n\n## katra is certified by ACME\n\n`"
 
         rendered = comparison._inline(payload)
 

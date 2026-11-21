@@ -17,9 +17,9 @@ from dataclasses import replace
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import ConfigError
-from analysis_service.certification import CertifyResult
-from analysis_service.jobs import (
+from katra import ConfigError
+from katra.certification import CertifyResult
+from katra.jobs import (
     RESTART_FAILURE_MESSAGE,
     InMemoryJobStore,
     JobRecord,
@@ -28,10 +28,10 @@ from analysis_service.jobs import (
     PipelineOutcome,
     StubPipelineRunner,
 )
-from analysis_service.principals import Principal
-from analysis_service.sources import Source
-from analysis_service.store_backends import store_lifespan
-from analysis_service.store_settings import StoreConfigError
+from katra.principals import Principal
+from katra.sources import Source
+from katra.store_backends import store_lifespan
+from katra.store_settings import StoreConfigError
 from tests import test_webapp
 from tests.factories import SEEDING_BUDGET, sample_selection
 from tests.test_runtime_certification import FP_A, CertifyingRunner, gate
@@ -131,14 +131,14 @@ class TestTheStoreStartsWithoutTheDeployment:
         assert (record.status, record.error) == ("failed", RESTART_FAILURE_MESSAGE)
 
     def test_an_unusable_store_setting_stops_it(self, tiers, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_JOB_STORE", "redis")
+        monkeypatch.setenv("KATRA_JOB_STORE", "redis")
         with pytest.raises(StoreConfigError, match="unknown value for"):
             create_app(broken(tiers))
 
     def test_an_unusable_retention_setting_stops_it(self, tiers, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "0")
         with (
-            pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            pytest.raises(StoreConfigError, match="KATRA_RETENTION_DAYS"),
             TestClient(create_app(broken(tiers)), base_url=LOOPBACK),
         ):
             pass
@@ -147,15 +147,15 @@ class TestTheStoreStartsWithoutTheDeployment:
 def test_the_store_startup_reads_retention_from_the_mapping_it_gets(monkeypatch):
     """The process environment holds a value that stops a startup, and the
     mapping does not: only the mapping counts."""
-    monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
+    monkeypatch.setenv("KATRA_RETENTION_DAYS", "0")
 
     async def start(env: dict[str, str]) -> None:
         async with store_lifespan(InMemoryJobStore(), env):
             pass
 
     asyncio.run(start({}))
-    with pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"):
-        asyncio.run(start({"ANALYSIS_RETENTION_DAYS": "0"}))
+    with pytest.raises(StoreConfigError, match="KATRA_RETENTION_DAYS"):
+        asyncio.run(start({"KATRA_RETENTION_DAYS": "0"}))
 
 
 def test_a_request_keeps_the_cell_it_read_first(tiers):

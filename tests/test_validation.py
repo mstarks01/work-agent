@@ -4,19 +4,19 @@ from typing import ClassVar
 
 import pytest
 
-from analysis_service.assertions import _ELEMENT_TYPES
-from analysis_service.early_questions import element_type
-from analysis_service.evidence import _element_gloss
-from analysis_service.graph import render_model
-from analysis_service.links import components
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import (
+from katra.assertions import _ELEMENT_TYPES
+from katra.early_questions import element_type
+from katra.evidence import _element_gloss
+from katra.graph import render_model
+from katra.links import components
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import (
     UNKNOWN,
     ExcerptRepair,
     SystemModel,
     make_flow_id,
 )
-from analysis_service.validation import (
+from katra.validation import (
     CITATION_FIELDS,
     MAX_ELEMENTS,
     parse_and_validate,
@@ -171,7 +171,7 @@ class TestAssumptionsRecordAnInference:
 
     def test_the_assumable_registry_is_the_schema_plus_assets(self):
         """The one exception stays the only one, checked against the schema."""
-        from analysis_service.system_model import (
+        from katra.system_model import (
             assumable_attributes,
             attribute_names,
         )
@@ -193,9 +193,9 @@ class TestAssumptionsRecordAnInference:
         a ground's attribute is optional and an assumption's names the whole
         point of the entry. ``assets`` is the mirror of the exception above.
         """
-        from analysis_service.claims import Ground, UnknownRef
-        from analysis_service.compact import CompactSystemModel
-        from analysis_service.system_model import (
+        from katra.claims import Ground, UnknownRef
+        from katra.compact import CompactSystemModel
+        from katra.system_model import (
             SystemModel,
             all_attribute_names,
             assumable_attribute_names,
@@ -217,8 +217,8 @@ class TestAssumptionsRecordAnInference:
 
     def test_every_assets_field_states_the_tag_set(self):
         """Each element shape the provider sees lists ``CORE_ASSET_TAGS``."""
-        from analysis_service.compact import CompactSystemModel
-        from analysis_service.system_model import CORE_ASSET_TAGS, SystemModel
+        from katra.compact import CompactSystemModel
+        from katra.system_model import CORE_ASSET_TAGS, SystemModel
 
         for model in (SystemModel, CompactSystemModel):
             shapes = model.model_json_schema()["$defs"].values()
@@ -230,7 +230,7 @@ class TestAssumptionsRecordAnInference:
 
     def test_the_assumable_union_covers_every_element_type(self):
         """The table against its registry: no type carries a name outside it."""
-        from analysis_service.system_model import (
+        from katra.system_model import (
             assumable_attribute_names,
             assumable_attributes,
         )
@@ -549,7 +549,7 @@ class TestCitationsResolve:
 class TestExcerptsVerify:
     """An excerpt is checked against the source it cites, not just its label.
 
-    The same question :mod:`analysis_service.grounding` answers for a threat's
+    The same question :mod:`katra.grounding` answers for a threat's
     quote ground, asked of the citation that ties an element to the words it
     came from. Failing closed is affordable here and nowhere else: extraction
     has the ``repair`` pass, so the transcriber is shown its own fabrication

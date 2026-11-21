@@ -25,8 +25,11 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.assertions import (
+from evals.harness import falsify
+from evals.harness.reference import load_corpus
+from evals.harness.replay import signed_reference
+from katra import graph
+from katra.assertions import (
     ABSENT,
     UNKNOWN,
     AssertionCatalog,
@@ -34,12 +37,9 @@ from analysis_service.assertions import (
     assertion_id,
     projected_attribute,
 )
-from analysis_service.frameworks import PACKAGES
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.system_model import SystemModel
-from evals.harness import falsify
-from evals.harness.reference import load_corpus
-from evals.harness.replay import signed_reference
+from katra.frameworks import PACKAGES
+from katra.markdown_loader import MarkdownLoader
+from katra.system_model import SystemModel
 from tests.factories import repo_package_loaders
 from tests.test_graph import ASVS_OPTIONS, PROJECT_ROOT, FakeContext
 

@@ -23,7 +23,7 @@ the service that produced it — had no way to say who made it.
 the findings are correct, and it does not establish that the run was certified.**
 
 Certification is a separate, deployment-local verdict about execution identity
-(`analysis_service.certification`), and a signed uncertified report is an
+(`katra.certification`), and a signed uncertified report is an
 ordinary artifact. The two are easy to conflate because both are green ticks
 about the same file.
 
@@ -88,7 +88,7 @@ those are different incidents.
 
 ### The verifier reads JSON, never a model
 
-`analysis_service.verify_report` loads the report as a plain mapping. It never
+`katra.verify_report` loads the report as a plain mapping. It never
 imports the report schema, so a report from a build whose schema has since moved
 still verifies, and a verifier written in another language can follow the same
 rules from the docstring alone. That is most of what "operates independently of

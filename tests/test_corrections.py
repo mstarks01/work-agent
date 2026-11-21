@@ -6,13 +6,13 @@ import asyncio
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.claims import Ground, UnknownRef
-from analysis_service.fact_answers import FactAnswer, fact_line
-from analysis_service.grounding import verify_quote
-from analysis_service.jobs import Checkpoint, JobRecord, Resumption
-from analysis_service.report_conditions import corrected_findings
-from analysis_service.sources import ANSWERS_LABEL, Source
+from katra.answer_sets import AnswerSet
+from katra.claims import Ground, UnknownRef
+from katra.fact_answers import FactAnswer, fact_line
+from katra.grounding import verify_quote
+from katra.jobs import Checkpoint, JobRecord, Resumption
+from katra.report_conditions import corrected_findings
+from katra.sources import ANSWERS_LABEL, Source
 from tests.factories import (
     DESCRIPTION_TEXT,
     asking_threat,

@@ -66,16 +66,15 @@ from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any, NamedTuple, get_args, get_type_hints
 
-from analysis_service.model_tiers import TierName
-from analysis_service.parsing import non_negative, strings
-from analysis_service.sources import text_digest
-from analysis_service.vendors import vendor_for_route
+from katra.model_tiers import TierName
+from katra.parsing import non_negative, strings
+from katra.sources import text_digest
+from katra.vendors import vendor_for_route
 
 # The tier whose model names a baseline. Spelled, not indexed: a position in
 # the tier vocabulary is not the analysis tier, so the tier is named. An index
 # would name every baseline ``<commit>-unknown-<hash>`` once a tier is appended.
 _NAMING_TIER: TierName = "strong"
-from analysis_service.report import TokenUsage
 from evals.harness.archive import archive_bytes
 from evals.harness.artifact import (
     EvalArtifact,
@@ -87,6 +86,7 @@ from evals.harness.bundle import FINISHED_KINDS, finished_file, reports_dir
 from evals.harness.history import current_commit
 from evals.harness.modes import EvalRunError
 from evals.harness.prices import UnitPrices, price_calls
+from katra.report import TokenUsage
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 BASELINES_DIR = EVALS_ROOT / "baselines"
@@ -422,7 +422,7 @@ def money(raw: Any) -> float | None:
     The shape is the one :meth:`SweepCost.to_json` writes: a JSON number. A
     string is refused even when `float()` would read it -- "1_000" and
     non-ASCII digits both would -- and so is a boolean, which is an `int` to
-    `float()`. :func:`~analysis_service.parsing.non_negative` decides all of
+    `float()`. :func:`~katra.parsing.non_negative` decides all of
     it, so a ledger's dollars and a manifest's read one rule.
     """
     return float(raw) if non_negative(raw) else None

@@ -7,7 +7,7 @@ for each shape a catalog can hold about one attribute, and asks every reader
 the same question: the report's model, its catalog, and the view a later
 reader such as the post-review reassessment prepares from them.
 
-**The table is keyed by** :data:`~analysis_service.assertions.PROJECTION_EFFECT`.
+**The table is keyed by** :data:`~katra.assertions.PROJECTION_EFFECT`.
 A projection reason added tomorrow has no row here, and the completeness test
 fails until one is written.
 """
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     PROJECTION_EFFECT,
     UNKNOWN,
@@ -31,13 +31,13 @@ from analysis_service.assertions import (
     projected_attribute,
     support_span,
 )
-from analysis_service.early_questions import early_questions
-from analysis_service.evidence import prepared_view
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.jobs import Checkpoint
-from analysis_service.links import check_answers
-from analysis_service.open_facts import open_attribute
-from analysis_service.sources import Source
+from katra.early_questions import early_questions
+from katra.evidence import prepared_view
+from katra.fact_answers import FactAnswer
+from katra.jobs import Checkpoint
+from katra.links import check_answers
+from katra.open_facts import open_attribute
+from katra.sources import Source
 from tests.factories import DESCRIPTION_TEXT, valid_model
 from tests.test_early_questions import prior_of
 from tests.test_questions import resume

@@ -35,16 +35,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from analysis_service.analysis import (
-    crossings_by_flow,
-    inbound_flows,
-    internet_exposed_elements,
-    is_unverified,
-    outbound_flows,
-)
-from analysis_service.candidates import Candidate, CandidateSet
-from analysis_service.claims import FrameworkName
-from analysis_service.system_model import SystemModel
 from evals.harness.bundle import read_report
 from evals.harness.reference import (
     GoldenCase,
@@ -53,6 +43,16 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.triggers import _hit, lead_rules
+from katra.analysis import (
+    crossings_by_flow,
+    inbound_flows,
+    internet_exposed_elements,
+    is_unverified,
+    outbound_flows,
+)
+from katra.candidates import Candidate, CandidateSet
+from katra.claims import FrameworkName
+from katra.system_model import SystemModel
 
 FRAMEWORK: FrameworkName = "stride"
 

@@ -7,8 +7,6 @@ from typing import Any
 
 import pytest
 
-from analysis_service.answer_state import EARLY_RULES
-from analysis_service.capabilities import CAPABILITIES, lineage
 from evals.harness.rule_applicability import (
     FIXTURES_DIR,
     Fixture,
@@ -17,6 +15,8 @@ from evals.harness.rule_applicability import (
     score_fixture,
     simulate_questions,
 )
+from katra.answer_state import EARLY_RULES
+from katra.capabilities import CAPABILITIES, lineage
 
 FIXTURES = load_fixtures()
 
@@ -63,7 +63,7 @@ def test_the_rule_meets_each_fixture(fixture):
 
 
 def test_a_false_exclusion_is_counted():
-    from analysis_service.system_model import CapabilityStatement
+    from katra.system_model import CapabilityStatement
 
     fixture = _fixture(
         statements=(

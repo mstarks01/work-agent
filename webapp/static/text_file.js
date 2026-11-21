@@ -8,7 +8,7 @@
 // then run cheapest first: the size before a byte is read, then a strict
 // UTF-8 decode, then no control character other than a tab or a line break,
 // then some text. The server holds the same control class in
-// analysis_service.owner_files.CONTROL_CHARACTER, and it renders the refusal
+// katra.owner_files.CONTROL_CHARACTER, and it renders the refusal
 // of each of its own checks into the page.
 const textFile = (() => {
   const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;

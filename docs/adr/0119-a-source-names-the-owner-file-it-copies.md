@@ -81,6 +81,6 @@ File.
 A delete or a new upload of an Owner File changes no job, no Resumed Job and
 no Amendment. A Submission that names a deleted Owner File is refused. `/v1`
 can get `owner_files` later as a thin route, because the reader lives in
-`analysis_service`. An analysis that opens again shows the name that each
+`katra`. An analysis that opens again shows the name that each
 Owner File had when its job ran, which can differ from the current name in
 Files.

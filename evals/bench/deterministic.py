@@ -14,7 +14,7 @@ deliberate, and it is what makes a deterministic benchmark repeatable: an LLM's
 latency would swamp every figure here and cost money to collect.
 
 Every timing is :func:`time.thread_time`, which is the clock the bounds in
-:mod:`analysis_service.grounding` are written against — node bodies run on a
+:mod:`katra.grounding` are written against — node bodies run on a
 worker pool, and wall-clock on one of eight threads measures the other seven.
 
 **What the numbers say, so nobody optimises this layer again without reading
@@ -61,27 +61,27 @@ from typing import Any, Literal, get_args
 
 from google.adk.workflow import FunctionNode
 
-from analysis_service import evidence, fan_in, graph
-from analysis_service.claims import Ground
-from analysis_service.compact import (
+from katra import evidence, fan_in, graph
+from katra.claims import Ground
+from katra.compact import (
     OMITTABLE_FIELDS,
     REF_TAGS,
     REFERENCE_FIELDS,
 )
-from analysis_service.execution import GraphExecutor
-from analysis_service.fan_in import (
+from katra.execution import GraphExecutor
+from katra.fan_in import (
     _bound_element_references,
     _scope_grounds,
     _verify_quotes,
 )
-from analysis_service.frameworks import (
+from katra.frameworks import (
     PACKAGES,
     FrameworkName,
     FrameworkPackage,
 )
-from analysis_service.grounding import PreparedSource, prepare_source
-from analysis_service.sources import Source
-from analysis_service.system_model import (
+from katra.grounding import PreparedSource, prepare_source
+from katra.sources import Source
+from katra.system_model import (
     ELEMENT_GROUPS,
     UNKNOWN,
     ModelIndex,

@@ -3,7 +3,7 @@
 Run from the repository root with the directory of a sweep's re-scored
 artifacts::
 
-    ANALYSIS_OFFLINE=1 python evals/experiments/QA-2026-10-27-01/price.py <dir>
+    KATRA_OFFLINE=1 python evals/experiments/QA-2026-10-27-01/price.py <dir>
 
 A must-find is newly led when no shipped rule in its lane names one of its
 elements and a trial rule does, which is the overlap
@@ -17,11 +17,11 @@ import sys
 from collections.abc import Iterator
 from pathlib import Path
 
-from analysis_service.assertions import AssertionCatalog
-from analysis_service.candidates import Match, Rule, generate_candidates
-from analysis_service.frameworks import package_for
-from analysis_service.system_model import SystemModel
 from evals.harness.reference import MUST_FIND, development_cases, load_corpus
+from katra.assertions import AssertionCatalog
+from katra.candidates import Match, Rule, generate_candidates
+from katra.frameworks import package_for
+from katra.system_model import SystemModel
 
 
 def _writes(model: SystemModel) -> Iterator[tuple[str, str]]:

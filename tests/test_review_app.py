@@ -14,13 +14,13 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.frameworks import PACKAGES
 from evals.harness import queue as review_queue
 from evals.harness.artifact import load_artifact
 from evals.harness.baseline import configuration_label
 from evals.harness.ledger import Ledger, append, load
 from evals.harness.modes import EvalRunError
 from evals.harness.provenance import ProvenanceError
+from katra.frameworks import PACKAGES
 from tests.eval_factories import (
     SAMPLE_CONTENT,
     SAMPLE_PROSE,
@@ -325,7 +325,7 @@ class TestReadingSeveralSweeps:
         """One sweep's artifact and the report beside it.
 
         Both halves are what the producers produce: the report is a
-        :class:`~analysis_service.report.Report`, dumped, and the artifact is a
+        :class:`~katra.report.Report`, dumped, and the artifact is a
         document :func:`~evals.harness.artifact.load_artifact` accepts. A
         hand-built dict here invents keys, and then the app and the test agree
         with each other about a fact no producer produces.

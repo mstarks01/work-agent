@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
-from analysis_service.grounding import normalize, verify_normalized
-from analysis_service.system_model import ModelIndex
 from evals.critic_review.loading import corpus_model, load_fixtures, source_text
 from evals.critic_review.model import CriticFixture, FixtureKind
 from evals.critic_review.replay import carries_both_answers
+from katra.frameworks import PACKAGES
+from katra.grounding import normalize, verify_normalized
+from katra.system_model import ModelIndex
 
 pytestmark = pytest.mark.lint
 
@@ -91,7 +91,7 @@ def test_every_quoted_ground_is_really_in_the_source(fixture):
     its citation rather than for its reasoning, and stops testing the thing it
     is there to test.
 
-    Read through :func:`~analysis_service.grounding.verify_normalized`, which is
+    Read through :func:`~katra.grounding.verify_normalized`, which is
     what the fan-in runs on a real ground. A second rule here would eventually
     accept a quote the service rejects, and the fixture would be measuring the
     lint rather than the critic — the sources are hard-wrapped prose, so a plain
@@ -343,7 +343,7 @@ def test_the_cli_resolves_its_critic_tier_through_the_one_reader():
 
     Two spellings name this node: the graph's ``critic_<framework>`` and the
     tiers file's ``critic/<framework>``.
-    :meth:`~analysis_service.deployment.Deployment.tier_of` walks the graph
+    :meth:`~katra.deployment.Deployment.tier_of` walks the graph
     spelling to a tier, and asking ``tiers.resolve_tier`` with the
     graph spelling raises ``unknown LLM node`` — so the run dies at its first
     line, after a reader has already paid for nothing.
@@ -351,15 +351,15 @@ def test_the_cli_resolves_its_critic_tier_through_the_one_reader():
     Driven against a real deployment rather than a spelling assertion, so the
     two names are checked against each other and not each against its own idea.
     """
-    from analysis_service.deployment import Deployment
     from evals.critic_review.__main__ import _critic_node
+    from katra.deployment import Deployment
 
     env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
-        "ANALYSIS_MODEL_BASE_MODEL": "openai/gpt-5.6-terra",
-        "ANALYSIS_MODEL_STRONG_VENDOR": "openrouter",
-        "ANALYSIS_MODEL_STRONG_MODEL": "openai/gpt-5.6-terra",
-        "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+        "KATRA_MODEL_BASE_VENDOR": "openrouter",
+        "KATRA_MODEL_BASE_MODEL": "openai/gpt-5.6-terra",
+        "KATRA_MODEL_STRONG_VENDOR": "openrouter",
+        "KATRA_MODEL_STRONG_MODEL": "openai/gpt-5.6-terra",
+        "KATRA_MODEL_CHARGES_OPENROUTER": "direct",
     }
     deployment = Deployment.from_env(env=env)
 

@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import QUESTION_PRIOR, PriorError, load_prior
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.modes import EvalRunError
 from evals.harness.question_prior import command_question_prior, count, samples_of
+from katra.claims import UnknownRef
+from katra.early_questions import QUESTION_PRIOR, PriorError, load_prior
 from tests.factories import valid_model
 from tests.test_evals_descendants import archive  # noqa: F401  (fixture)
 from tests.test_evals_run_grounds import case  # noqa: F401  (fixture)

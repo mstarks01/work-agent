@@ -21,8 +21,9 @@ from google.adk.agents import LlmAgent
 from google.adk.utils import instructions_utils
 from google.adk.workflow import FunctionNode, JoinNode
 
-from analysis_service import critic, graph
-from analysis_service.assertions import (
+from evals.bench.deterministic import as_compact
+from katra import critic, graph
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -33,8 +34,8 @@ from analysis_service.assertions import (
     assertion_id,
     support_span,
 )
-from analysis_service.binding import NodeBinding
-from analysis_service.claims import (
+from katra.binding import NodeBinding
+from katra.claims import (
     CLAIM_BOUND_MARKS,
     AnalysisMarks,
     FrameworkName,
@@ -42,44 +43,43 @@ from analysis_service.claims import (
     UnknownRef,
     UnresolvedMention,
 )
-from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.critic import CriticOutputError
-from analysis_service.critic_round import CriticRound
-from analysis_service.deployment import DEFAULT_PROMPTS_DIR
-from analysis_service.frameworks import (
+from katra.compact import COMPACT_FORMAT, FULL_FORMAT
+from katra.critic import CriticOutputError
+from katra.critic_round import CriticRound
+from katra.deployment import DEFAULT_PROMPTS_DIR
+from katra.frameworks import (
     PACKAGES,
     PRECONDITION_RESULTS,
     PreconditionError,
     package_for,
 )
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import (
     STRIDE_CATEGORIES,
     ThreatProposals,
     ThreatRulings,
 )
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_tiers import LLM_NODES, framework_of_lane_key
-from analysis_service.report import (
+from katra.markdown_loader import MarkdownLoader
+from katra.model_tiers import LLM_NODES, framework_of_lane_key
+from katra.report import (
     InputRef,
     Job,
     NodeRun,
     Report,
 )
-from analysis_service.sampling import load_sampling
-from analysis_service.sources import (
+from katra.sampling import load_sampling
+from katra.sources import (
     DEFAULT_DESCRIPTION_LABEL,
     Source,
     render,
     render_fenced,
 )
-from analysis_service.system_model import (
+from katra.system_model import (
     UNKNOWN,
     EmittedSystemModel,
     normalize_element_ids,
 )
-from analysis_service.validation import ValidationIssue
-from evals.bench.deterministic import as_compact
+from katra.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     DESCRIPTION_TEXT,
@@ -144,7 +144,7 @@ def analyze_state(**proposals_by_category: list) -> dict[str, object]:
     """State as STRIDE's six lane agents, all of which ran, leave it.
 
     Proposals, not drafts: a lane agent's node emits this package's own
-    :class:`~analysis_service.frameworks.stride.record.ThreatProposals`, and
+    :class:`~katra.frameworks.stride.record.ThreatProposals`, and
     ``merge_drafts`` resolves each proposal's references into the grounds a
     draft carries. A test seeding drafts here would be asserting against a shape
     no agent can produce.
@@ -1165,7 +1165,7 @@ def test_no_node_writes_session_state_directly():
     context whose ``state`` is a plain dict, so ``ctx.state[key] = value`` stays
     available and silently bypasses both family checks.
     """
-    source = (PROJECT_ROOT / "src" / "analysis_service" / "graph.py").read_text()
+    source = (PROJECT_ROOT / "src" / "katra" / "graph.py").read_text()
     direct = [
         line.strip()
         for line in source.splitlines()
@@ -1250,11 +1250,11 @@ def test_validate_logs_a_stated_control_its_source_never_mentions(caplog):
     The shared fixture is itself an example: its model states ``TLS 1.3`` and
     ``session cookie`` over a description that mentions neither. So this asserts
     the wiring — the node hands the real sources to
-    :func:`~analysis_service.basis.unbased_controls` — and asserts that a job
+    :func:`~katra.basis.unbased_controls` — and asserts that a job
     carrying three flagged controls still routes valid and publishes its model.
     """
     ctx = FakeContext()
-    with caplog.at_level(logging.WARNING, logger="analysis_service.graph"):
+    with caplog.at_level(logging.WARNING, logger="katra.graph"):
         event = graph.validate_extraction(
             ctx,
             KEYS,
@@ -1773,7 +1773,7 @@ def test_merge_parks_every_mark_kind_under_one_key():
     """One key, whatever the fan-in found.
 
     The marks have one owner, one standing and one policy, so they travel as
-    one :class:`~analysis_service.claims.AnalysisMarks`. A sixth kind is a field
+    one :class:`~katra.claims.AnalysisMarks`. A sixth kind is a field
     on that model and no new key here.
 
     The key is the *framework's*, because the fan-in that produced them is: two
@@ -1930,7 +1930,7 @@ def test_merge_drops_and_marks_a_claim_about_a_hallucinated_element():
 
 def test_merge_refuses_a_draft_on_a_unit_the_rules_ruled_out(monkeypatch):
     """#443: a unit ruled out in ``prepare`` takes no claim, whatever the agent read."""
-    from analysis_service.frameworks.stride.record import DraftThreat
+    from katra.frameworks.stride.record import DraftThreat
 
     monkeypatch.setattr(
         DraftThreat, "unit_of", classmethod(lambda cls, draft: draft.id)
@@ -3405,7 +3405,7 @@ def test_a_graph_entered_past_prepare_records_an_empty_context():
 
 
 class TestIntoReport:
-    """The one mapping from an :class:`~analysis_service.graph.Analysis` to a report.
+    """The one mapping from an :class:`~katra.graph.Analysis` to a report.
 
     Both drivers — the service over a job, the eval harness over a corpus case
     — reach the report through this method, so these tests hold the shape
@@ -3799,9 +3799,9 @@ def test_a_fenced_value_and_a_fenced_source_share_one_layout():
 
     ``render_fenced`` and ``render_sources`` both wrap a body in the shortest
     fence it cannot close. Both read the layout from
-    :func:`analysis_service.sources.fenced`, and this holds the two to it.
+    :func:`katra.sources.fenced`, and this holds the two to it.
     """
-    from analysis_service.sources import Source, fenced, render_sources
+    from katra.sources import Source, fenced, render_sources
 
     value = {"notes": "a ``` run inside"}
     assert render_fenced(value) == fenced(render(value))
@@ -3814,8 +3814,8 @@ def test_merge_marks_an_invented_key_before_the_deferral_split():
     """#659: the identity check runs on the whole batch before the deferral
     split, so the mark is written and the deferred map never carries a key the
     catalog does not hold. The scope builder would drop such a key silently."""
-    from analysis_service.frameworks import PACKAGES
-    from analysis_service.frameworks.asvs.record import RequirementProposal
+    from katra.frameworks import PACKAGES
+    from katra.frameworks.asvs.record import RequirementProposal
 
     asvs_nodes = graph.FrameworkNodes("asvs")
     asvs_keys = graph.GraphKeys.of(("asvs",))
@@ -3858,8 +3858,8 @@ def test_merge_drops_a_gap_that_rests_on_absence_alone():
     and nothing else is a Dropped Claim at the fan-in, with the reason, and no
     critic reads it. The same grounds under ``excluded`` are what ADR 0027
     allows, and that draft goes on to the critic."""
-    from analysis_service.frameworks import PACKAGES
-    from analysis_service.frameworks.asvs.record import RequirementProposal
+    from katra.frameworks import PACKAGES
+    from katra.frameworks.asvs.record import RequirementProposal
 
     asvs_nodes = graph.FrameworkNodes("asvs")
     asvs_keys = graph.GraphKeys.of(("asvs",))
@@ -3928,7 +3928,7 @@ def test_a_mark_on_a_returned_claim_leaves_the_block_with_it(domain_loader):
     """A claim the critic kept against every Control row goes back to the
     deferred set, and each mark on it goes with it (ADR 0126). A mark left on
     the block would name a claim the block does not hold."""
-    from analysis_service.claims import UnverifiedGround
+    from katra.claims import UnverifiedGround
     from tests.test_critic_controls import DB_CONTROL, _applied, _asvs_draft, _db, _row
 
     asvs = graph.FrameworkNodes("asvs")

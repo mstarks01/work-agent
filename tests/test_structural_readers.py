@@ -1,7 +1,7 @@
 """The two readers of a report's structural rules, held against each other.
 
 One rule has two readers here, on purpose.
-:class:`~analysis_service.report.Report` refuses an unsound payload at
+:class:`~katra.report.Report` refuses an unsound payload at
 validation, and :func:`~evals.harness.structural.report_issues` refuses one
 again over a report that already parsed.
 :mod:`evals.harness.structural` states why the second exists: a gate that would
@@ -26,7 +26,7 @@ refuse a sweep of reports the service serves happily, and
 :func:`test_the_gate_is_never_stricter_than_the_service` is what says so.
 
 **Every fault runs against every package.** The rules under test read
-:class:`~analysis_service.claims.Claim` and nothing a package declares, so they
+:class:`~katra.claims.Claim` and nothing a package declares, so they
 are neutral — and a neutral-looking rule that diverged for one package is
 exactly what dropped eleven correctly shaped claims from the first ASVS corpus
 sweep. :data:`BLOCKS` is therefore a table keyed by framework, checked against
@@ -42,8 +42,9 @@ from dataclasses import dataclass, field
 import pytest
 from pydantic import ValidationError
 
-from analysis_service import FrameworkName
-from analysis_service.claims import (
+from evals.harness.structural import report_issues
+from katra import FrameworkName
+from katra.claims import (
     FrameworkAnalysis,
     Ground,
     RepairedQuote,
@@ -53,12 +54,11 @@ from analysis_service.claims import (
     UnverifiedGround,
     Verdict,
 )
-from analysis_service.frameworks import PACKAGES, FrameworkPackage, package_for
-from analysis_service.frameworks.asvs import ASVS
-from analysis_service.frameworks.asvs.record import AsvsAnalysis, RequirementRuling
-from analysis_service.frameworks.stride.record import Threat
-from analysis_service.report import Report
-from evals.harness.structural import report_issues
+from katra.frameworks import PACKAGES, FrameworkPackage, package_for
+from katra.frameworks.asvs import ASVS
+from katra.frameworks.asvs.record import AsvsAnalysis, RequirementRuling
+from katra.frameworks.stride.record import Threat
+from katra.report import Report
 from tests.factories import PROJECT_ROOT, sample_analysis, sample_report
 
 #: Refused by the shipped validator and by the offline gate.
@@ -291,7 +291,7 @@ class Fault:
 #: drift apart without a line here going stale.
 FAULTS: Mapping[str, Fault] = {
     # The shared rules. Each of these is written twice, once in
-    # `analysis_service.claims` and once in `evals.harness.structural`.
+    # `katra.claims` and once in `evals.harness.structural`.
     "a claim names an element the model does not hold": Fault(
         _dangling_reference, BOTH
     ),

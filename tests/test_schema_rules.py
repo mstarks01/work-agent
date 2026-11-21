@@ -22,18 +22,18 @@ import pytest
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.frameworks import schemas_for
-from analysis_service.model_gate import (
+from katra.binding import build_tier_adapters
+from katra.conformance import REFERENCE_MODELS
+from katra.frameworks import schemas_for
+from katra.model_gate import (
     _litellm,
     emulates_structured_output,
     schema_support,
 )
-from analysis_service.provider import InProcessExecutor
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
-from analysis_service.vendors import (
+from katra.provider import InProcessExecutor
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
+from katra.vendors import (
     _CLAUDE_FAMILY,
     VENDOR_NAMES,
     VendorName,
@@ -177,7 +177,7 @@ def _bedrock_schema(response_format: Any) -> dict[str, Any]:
 
 def test_the_bedrock_test_model_takes_both_paths_under_the_pin():
     """Without this, a test of one path could pass on another."""
-    from analysis_service.ladder import _PROBE_TOOL, RUNG_KWARGS, _accepts
+    from katra.ladder import _PROBE_TOOL, RUNG_KWARGS, _accepts
 
     forced_tool = {"tools": [_PROBE_TOOL], **RUNG_KWARGS["forced_tool"]}
     bedrock = vendor_for("bedrock")
@@ -238,7 +238,7 @@ def test_the_anthropic_wire_does_not_change():
 
 @pytest.mark.parametrize("vendor", VENDOR_NAMES)
 def test_every_vendor_names_a_rule_the_executor_can_apply(vendor):
-    from analysis_service.model_gate import SCHEMA_RULES
+    from katra.model_gate import SCHEMA_RULES
 
     entries = vendor_for(vendor).schema_rules
     assert {entry.rule for entry in entries} <= SCHEMA_RULES.keys()

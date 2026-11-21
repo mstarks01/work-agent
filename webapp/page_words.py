@@ -12,8 +12,8 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Literal
 
-from analysis_service.answer_state import EmptyListReason
-from analysis_service.claims import (
+from katra.answer_state import EmptyListReason
+from katra.claims import (
     VERDICT_LABELS,
     GroundKind,
     ScopeState,
@@ -21,12 +21,12 @@ from analysis_service.claims import (
     UnitRuling,
     VerdictStatus,
 )
-from analysis_service.fact_answers import FactStatus
-from analysis_service.frameworks import PreconditionResult
-from analysis_service.job_state import (
+from katra.fact_answers import FactStatus
+from katra.frameworks import PreconditionResult
+from katra.job_state import (
     PageStatus,
 )
-from analysis_service.report_changes import Change, FindingChange
+from katra.report_changes import Change, FindingChange
 
 #: Why an open fact is still open, as the owner reads it under a finding.
 WHY_OPEN: Mapping[FactStatus, str] = MappingProxyType(

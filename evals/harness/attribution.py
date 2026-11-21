@@ -29,16 +29,16 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from analysis_service.claims import (
+from evals.harness.critic_yield import UNSTATED
+from evals.harness.reference import GoldenCase
+from katra.claims import (
     FrameworkAnalysis,
     FrameworkName,
     RuledClaim,
     ScopeEntry,
     ScopeState,
 )
-from analysis_service.frameworks.asvs.record import requirement_of
-from evals.harness.critic_yield import UNSTATED
-from evals.harness.reference import GoldenCase
+from katra.frameworks.asvs.record import requirement_of
 
 if TYPE_CHECKING:
     from evals.harness.applicability import ApplicabilityScore, DispositionScore
@@ -61,7 +61,7 @@ STAGES: tuple[Stage, ...] = (
 )
 
 #: What a scope entry's state says about a requirement the run never applied.
-#: Keyed by every state :class:`~analysis_service.claims.ScopeEntry` can carry,
+#: Keyed by every state :class:`~katra.claims.ScopeEntry` can carry,
 #: and ``tests/test_evals_attribution.py`` holds it to that set, so a fifth
 #: state raises here rather than reading as one of these four.
 #: ``needs-other-evidence`` cannot be a miss — the matrix counts it applied —
@@ -108,7 +108,7 @@ class Loss:
 
     ``re_ask`` is what the *first* critic pass got wrong on this row's own
     claim, from
-    :meth:`~analysis_service.claims.FrameworkAnalysis.re_ask_kinds`. Empty is
+    :meth:`~katra.claims.FrameworkAnalysis.re_ask_kinds`. Empty is
     the common case and means the ruling that lost the requirement is the one
     the first pass wrote. Non-empty splits a ``critic`` or a ``verdict`` charge
     in two: a rejection the critic argued for is priced against its reasoning,

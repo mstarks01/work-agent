@@ -13,7 +13,7 @@ Build once and reuse. `from_config()` composes the pipeline's cacheable prompt
 prefix at construction, so a fresh engine per call pays that cost every time.
 
 ```python
-from analysis_service import Engine
+from katra import Engine
 
 engine = Engine.from_config(
     ["stride"]
@@ -28,7 +28,7 @@ that rule exists to prevent. Pass a `FrameworkSelection` instead of a bare name
 where a framework takes job-level options:
 
 ```python
-from analysis_service import FrameworkSelection
+from katra import FrameworkSelection
 
 engine = Engine.from_config([FrameworkSelection(name="stride")])
 ```
@@ -42,11 +42,11 @@ reads paths and overrides from the environment; pass `env=` to override that
 engine = Engine.from_config(
     ["stride"],
     env={
-        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-5",
-        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5-5",
-        "ANALYSIS_ANTHROPIC_API_KEY_FILE": "/run/secrets/anthropic.key",
+        "KATRA_MODEL_BASE_VENDOR": "anthropic",
+        "KATRA_MODEL_BASE_MODEL": "claude-sonnet-5",
+        "KATRA_MODEL_STRONG_VENDOR": "anthropic",
+        "KATRA_MODEL_STRONG_MODEL": "claude-opus-5-5",
+        "KATRA_ANTHROPIC_API_KEY_FILE": "/run/secrets/anthropic.key",
     },
 )
 ```
@@ -62,13 +62,13 @@ registered vendors.
 <!-- /every-vendor -->
 
 `bedrock` allows two credential modes,
-so a deployment that selects it also passes `ANALYSIS_MODEL_CREDENTIALS_BEDROCK`,
-and installs `analysis-service[bedrock]` for the client library its provider
+so a deployment that selects it also passes `KATRA_MODEL_CREDENTIALS_BEDROCK`,
+and installs `katra[bedrock]` for the client library its provider
 needs. `openrouter` carries the upstream vendor inside the model identifier, so
 its `_MODEL` value has a slash in it — `anthropic/claude-opus-4.7`. It also
 states what it charged, and what that figure covers depends on how the account
 reaches the upstream provider, so a deployment that selects it passes
-`ANALYSIS_MODEL_CHARGES_OPENROUTER` as well. `ANALYSIS_MODEL_UPSTREAMS_OPENROUTER`
+`KATRA_MODEL_CHARGES_OPENROUTER` as well. `KATRA_MODEL_UPSTREAMS_OPENROUTER`
 pins the upstream providers a request may reach, as a comma-separated list, and
 is optional.
 
@@ -83,11 +83,11 @@ tasks.
 ### When you need the configuration too
 
 `from_config()` resolves a `Deployment` — this installation's config files,
-located by the `ANALYSIS_*` variables in [Configuration](Configuration.md) and read
+located by the `KATRA_*` variables in [Configuration](Configuration.md) and read
 once — and builds the engine from it. Resolve it yourself when you need both:
 
 ```python
-from analysis_service import Deployment, Engine
+from katra import Deployment, Engine
 
 deployment = Deployment.from_env()  # reads config; no credentials touched
 engine = Engine.from_deployment(deployment, deployment.carried_frameworks)

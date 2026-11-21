@@ -4,7 +4,7 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.validation import (
+from katra.validation import (
     RENAMING_CODES,
     IssueCode,
     ValidationIssue,

@@ -18,18 +18,6 @@ from typing import get_args
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.critic_round import CriticRound
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.job_controls import (
-    AppliedControl,
-    AppliedScope,
-    CopiedEvidence,
-    CopiedRow,
-)
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.sources import text_digest
-from analysis_service.system_model import SystemModel
 from evals.critic_review import __main__ as critic_review
 from evals.critic_review import replay as R
 from evals.critic_review.loading import (
@@ -45,6 +33,18 @@ from evals.harness.assembly import ruling_type
 from evals.harness.bundle import write_reports
 from evals.harness.provenance import ProvenanceError
 from evals.harness.run_record import loaded
+from katra import graph
+from katra.critic_round import CriticRound
+from katra.frameworks import PACKAGES, schemas_for
+from katra.job_controls import (
+    AppliedControl,
+    AppliedScope,
+    CopiedEvidence,
+    CopiedRow,
+)
+from katra.markdown_loader import MarkdownLoader
+from katra.sources import text_digest
+from katra.system_model import SystemModel
 from tests import test_evals_run_grounds as grounds
 from tests.test_evals_lane_replay import (  # noqa: F401  (fixtures)
     finished,

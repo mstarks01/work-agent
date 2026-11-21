@@ -1,7 +1,7 @@
 # Live golden-case evals against the two API-key vendors: Anthropic and OpenAI.
 #
 # The model pins in the matrix below are the same pairs
-# `analysis_service.conformance.REFERENCE_MODELS` profiles, and that is enforced
+# `katra.conformance.REFERENCE_MODELS` profiles, and that is enforced
 # rather than remembered: `tests/test_conformance.py` fails if a model pinned
 # here is one the offline suite has never seen. A live lane sweeping an
 # unprofiled pair is how a vendor ends up "covered" by a job nobody has run.
@@ -18,7 +18,7 @@
 # credentials at all. A job that holds a long-lived third-party API key must not
 # also hold an identity it could exchange for cloud credentials, and matrix legs
 # share their job's permissions. Two files is what keeps `id-token: write` and
-# `secrets.ANALYSIS_*_API_KEY` in disjoint jobs. Do not merge them.
+# `secrets.KATRA_*_API_KEY` in disjoint jobs. Do not merge them.
 #
 # `pull_request_target` is PROHIBITED repository-wide and the reasoning in
 # evals-live.yml applies here unchanged -- more so, since the credential here is
@@ -133,11 +133,11 @@ jobs:
           #     the strong one. The pin names the dated build rather than the
           #     alias, because the alias is one OpenAI can point elsewhere.
           - vendor: anthropic
-            secret_name: ANALYSIS_ANTHROPIC_API_KEY
+            secret_name: KATRA_ANTHROPIC_API_KEY
             base_model: claude-sonnet-5
             strong_model: claude-opus-5-5
           - vendor: openai
-            secret_name: ANALYSIS_OPENAI_API_KEY
+            secret_name: KATRA_OPENAI_API_KEY
             base_model: gpt-4o-2024-08-06
             strong_model: gpt-5.6-sol
 
@@ -148,23 +148,23 @@ jobs:
     # the steps instead. See the two step-level `if:` guards below.
 
     env:
-      # The vendor registry reads its own ANALYSIS_-prefixed variables and nothing
+      # The vendor registry reads its own KATRA_-prefixed variables and nothing
       # else: an ambient credential this deployment did not declare must not be
       # able to authenticate a run, which is the ASI03 inherited-credential
-      # path. That is why the key arrives through ANALYSIS_ANTHROPIC_API_KEY_FILE
+      # path. That is why the key arrives through KATRA_ANTHROPIC_API_KEY_FILE
       # rather than the ANTHROPIC_API_KEY LiteLLM would otherwise pick up on its
       # own.
-      ANALYSIS_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_BASE_MODEL: ${{ matrix.base_model }}
-      ANALYSIS_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
+      KATRA_MODEL_BASE_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_BASE_MODEL: ${{ matrix.base_model }}
+      KATRA_MODEL_STRONG_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_STRONG_MODEL: ${{ matrix.strong_model }}
       # `review` selects the same pair as `strong`. Every tier must name one or
       # the config refuses to load, and the shipped node map binds nothing to
       # this tier -- so no adapter is built for it and it costs no credential.
       # The shipped `review_independence = "shared"` is what makes a repeated
       # pair legal here.
-      ANALYSIS_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
-      ANALYSIS_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
+      KATRA_MODEL_REVIEW_VENDOR: ${{ matrix.vendor }}
+      KATRA_MODEL_REVIEW_MODEL: ${{ matrix.strong_model }}
 
     steps:
       - name: Check out
@@ -224,7 +224,7 @@ jobs:
             echo '```'
             echo
             echo "The name is vendor-scoped on purpose: the registry reads only"
-            echo "its own ANALYSIS_-prefixed variables, so a plain"
+            echo "its own KATRA_-prefixed variables, so a plain"
             echo "\`${VENDOR^^}_API_KEY\` will not authenticate a run."
           } >>"$GITHUB_STEP_SUMMARY"
 

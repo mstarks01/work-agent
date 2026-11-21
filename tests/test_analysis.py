@@ -10,8 +10,8 @@ import re
 
 import pytest
 
-from analysis_service import analysis
-from analysis_service.analysis import (
+from katra import analysis
+from katra.analysis import (
     CONTROL_ATTRIBUTES,
     TEXT_ATTRIBUTES,
     WHOLE_WORD,
@@ -29,7 +29,7 @@ from analysis_service.analysis import (
     unknown_controls,
     zone_kinds,
 )
-from analysis_service.system_model import (
+from katra.system_model import (
     CORE_ASSET_TAGS,
     UNKNOWN,
     BoundaryCrossing,
@@ -270,7 +270,7 @@ def test_a_term_fires_at_the_start_of_a_word_or_as_a_whole_word():
     A leading boundary always. The trailing one is per term: a stem reaches
     its inflections, and a term marked ``$`` reaches the whole word only.
     """
-    from analysis_service.analysis import matches_term
+    from katra.analysis import matches_term
 
     assert not matches_term("sso", "our card processor is a third party")
     assert not matches_term("sso", "an associate signs in")
@@ -294,7 +294,7 @@ def random_text(rng, longest):
 
 def test_the_matcher_states_a_leading_word_boundary():
     """The word-start check sits behind the stem (#1316) and states one rule."""
-    from analysis_service.analysis import matches_term
+    from katra.analysis import matches_term
 
     rng = random.Random(1316)
     for _ in range(20_000):
@@ -313,7 +313,7 @@ def test_the_joined_text_names_what_a_value_names():
     The value-by-value search is the rule as it reads, and the joined text is
     the fast form of it (#1316). They are tested against each other.
     """
-    from analysis_service.analysis import matches_term, model_text, names_term
+    from katra.analysis import matches_term, model_text, names_term
 
     rng = random.Random(1316)
     base = valid_model()

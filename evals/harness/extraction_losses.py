@@ -51,8 +51,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from analysis_service.claims import FrameworkName
-from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file
 from evals.harness.fingerprint import IDENTIFIER_OF
@@ -65,6 +63,8 @@ from evals.harness.stability import (
     comparability_warnings,
     refuse_incomparable,
 )
+from katra.claims import FrameworkName
+from katra.system_model import SystemModel, normalize_element_ids
 
 Fate = Literal["both", "downstream", "extraction", "recovered"]
 FATES: tuple[Fate, ...] = ("both", "downstream", "extraction", "recovered")

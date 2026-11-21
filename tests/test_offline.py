@@ -13,11 +13,11 @@ import asyncio
 import pytest
 from google.genai import types
 
-from analysis_service.deployment import Deployment
-from analysis_service.frameworks import schemas_for
-from analysis_service.graph import CRITIC_ROLE, FrameworkNodes
-from analysis_service.offline import OFFLINE_ENV, LiveInferenceRefused
 from evals.harness.node_call import node_call
+from katra.deployment import Deployment
+from katra.frameworks import schemas_for
+from katra.graph import CRITIC_ROLE, FrameworkNodes
+from katra.offline import OFFLINE_ENV, LiveInferenceRefused
 from tests.test_provider_contract import (  # noqa: F401 - the fixture is autouse
     declining,
     no_real_sleeping,

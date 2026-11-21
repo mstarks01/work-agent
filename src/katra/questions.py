@@ -1,0 +1,512 @@
+"""The open facts a report's conditional findings rest on, asked of the submitter.
+
+A ``needs-info`` verdict names the facts an answer would settle. This module
+turns a report's findings into its ranked list of questions (#1225).
+
+**Every open fact is asked, the most important findings' facts first**
+(ADR 0056). The findings that wait on an answer decide the order, the highest
+band first: a critical finding that waits on two facts comes before a low one
+that waits on one. Each question keeps its basis, ``evidence`` where a
+draft's own grounds cite it and ``critic`` where only the critic named it.
+With the STRIDE lane closing a conditional finding waits on several facts,
+and six questions settled about a quarter of them where asking every one
+settled all (``QA-2026-09-26-03-E6``). So no cap is chosen here. Each question
+states how many findings are covered once it and every question before it is
+answered. That count is coverage, not a verdict: only the resumed run rules
+on a finding again. The facts no waiting finding needs follow, in their own
+section of the page. A submitter answers from the top as far as they choose.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Mapping, Sequence
+from collections.abc import Set as AbstractSet
+from dataclasses import dataclass, field
+from typing import Literal
+
+from katra.answer_forms import (
+    AnswerForm,
+    answer_choices,
+    answer_form,
+    answer_limit,
+    answer_suggestions,
+    facets_json,
+)
+from katra.assertions import AssertionCatalog
+from katra.bands import UNRANKED, Band
+from katra.claims import FrameworkAnalysis, UnknownKey, UnknownRef
+from katra.fact_answers import (
+    FactAnswer,
+    FactKind,
+    FactStatus,
+    answer_facets,
+    answered_keys,
+    asked_facets,
+    covers,
+    fact_kind,
+    needed_facets,
+    needs_of,
+)
+from katra.frameworks import PACKAGES
+from katra.open_facts import (
+    element_names,
+    fact_routes,
+    group_of,
+    label_of,
+    open_attribute,
+    prepared_model,
+    routed,
+)
+from katra.question_kinds import Facet
+from katra.system_model import SystemModel
+
+__all__ = [
+    "Basis",
+    "FactQuestion",
+    "Fallback",
+    "Finding",
+    "FollowUpNeeds",
+    "choices_of",
+    "fact_questions",
+    "follow_up_needs",
+    "follow_up_order",
+    "question_fallback",
+]
+
+
+Basis = Literal["evidence", "critic"]
+
+
+#: One finding: its framework and its claim ID.
+Finding = tuple[str, str]
+
+
+@dataclass(frozen=True)
+class FactQuestion:
+    """One open fact, the findings that wait on it, and the answers it takes."""
+
+    key: UnknownKey
+    kind: FactKind
+    #: ``evidence`` where a finding's own grounds cite the fact, which does not
+    #: change when the critic is sampled again; ``critic`` where only the
+    #: critic's verdict names it, which does.
+    basis: Basis
+    #: What a reader sees: an element's name and the attribute, or the subject.
+    label: str
+    #: How many still-open findings cite it when it is asked.
+    cited_by: int
+    #: For how many findings every fact is answered once it and every question
+    #: before it is answered. Coverage, not a verdict.
+    covered_so_far: int
+    #: The answers it takes, or empty where the answer is free text.
+    choices: tuple[str, ...]
+    #: How a page takes the answer; see
+    #: :data:`~katra.answer_forms.AnswerForm`.
+    form: AnswerForm
+    #: Common mechanisms a ``control`` answer may start from.
+    suggestions: tuple[str, ...]
+    #: The parts a ``facets`` answer is given in.
+    facets: tuple[Facet, ...]
+    #: The longest answer it admits
+    #: (:func:`~katra.answer_forms.answer_limit`).
+    max_length: int
+    #: The group a page shows it in, the group's heading, and the element's
+    #: name as its row in that group (:func:`~katra.open_facts.group_of`),
+    #: as the early list shows them. A question about no element is its own row.
+    group: str
+    group_heading: str
+    element: str
+    #: The label of the highest :class:`~katra.frameworks.Band`
+    #: among the findings that wait on it, or empty where none does or its
+    #: package grades nothing.
+    band: str
+    #: Every finding that waits on it, as ``framework/claim``. A finding is
+    #: covered once every question that names it has an answer, whichever
+    #: questions those are.
+    findings: tuple[str, ...]
+    #: What became of this fact at the pause, so a page can say it was
+    #: skipped, left blank or answered in part before the analysis, or never
+    #: shown (:func:`~katra.fact_answers.fact_status`).
+    history: FactStatus = "open"
+    #: For each finding that waits on only some facets of this question, as
+    #: ``framework/claim``, the facets it needs (ADR 0073). A finding absent
+    #: here needs every facet. :meth:`to_json` sends each waiting finding's
+    #: facets as :func:`~katra.fact_answers.needed_facets` reads
+    #: them, so a page applies no rule of its own.
+    needs: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+
+    @property
+    def asks(self) -> tuple[str, ...]:
+        """The facets a page asks for (:func:`~katra.fact_answers.asked_facets`)."""
+        return asked_facets(self.key, self.findings, self.needs)
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "key": list(self.key),
+            "kind": self.kind,
+            "basis": self.basis,
+            "history": self.history,
+            "label": self.label,
+            "cited_by": self.cited_by,
+            "covered_so_far": self.covered_so_far,
+            "choices": list(self.choices),
+            "form": self.form,
+            "suggestions": list(self.suggestions),
+            "facets": facets_json(self.facets),
+            "asks": list(self.asks),
+            "max_length": self.max_length,
+            "group": self.group,
+            "group_heading": self.group_heading,
+            "element": self.element,
+            "band": self.band,
+            "findings": list(self.findings),
+            "needs": {
+                finding: list(needed_facets(self.key, self.needs.get(finding, ())))
+                for finding in self.findings
+            },
+        }
+
+
+def choices_of(key: UnknownKey) -> int:
+    """The choices one question takes: one a facet, else one."""
+    return len(answer_facets(key)) or 1
+
+
+def _by_band(
+    open_facts: Mapping[Finding, AbstractSet[UnknownKey]],
+    band: Mapping[Finding, int],
+    needed: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]],
+) -> list[UnknownKey]:
+    """The facts in the order that serves the most important findings first.
+
+    ``band`` is each finding's :class:`~katra.bands.Band` order.
+    The highest band left decides each step. Where a fact completes findings
+    of that band, the next is the one that completes the most of them, then
+    the most in each band below. Where none does, the next are the facts of
+    that band's finding with the fewest choices left, the most cited first,
+    asked together. A finding's choices are the facets it needs of each fact
+    (``needed``, ADR 0073), as :func:`~katra.fact_answers.needed_facets`
+    reads them, and one for a fact with no facets. A lower band never comes
+    before a higher one that still
+    waits: a critical finding that waits on two facts comes before a low one
+    that waits on one. A tie goes to more citations, then to the lower key,
+    so one input always gives one order (``QA-2026-09-26-03-E35``).
+    """
+    left = {finding: set(keys) for finding, keys in open_facts.items() if keys}
+
+    def choices(finding: Finding, key: UnknownKey) -> int:
+        return len(needed_facets(key, needed.get(finding, {}).get(key, ()))) or 1
+
+    order: list[UnknownKey] = []
+    while left:
+        cites = Counter(key for keys in left.values() for key in keys)
+        top = max(band[finding] for finding in left)
+        bands = sorted({band[finding] for finding in left}, reverse=True)
+        completes: dict[UnknownKey, Counter[int]] = {}
+        for finding, keys in left.items():
+            if len(keys) == 1:
+                completes.setdefault(next(iter(keys)), Counter())[band[finding]] += 1
+        at_top = {key: done for key, done in completes.items() if done[top]}
+        if at_top:
+            chosen = [
+                min(
+                    at_top,
+                    key=lambda key: (
+                        tuple(-at_top[key][level] for level in bands),
+                        -cites[key],
+                        key,
+                    ),
+                )
+            ]
+        else:
+            _, nearest = min(
+                (
+                    (finding, keys)
+                    for finding, keys in left.items()
+                    if band[finding] == top
+                ),
+                key=lambda pair: (
+                    sum(choices(pair[0], key) for key in pair[1]),
+                    len(pair[1]),
+                    sorted(pair[1]),
+                ),
+            )
+            chosen = sorted(nearest, key=lambda key: (-cites[key], key))
+        order.extend(chosen)
+        asked = set(chosen)
+        left = {finding: keys - asked for finding, keys in left.items() if keys - asked}
+    return order
+
+
+@dataclass(frozen=True)
+class FollowUpNeeds:
+    """What a report's findings wait on: read once, for the order and the counts."""
+
+    #: Each draft's open grounds, whatever its verdict.
+    evidence: Mapping[Finding, frozenset[UnknownKey]]
+    #: The open facts each draft waits on
+    #: (:meth:`~katra.claims.RuledClaim.waits_on`).
+    named: Mapping[Finding, frozenset[UnknownKey]]
+    #: Each conditional finding's ``named`` facts: the findings an answer can
+    #: cover. A ground the critic dismissed is not one (ADR 0094).
+    waiting: Mapping[Finding, frozenset[UnknownKey]]
+    #: Each draft's band, as its package ranks it.
+    bands: Mapping[Finding, Band]
+    #: The reference each open fact was first cited by.
+    refs: Mapping[UnknownKey, UnknownRef]
+    #: For each draft, the question kinds it waits on only in part, with the
+    #: facets it needs of each (ADR 0073). A kind it waits on whole is absent.
+    facets: Mapping[Finding, Mapping[UnknownKey, tuple[str, ...]]] = field(
+        default_factory=dict
+    )
+
+
+def follow_up_needs(
+    analyses: Sequence[FrameworkAnalysis],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
+) -> FollowUpNeeds:
+    """Every open fact each draft waits on, as :func:`fact_questions` reads them.
+
+    A fact ``earlier`` answers in full is not open. A finding waits on the
+    facts :meth:`~katra.claims.RuledClaim.waits_on` reads, which
+    are the facts its card in
+    :func:`~katra.report_conditions.conditions` shows. A ground the
+    critic dismissed is not one (ADR 0094): it is only ``evidence``, which
+    sets a question's basis and places it among the facts no waiting finding
+    needs. A ``needs-info`` finding is conditional unless ``earlier`` answers
+    a fact it waits on without settling it, because no answer in the list can
+    cover it.
+
+    A reference to a row the graph contradicts or another row disputes is
+    read as the fact it is asked as (:func:`~katra.open_facts.fact_routes`).
+
+    **A finding that needs only some facets of a kind**
+    (:func:`~katra.fact_answers.needs_of`) waits on it until those
+    facets are known, and no longer (ADR 0073).
+    """
+    evidence: dict[Finding, frozenset[UnknownKey]] = {}
+    named: dict[Finding, frozenset[UnknownKey]] = {}
+    refs: dict[UnknownKey, UnknownRef] = {}
+    conditional: set[Finding] = set()
+    prepared = prepared_model(model, catalog)
+    routes = fact_routes(catalog, prepared)
+    done = answered_keys(earlier)
+    said = {answer.key: answer for answer in earlier}
+    bands: dict[Finding, Band] = {}
+    facets: dict[Finding, dict[UnknownKey, tuple[str, ...]]] = {}
+    for block in analyses:
+        rank = PACKAGES[block.framework].rank
+        for claim in block.all_claims():
+            finding = (block.framework, claim.id)
+            bands[finding] = rank(claim)
+            waited = routed(claim.waits_on(), routes)
+            wanted = needs_of(waited)
+            covered = {
+                key for key, need in wanted.items() if covers(said.get(key), need)
+            }
+            stuck = any(key in done and key not in covered for key in wanted)
+            partly = {
+                key: need
+                for key, need in wanted.items()
+                if need and len(need) < len(answer_facets(key))
+            }
+            if partly:
+                facets[finding] = partly
+            if claim.verdict.status == "needs-info" and not stuck:
+                conditional.add(finding)
+            grounds = [
+                ref
+                for ref in routed(claim.unknown_grounds(), routes)
+                if _open(ref, prepared, catalog) and ref.key not in done
+            ]
+            evidence[finding] = frozenset(ref.key for ref in grounds)
+            verdict = [
+                ref
+                for ref in waited
+                if _open(ref, prepared, catalog) and ref.key not in done | covered
+            ]
+            named[finding] = frozenset(ref.key for ref in verdict)
+            for ref in (*grounds, *verdict):
+                refs.setdefault(ref.key, ref)
+    return FollowUpNeeds(
+        evidence=evidence,
+        named=named,
+        waiting={finding: named[finding] for finding in conditional if named[finding]},
+        bands=bands,
+        refs=refs,
+        facets=facets,
+    )
+
+
+def follow_up_order(needs: FollowUpNeeds) -> list[tuple[Basis, UnknownKey]]:
+    """The order the follow-up asks its facts in, each with its basis.
+
+    **The findings that wait decide the order** (ADR 0056). The facts the
+    conditional findings wait on come first, the most important findings'
+    first (:func:`_by_band`), the critic's facts among them. The facts no
+    waiting finding needs follow: those of a confirmed or rejected draft, of
+    one that waits on a fact answered "I don't know", which no answer here can
+    complete, and a ground the critic dismissed (ADR 0094). Each
+    fact is ``evidence`` where any draft's own grounds cite it, and
+    ``critic`` where only a verdict names it.
+
+    The order reads the critic's verdicts, so a critic sampled again moves
+    it. Built from one sample and scored on another, it still completed 29%
+    more critical and high findings at five choices than the evidence-first
+    order, and 42% more at ten (``QA-2026-09-26-03-E35``).
+    """
+    band = {finding: each.order for finding, each in needs.bands.items()}
+    first = _by_band(needs.waiting, band, needs.facets)
+    asked = set(first)
+    rest = _by_band(
+        {
+            finding: (
+                needs.evidence.get(finding, frozenset())
+                | needs.named.get(finding, frozenset())
+            )
+            - asked
+            for finding in needs.bands
+        },
+        band,
+        needs.facets,
+    )
+    grounded = {key for keys in needs.evidence.values() for key in keys}
+    return [
+        ("evidence" if key in grounded else "critic", key) for key in (*first, *rest)
+    ]
+
+
+def fact_questions(
+    analyses: Sequence[FrameworkAnalysis],
+    model: SystemModel,
+    catalog: AssertionCatalog | None,
+    earlier: Sequence[FactAnswer] = (),
+) -> tuple[FactQuestion, ...]:
+    """Every open fact a report's findings rest on, in :func:`follow_up_order`.
+
+    ``earlier`` is the fact answers of the earlier saves. A fact they answer
+    in full (:func:`~katra.fact_answers.answered_keys`) is not
+    asked again. A finding that waits on a fact they answer without settling
+    it (:attr:`~katra.fact_answers.FactAnswer.settles`), such as
+    "I don't know" or a facet answered so, is not counted, because no answer
+    in this list can cover it.
+
+    **The findings that wait decide the order** (ADR 0056). The facts the most
+    important conditional findings wait on come first, and the facts only the
+    critic named sit among them. Each question keeps its basis: ``evidence``
+    where a draft's own grounds cite the fact, ``critic`` where only a verdict
+    names it, so a page can say which facts can change when the critic is
+    sampled again.
+
+    Each question counts the findings of every framework together, because one
+    answer settles a fact for every framework that cites it. ``cited_by`` and
+    ``covered_so_far`` count only the conditional findings, which are the ones
+    waiting on an answer, by the facts they wait on. A confirmed
+    finding and a rejected draft rank the questions and are not counted: the
+    first waits on nothing, and no answer brings the second into the report.
+
+    An attribute the model states is not asked, even where the critic names
+    it, because :func:`~katra.fact_writes.check_fact_answers`
+    refuses an answer to it.
+    """
+    needs = follow_up_needs(analyses, model, catalog, earlier)
+    waiting = needs.waiting
+    bands = needs.bands
+    names = element_names(model)
+    asked: list[FactQuestion] = []
+    answered: set[UnknownKey] = set()
+    for basis, key in follow_up_order(needs):
+        cited_by = sum(
+            1 for facts in waiting.values() if key in facts and not facts <= answered
+        )
+        answered.add(key)
+        ref = needs.refs[key]
+        label = label_of(ref, names, model, catalog)
+        group, heading = group_of(ref)
+        asked.append(
+            FactQuestion(
+                key=key,
+                kind=fact_kind(key),
+                basis=basis,
+                label=label,
+                cited_by=cited_by,
+                covered_so_far=sum(
+                    1 for facts in waiting.values() if facts <= answered
+                ),
+                choices=answer_choices(key, model, catalog),
+                form=answer_form(key, model, catalog),
+                suggestions=answer_suggestions(key),
+                facets=answer_facets(key),
+                max_length=answer_limit(key, model),
+                group=group,
+                group_heading=heading,
+                element=names.get(ref.element_id, label) if ref.element_id else label,
+                findings=tuple(
+                    sorted(
+                        f"{framework}/{claim}"
+                        for (framework, claim), facts in waiting.items()
+                        if key in facts
+                    )
+                ),
+                band=max(
+                    (bands[f] for f, facts in waiting.items() if key in facts),
+                    key=lambda band: band.order,
+                    default=UNRANKED,
+                ).label,
+                needs={
+                    f"{framework}/{claim}": partly[key]
+                    for (framework, claim), partly in needs.facets.items()
+                    if key in partly and key in waiting.get((framework, claim), ())
+                },
+            )
+        )
+    return tuple(asked)
+
+
+def _open(
+    ref: UnknownRef, model: SystemModel, catalog: AssertionCatalog | None
+) -> bool:
+    """False for an attribute the model states; every other fact is open."""
+    element_id, attribute = ref.element_id, ref.attribute
+    return fact_kind(ref.key) != "attribute" or open_attribute(
+        model, element_id, attribute, catalog
+    )
+
+
+@dataclass(frozen=True)
+class Fallback:
+    """How the critic named the open facts that have no place in the model.
+
+    ``typed`` names a kind from the question table and an element; ``free_text``
+    fell back to a ``subject``. The share that fell back is what says whether
+    the table is enough (``QA-2026-09-26-03-E8``): a low, steady share means it
+    is, and the fallback texts name the kinds it lacks.
+    """
+
+    typed: int
+    free_text: int
+
+    @property
+    def rate(self) -> float | None:
+        total = self.typed + self.free_text
+        return None if total == 0 else round(self.free_text / total, 3)
+
+    def to_json(self) -> dict[str, object]:
+        return {"typed": self.typed, "free_text": self.free_text, "rate": self.rate}
+
+
+def question_fallback(analyses: Sequence[FrameworkAnalysis]) -> Fallback:
+    """Count a report's typed and free-text open facts across its verdicts."""
+    refs = [
+        ref
+        for block in analyses
+        for claim in block.all_claims()
+        for ref in claim.verdict.related_unknowns
+    ]
+    return Fallback(
+        typed=sum(1 for ref in refs if ref.sound and ref.kind == "question"),
+        free_text=sum(1 for ref in refs if ref.sound and ref.kind == "subject"),
+    )

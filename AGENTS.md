@@ -78,7 +78,7 @@ the `needs-sweep` label do not.
 Use the cheapest evidence that is sufficient for the claim. Reproduce the
 defect on the code before the fix, then verify the fix. Never weaken a gate:
 if an acceptance criterion needs live evidence, it stays unmet. Set
-`ANALYSIS_OFFLINE` for every offline validation.
+`KATRA_OFFLINE` for every offline validation.
 
 The completion statement for a fix is: "The fix is verified by the listed
 offline evidence; its live quality effect remains unmeasured." See

@@ -17,17 +17,17 @@ import os
 import sys
 from pathlib import Path
 
-from analysis_service import model_gate
-from analysis_service.capability_reader import (
+from katra import model_gate
+from katra.capability_reader import (
     CapabilityReading,
     with_stated_capabilities,
 )
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.offline import refuse_live_inference
-from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.sources import Source, render_sources
-from analysis_service.system_model import SystemModel
-from analysis_service.vendors import CredentialMode, vendor_for_route
+from katra.markdown_loader import MarkdownLoader
+from katra.offline import refuse_live_inference
+from katra.prompts import compose_capabilities_prompt
+from katra.sources import Source, render_sources
+from katra.system_model import SystemModel
+from katra.vendors import CredentialMode, vendor_for_route
 
 
 def read_case(case: str, model: str, key: str) -> dict:

@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.actions import family_of
-from analysis_service.frameworks import PACKAGES, package_for
 from evals import verify_corpus
 from evals.harness.exemplar_verbs import (
     collisions,
@@ -28,6 +26,8 @@ from evals.harness.exemplar_verbs import (
 )
 from evals.harness.fingerprint import IDENTIFIER_OF
 from evals.harness.reference import development_cases, load_corpus
+from katra.actions import family_of
+from katra.frameworks import PACKAGES, package_for
 
 
 @pytest.fixture(scope="module")

@@ -12,12 +12,12 @@ import json
 import sys
 from pathlib import Path
 
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.sources import text_digest
 from evals.harness.descendants import FRAMEWORK
 from evals.harness.lane_replay import compose, prepare_today
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_case
+from katra.markdown_loader import MarkdownLoader
+from katra.sources import text_digest
 
 ARMS = {
     "01-payments-checkout": "signed",

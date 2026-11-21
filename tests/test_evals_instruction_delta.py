@@ -22,7 +22,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.identity import IDENTITY_VERSION
 from evals.harness.artifact import ARTIFACT_VERSION, DECLARED_KEYS, load_artifact
 from evals.harness.instruction_delta import (
     absent_blocks,
@@ -35,6 +34,7 @@ from evals.harness.instruction_delta import (
     artifact as delta_artifact,
 )
 from evals.harness.provenance import RunProvenance
+from katra.identity import IDENTITY_VERSION
 from tests.source_tree import REPO_ROOT
 
 #: A committed sweep that carries no ``applicability_holdout_split`` block.

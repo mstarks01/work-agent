@@ -41,8 +41,8 @@ comparable to published figures from other tools. The matching half is
 deterministic, so it cannot move between two runs of one configuration. The
 vote-status half moves only when a person votes.
 
-The scorer takes :class:`~analysis_service.frameworks.stride.record.DraftThreat` rather than
-:class:`~analysis_service.frameworks.stride.record.Threat`, so the same function scores the
+The scorer takes :class:`~katra.frameworks.stride.record.DraftThreat` rather than
+:class:`~katra.frameworks.stride.record.Threat`, so the same function scores the
 pre-critic union and the post-critic report. Nothing is promoted to make that
 work. ``verdict`` and ``confidence`` are the critic's outputs, and synthesizing
 them to measure the critic would decide the answer by fiat, so the scorer reads
@@ -56,13 +56,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal, get_args
 
-from analysis_service.claim_identity import NO_ROWS, mechanism_of
-from analysis_service.claims import (
-    SeverityLevel,
-    derive_severity_level,
-)
-from analysis_service.frameworks.stride.record import DraftThreat, StrideCategory
-from analysis_service.system_model import ModelIndex
 from evals.harness import audit
 from evals.harness.content import structural
 from evals.harness.fingerprint import key_claim
@@ -79,6 +72,13 @@ from evals.harness.rates import (
 )
 from evals.harness.reference import MUST_FIND, GoldenCase, ReferenceThreat
 from evals.harness.standings import SubstanceClass
+from katra.claim_identity import NO_ROWS, mechanism_of
+from katra.claims import (
+    SeverityLevel,
+    derive_severity_level,
+)
+from katra.frameworks.stride.record import DraftThreat, StrideCategory
+from katra.system_model import ModelIndex
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases

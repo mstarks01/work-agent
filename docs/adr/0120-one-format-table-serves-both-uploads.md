@@ -33,7 +33,7 @@ and subgraphs. QA-2026-10-31-03 measured flowcharts only.
 
 ## Decision
 
-**The table lives in `analysis_service/sources.py`, beside `SourceKind`.**
+**The table lives in `katra/sources.py`, beside `SourceKind`.**
 `SourceFormat` is a `Literal` of the format values. Each row holds the format
 value, its extensions, the kinds it allows and its default kind:
 

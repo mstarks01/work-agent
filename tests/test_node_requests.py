@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from analysis_service.node_requests import node_instruction, node_request
+from katra.node_requests import node_instruction, node_request
 
 
 def test_the_skill_text_comes_before_the_prompt_text():

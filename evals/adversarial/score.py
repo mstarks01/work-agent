@@ -26,8 +26,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from analysis_service.report import Report
 from evals.adversarial.model import AdversarialCase
+from katra.report import Report
 
 
 def _element_names(report: Report) -> tuple[str, ...]:

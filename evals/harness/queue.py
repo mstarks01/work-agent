@@ -45,23 +45,23 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claim_identity import (
-    grounded_mechanism,
-)
-from analysis_service.claims import Claim, FrameworkName
-from analysis_service.sources import text_digest
 from evals.harness import content as digests
 from evals.harness import ledger
 from evals.harness.fingerprint import Components, key_claim
 from evals.harness.identity import NO_FLOWS, CaseFlows, channels
 from evals.harness.ledger import Identity, Ledger, github_login, identity_of
+from katra.claim_identity import (
+    grounded_mechanism,
+)
+from katra.claims import Claim, FrameworkName
+from katra.sources import text_digest
 
 
 @dataclass(frozen=True)
 class Finding:
     """One produced claim, reduced to what a reviewer and the queue read.
 
-    Deliberately not a :class:`~analysis_service.claims.Claim`: a queue item must
+    Deliberately not a :class:`~katra.claims.Claim`: a queue item must
     not carry a field a reviewer should not see, and the cheapest way to
     guarantee that is a type that has no room for one.
     """
@@ -87,7 +87,7 @@ class Finding:
     seen_in: int = 1
     runs: int = 1
     #: The controls the claim's grounds say are unstated or missing, sorted,
-    #: from :func:`~analysis_service.claim_identity.grounded_mechanism`. Two findings
+    #: from :func:`~katra.claim_identity.grounded_mechanism`. Two findings
     #: under one fingerprint are two questions where these are distinct.
     mechanism: tuple[str, ...] = ()
 

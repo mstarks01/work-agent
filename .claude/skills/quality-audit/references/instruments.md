@@ -75,7 +75,7 @@ gives the shape, or the command refuses the view before the call. With `--out
 <file>` it writes the problems the re-ask was sent, its answer, the problems
 that remain and each ruling it changed that no problem named.
 
-The three replays send a live request, so `ANALYSIS_OFFLINE` refuses them. Their
+The three replays send a live request, so `KATRA_OFFLINE` refuses them. Their
 names say "replay"; their cost says paid. `replay` and `score` above re-read an
 archive and are free.
 

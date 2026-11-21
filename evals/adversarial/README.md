@@ -12,7 +12,7 @@ and an adversarial case is not something a voter grades. It is a fixture.
 ## What the attacker controls, and what they do not
 
 Everything inside `source.md`. That text is rendered by
-`analysis_service.sources.render_sources`, which puts every caller byte —
+`katra.sources.render_sources`, which puts every caller byte —
 including the label — inside a fence sized to its own content, so it cannot
 close the block it sits in and continue in instruction position. That is the
 structural defence and it is deterministic.

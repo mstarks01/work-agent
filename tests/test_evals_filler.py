@@ -7,12 +7,12 @@ and a scripted quote always verifies.
 
 from __future__ import annotations
 
-from analysis_service.claims import (
+from evals.harness import filler
+from katra.claims import (
     Ground,
     UnknownRef,
     Verdict,
 )
-from evals.harness import filler
 from tests.factories import sample_report, sample_threat
 
 

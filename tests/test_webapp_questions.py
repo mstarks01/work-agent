@@ -20,34 +20,34 @@ from types import MappingProxyType
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service import StubPipelineRunner
-from analysis_service.analysis import ABSENT_WORD
-from analysis_service.answer_bodies import BodyRefused, read_answers
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.answer_shares import SharedAnswer
-from analysis_service.answer_state import ANSWER_LIMITS
-from analysis_service.assertions import FACET_ANSWERS, AssertionRecord
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import (
+from katra import StubPipelineRunner
+from katra.analysis import ABSENT_WORD
+from katra.answer_bodies import BodyRefused, read_answers
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.answer_shares import SharedAnswer
+from katra.answer_state import ANSWER_LIMITS
+from katra.assertions import FACET_ANSWERS, AssertionRecord
+from katra.claims import UnknownRef
+from katra.fact_answers import (
     MAX_FACT_ANSWERS,
     FactAnswer,
     merged_facts,
     needed_facets,
 )
-from analysis_service.fact_writes import check_fact_answers
-from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import (
+from katra.fact_writes import check_fact_answers
+from katra.frameworks import PACKAGES
+from katra.jobs import (
     Checkpoint,
     InMemoryJobStore,
     PipelineAwaiting,
     PipelineCompleted,
 )
-from analysis_service.links import NONE_OF_THESE, LinkAnswer, fold_principal
-from analysis_service.open_facts import group_of
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.selection import SelectionError, resolve_names
-from analysis_service.sources import FORMATS
-from analysis_service.system_model import ELEMENT_TYPE_NOUNS
+from katra.links import NONE_OF_THESE, LinkAnswer, fold_principal
+from katra.open_facts import group_of
+from katra.question_kinds import QUESTION_KINDS
+from katra.selection import SelectionError, resolve_names
+from katra.sources import FORMATS
+from katra.system_model import ELEMENT_TYPE_NOUNS
 from tests import test_open_facts, test_questions, test_webapp
 from tests.factories import (
     asking_threat,
@@ -473,7 +473,7 @@ class TestTheWholeFlow:
     ):
         """The page asks ``servable`` of the parent, as ``/v1`` does, so a
         report the gate withholds never shows through the comparison."""
-        from analysis_service.job_answers import JobAnswers
+        from katra.job_answers import JobAnswers
 
         client = client_for(tiers, runner)
         finished = asking_report(client)
@@ -496,7 +496,7 @@ class TestTheWholeFlow:
     ):
         """The snapshot asks ``servable`` of each report it lists, so a
         withheld report has no link that leads to a 404."""
-        from analysis_service.job_answers import JobAnswers
+        from katra.job_answers import JobAnswers
 
         client = client_for(tiers, runner)
         finished = start(client, questions=False)
@@ -514,7 +514,7 @@ class TestTheWholeFlow:
         self, tiers, runner, monkeypatch
     ):
         """The stream asks ``servable`` before it sends the page to the report."""
-        from analysis_service.job_answers import JobAnswers
+        from katra.job_answers import JobAnswers
 
         monkeypatch.setattr(JobAnswers, "withheld", lambda self, record: object())
         client = client_for(tiers, runner)
@@ -1117,7 +1117,7 @@ await ids.continue.listeners.click(); await settle();
 def test_the_key_field_list_names_each_part_of_a_key():
     """``UNKNOWN_KEY_FIELDS`` states ``UnknownRef.key``'s order a second time,
     so a reference with a distinct value in each field is put to both."""
-    from analysis_service.claims import UNKNOWN_KEY_FIELDS
+    from katra.claims import UNKNOWN_KEY_FIELDS
 
     ref = UnknownRef.model_construct(
         **{name: f"value-of-{name}" for name in UNKNOWN_KEY_FIELDS}
@@ -1260,9 +1260,9 @@ def _report_payloads(payloads: dict) -> dict:
 
 def _as_served(question: dict) -> dict:
     """A fact question fixture with ``needs`` as
-    :meth:`~analysis_service.questions.FactQuestion.to_json` sends it: each
+    :meth:`~katra.questions.FactQuestion.to_json` sends it: each
     waiting finding's facets, read by
-    :func:`~analysis_service.fact_answers.needed_facets`."""
+    :func:`~katra.fact_answers.needed_facets`."""
     key = tuple(question["key"])
     named = question.get("needs", {})
     return question | {
@@ -3432,8 +3432,8 @@ def test_the_page_opens_the_list_with_the_questions_the_service_counts(case):
     """The page hides a part until its parent's "yes", and the service counts
     a list without such a part: two readers of one rule, so a real ASVS
     level 2 list is given to both (#1378)."""
-    from analysis_service.answer_state import question_set
-    from analysis_service.system_model import SystemModel
+    from katra.answer_state import question_set
+    from katra.system_model import SystemModel
 
     path = PROJECT_ROOT / "evals/corpus" / case / "model.json"
     model = SystemModel.model_validate_json(path.read_text())
@@ -4886,8 +4886,8 @@ class TestThePageAndTheServiceCoverAlike:
     @pytest.mark.parametrize("rate", ["", "yes", "unknown"])
     @pytest.mark.parametrize("size", ["", "yes", "unknown"])
     def test_each_mix_of_answers_covers_the_same_findings(self, rate, size):
-        from analysis_service.claims import UnknownRef
-        from analysis_service.questions import follow_up_needs
+        from katra.claims import UnknownRef
+        from katra.questions import follow_up_needs
         from tests.factories import asking_threat, sample_analysis
 
         store = valid_model().data_stores[0]
@@ -5019,7 +5019,7 @@ def test_a_withheld_pause_ends_its_stream_with_a_frame_the_page_reads(
 ):
     """A pause the deployment's gate withholds tells the page why, rather than
     breaking the stream the page reads as an interrupted connection."""
-    from analysis_service.job_answers import JobAnswers
+    from katra.job_answers import JobAnswers
     from webapp.main import Workspace
 
     runner = PausingRunner(catalog=False)

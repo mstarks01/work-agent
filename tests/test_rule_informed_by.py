@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.assertions import REGISTRY
-from analysis_service.candidates import Candidate
-from analysis_service.claims import FrameworkName
-from analysis_service.early_questions import load_prior, reads
-from analysis_service.frameworks import PACKAGES, unprojected_predicates
-from analysis_service.question_kinds import QUESTION_KINDS, parse_question_kind
+from katra.assertions import REGISTRY
+from katra.candidates import Candidate
+from katra.claims import FrameworkName
+from katra.early_questions import load_prior, reads
+from katra.frameworks import PACKAGES, unprojected_predicates
+from katra.question_kinds import QUESTION_KINDS, parse_question_kind
 
 #: Each predicate of a part of a question kind.
 PARTS = frozenset(

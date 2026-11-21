@@ -5,11 +5,11 @@ import json
 import sys
 from pathlib import Path
 
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import question_set
-from analysis_service.field_capabilities import with_field_capabilities
-from analysis_service.frameworks import PACKAGES
-from analysis_service.system_model import CapabilityStatement, SystemModel
+from katra.answer_sets import AnswerSet
+from katra.answer_state import question_set
+from katra.field_capabilities import with_field_capabilities
+from katra.frameworks import PACKAGES
+from katra.system_model import CapabilityStatement, SystemModel
 
 D = Path("evals/experiments/QA-2026-10-14-01")
 

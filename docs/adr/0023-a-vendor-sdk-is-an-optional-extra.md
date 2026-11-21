@@ -88,7 +88,7 @@ which is the same call the gate makes.
 
 ## Consequences
 
-An operator who selects such a vendor installs `analysis-service[<vendor>]`. The
+An operator who selects such a vendor installs `katra[<vendor>]`. The
 bind-time error names the extra, so the instruction is in the failure rather
 than only in a guide.
 

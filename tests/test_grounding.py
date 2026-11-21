@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from analysis_service import grounding
-from analysis_service.grounding import (
+from katra import grounding
+from katra.grounding import (
     MAX_REPAIR_QUOTE_CHARS,
     MAX_REPAIR_WORK,
     REPAIR_THRESHOLD,
@@ -525,7 +525,7 @@ class TestATruncatedScanSaysSo:
         quote = " ".join(words[10:26]).replace("quick", "quikc")
         # Enough work to reach and rank the window at word 10, not enough to
         # rank the thousands after it.
-        monkeypatch.setattr("analysis_service.grounding.MAX_REPAIR_WORK", 400_000)
+        monkeypatch.setattr("katra.grounding.MAX_REPAIR_WORK", 400_000)
 
         repair = repair_prepared(
             quote, prepare_source(source), deadline=repair_deadline()

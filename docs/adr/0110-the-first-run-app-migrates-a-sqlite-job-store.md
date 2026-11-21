@@ -9,7 +9,7 @@
 
 The `sql` job store refuses a schema that is not at the latest revision, and
 the service never migrates. An operator runs
-`python -m analysis_service.migrations` as a deploy step, under a role that
+`python -m katra.migrations` as a deploy step, under a role that
 may change the schema, and the service runs under a role that may not.
 
 The first-run app uses the same rule. So a person who selects a SQLite store

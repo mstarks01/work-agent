@@ -15,8 +15,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.analysis import control_state
-from analysis_service.system_model import SystemModel
 from evals.harness import extraction_losses
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import reports_dir
@@ -30,6 +28,8 @@ from evals.harness.extraction_losses import (
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import load_case
 from evals.harness.stability import load_runs
+from katra.analysis import control_state
+from katra.system_model import SystemModel
 from tests.test_evals_provenance import provenance, sampling  # noqa: F401
 from tests.test_evals_stability import score, write_run
 

@@ -14,17 +14,17 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from analysis_service import graph
-from analysis_service.budgets import retried_prompt_tokens
-from analysis_service.provider import (
+from katra import graph
+from katra.budgets import retried_prompt_tokens
+from katra.provider import (
     REASK_INSTRUCTION,
     REASKS_METADATA_KEY,
     ExecutedLlm,
     GenerationRequest,
     GenerationResult,
 )
-from analysis_service.report import NodeRun, TokenUsage
-from analysis_service.retry import ATTEMPTS_METADATA_KEY, RetryBudget, RetryPolicy
+from katra.report import NodeRun, TokenUsage
+from katra.retry import ATTEMPTS_METADATA_KEY, RetryBudget, RetryPolicy
 from tests.factories import (
     STRONG_MODEL,
     collected,

@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import re
 
-from analysis_service.mermaid import model_mermaid, styled_mermaid
-from analysis_service.system_model import UNKNOWN, SystemModel
+from katra.mermaid import model_mermaid, styled_mermaid
+from katra.system_model import UNKNOWN, SystemModel
 from tests.factories import report_state, sample_report, sample_threat, valid_model
 from tests.test_report_page import run_report_page, two_findings
 from webapp.main import render_report

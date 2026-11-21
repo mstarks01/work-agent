@@ -42,7 +42,7 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import CONTENT_LICENSE
+from katra.frameworks import CONTENT_LICENSE
 from tests.source_tree import WHOLE_TREE, held_files, matching
 
 pytestmark = pytest.mark.lint
@@ -124,7 +124,7 @@ class ThirdPartyWork:
         )
 
 
-ASVS_CATALOG = "src/analysis_service/frameworks/asvs/catalog.json"
+ASVS_CATALOG = "src/katra/frameworks/asvs/catalog.json"
 
 
 def _asvs_requirements() -> tuple[str, ...]:
@@ -461,9 +461,7 @@ def test_every_corpus_case_from_an_external_source_names_its_license():
 def _locked_packages() -> list[str]:
     lock = tomllib.loads((REPO_ROOT / "uv.lock").read_text())
     return sorted(
-        package["name"]
-        for package in lock["package"]
-        if package["name"] != "analysis-service"
+        package["name"] for package in lock["package"] if package["name"] != "katra"
     )
 
 

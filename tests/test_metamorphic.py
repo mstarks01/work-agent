@@ -19,21 +19,21 @@ import random
 
 import pytest
 
-from analysis_service.analysis import unknown_controls
-from analysis_service.candidates import generate_candidates
-from analysis_service.claim_identity import finding_key
-from analysis_service.coverage import build_coverage
-from analysis_service.evidence import evidence_catalog
-from analysis_service.fan_in import join_drafts
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.graph import unfence
-from analysis_service.grounding import normalize
-from analysis_service.report import Report
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, render, render_fenced
-from analysis_service.system_model import ELEMENT_GROUPS, ModelIndex, SystemModel
-from analysis_service.validation import parse_and_validate
 from evals.harness.flow_ids import rewrite_text
+from katra.analysis import unknown_controls
+from katra.candidates import generate_candidates
+from katra.claim_identity import finding_key
+from katra.coverage import build_coverage
+from katra.evidence import evidence_catalog
+from katra.fan_in import join_drafts
+from katra.frameworks import PACKAGES
+from katra.frameworks.stride import STRIDE
+from katra.graph import unfence
+from katra.grounding import normalize
+from katra.report import Report
+from katra.sources import DEFAULT_DESCRIPTION_LABEL, render, render_fenced
+from katra.system_model import ELEMENT_GROUPS, ModelIndex, SystemModel
+from katra.validation import parse_and_validate
 from tests.factories import sample_draft, valid_model
 from tests.test_structural_readers import sound_report
 

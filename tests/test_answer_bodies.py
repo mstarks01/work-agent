@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_bodies import (
+from katra.answer_bodies import (
     AmendmentSubmission,
     BodyRefused,
     CorrectionsSubmission,
@@ -17,10 +17,10 @@ from analysis_service.answer_bodies import (
     read_answers,
     read_corrections,
 )
-from analysis_service.answer_state import MAX_SKIPS, Answers
-from analysis_service.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
-from analysis_service.links import MAX_LINK_ANSWERS, LinkAnswer
-from analysis_service.sources import MAX_SOURCE_BYTES_CEILING
+from katra.answer_state import MAX_SKIPS, Answers
+from katra.fact_answers import MAX_FACT_ANSWERS, MAX_HELD_FACTS, FactAnswer
+from katra.links import MAX_LINK_ANSWERS, LinkAnswer
+from katra.sources import MAX_SOURCE_BYTES_CEILING
 
 KEY = ("flow:web-app>database", "encryption_in_transit", "", "", "", "")
 OTHER = ("component:web-app", "", "", "rate_limits", "", "")

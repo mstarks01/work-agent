@@ -29,10 +29,10 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import ABSENT, Assertion, AssertionCatalog, Subject
-from analysis_service.jobs import Checkpoint, PipelineAwaiting
-from analysis_service.owner_files import NOT_UTF_8
-from analysis_service.system_model import (
+from katra.assertions import ABSENT, Assertion, AssertionCatalog, Subject
+from katra.jobs import Checkpoint, PipelineAwaiting
+from katra.owner_files import NOT_UTF_8
+from katra.system_model import (
     SystemModel,
     derive_element_id,
     make_element_id,
@@ -1268,10 +1268,8 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     from webapp.main import create_app
     from webapp.settings_page import EXAMPLES
 
-    write_settings(
-        tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_MODEL="claude-sonnet-5-5")
-    )
-    for url in serve(create_app(env=env_in(tmp_path, ANALYSIS_MAX_SOURCES="5"))):
+    write_settings(tmp_path, hand_written(KATRA_MODEL_REVIEW_MODEL="claude-sonnet-5-5"))
+    for url in serve(create_app(env=env_in(tmp_path, KATRA_MAX_SOURCES="5"))):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector("#settings-rows tr[data-key]")
         assert page.is_hidden("#changes-panel")
@@ -1310,7 +1308,7 @@ def test_the_settings_page_runs_its_script(browser, tmp_path):
     assert errors == [], f"the settings page raised: {errors}"
     assert "Not in the model list" in review
     assert "Shipped: none shipped" in review
-    assert "ANALYSIS_MAX_SOURCES" in sources
+    assert "KATRA_MAX_SOURCES" in sources
     assert location == f"e.g. {EXAMPLES['credentials.vertex.location']}"
     assert key is not None and "e.g." not in key
     assert found and all("imeout" in row for row in found)
@@ -1365,8 +1363,8 @@ def test_the_settings_page_saves_resets_and_refuses_a_stale_tab(browser, tmp_pat
     assert "Timeout ms: Enter a whole number." in refused
     assert "next analysis uses the new settings" in status
     assert "this page" in changed and "Shipped:" in changed
-    assert "ANALYSIS_TIMEOUT_MS=5000" in written
-    assert "ANALYSIS_TIMEOUT_MS" not in reset
+    assert "KATRA_TIMEOUT_MS=5000" in written
+    assert "KATRA_TIMEOUT_MS" not in reset
     assert "Reload the page" in stale
 
 
@@ -1460,7 +1458,7 @@ def test_a_thinking_row_follows_its_tier_model_and_resets_to_the_default(
     assert "This model takes no thinking level." in base_text
     assert base_selects == 0
     assert offered == ["The model's own level", "low", "medium", "high"]
-    assert "ANALYSIS_SAMPLING_STRONG_THINKING=high" in written
+    assert "KATRA_SAMPLING_STRONG_THINKING=high" in written
     assert "THINKING" not in removed
     assert "This model takes no thinking level." in typed
     assert typed_selects == 0
@@ -1498,7 +1496,7 @@ def test_the_settings_page_saves_a_key_with_the_vendor_that_needs_it(browser, tm
     [line] = [
         line
         for line in (tmp_path / "settings.env").read_text(encoding="utf-8").split("\n")
-        if line.startswith("ANALYSIS_ANTHROPIC_API_KEY_FILE=")
+        if line.startswith("KATRA_ANTHROPIC_API_KEY_FILE=")
     ]
     assert Path(line.partition("=")[2]).read_text(encoding="utf-8") == key
 
@@ -1516,7 +1514,7 @@ def test_the_page_warns_of_each_key_line_that_the_save_removes(
 ):
     """The page and the server each read which saved key a save removes:
     the warnings before the save name the key lines that it removes."""
-    from analysis_service.settings_variables import secret_vars
+    from katra.settings_variables import secret_vars
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app
     from webapp.settings_page import SETTINGS
@@ -1580,7 +1578,7 @@ def test_a_saved_vendor_that_names_an_object_key_still_draws_the_table(
     from tests.test_settings_env import env_in, hand_written, write_settings
     from webapp.main import create_app
 
-    write_settings(tmp_path, hand_written(ANALYSIS_MODEL_REVIEW_VENDOR="__proto__"))
+    write_settings(tmp_path, hand_written(KATRA_MODEL_REVIEW_VENDOR="__proto__"))
     for url in serve(create_app(env=env_in(tmp_path))):
         page, errors = opened(browser, url + "/settings")
         page.wait_for_selector('tr[data-key="tiers.review.model"]')
@@ -2013,7 +2011,7 @@ def test_a_report_sits_in_the_workspace_with_its_analysis_tabs(page):
 def test_reopening_an_analysis_whose_report_is_withheld_stays_on_it(page, monkeypatch):
     """The page goes to a report only where the snapshot lists it, so a
     withheld report never leads to a 404."""
-    from analysis_service.job_answers import JobAnswers
+    from katra.job_answers import JobAnswers
 
     pause(page)
     analysis_url = page.url
@@ -2112,7 +2110,7 @@ class _WaitingAsvsRunner(web.PausingRunner):
     """Completes with an ASVS ruling that waits on :data:`WAITS_ON`."""
 
     def _stub_block(self, selection):
-        from analysis_service.claims import UnknownRef, Verdict
+        from katra.claims import UnknownRef, Verdict
         from tests.test_asvs import _block, sample_asvs_claim
 
         if selection.name != "asvs":
@@ -2140,8 +2138,8 @@ def waiting_asvs(tiers):
 def test_a_report_names_each_open_fact_by_its_label(browser, waiting_asvs):
     """The card and the requirement row name each open fact by the label the
     server computes, never as "<attribute> on <element>"."""
-    from analysis_service.claims import UnknownRef
-    from analysis_service.open_facts import label_of
+    from katra.claims import UnknownRef
+    from katra.open_facts import label_of
 
     context = browser.new_context(base_url=waiting_asvs)
     page = context.new_page()
@@ -2251,7 +2249,7 @@ _PLACED = """() => [...document.querySelectorAll('#model-diagram g.element')].ma
 
 def test_the_diagram_link_downloads_the_model_as_mermaid(browser):
     """The link under the diagram saves the service's Mermaid text unchanged."""
-    from analysis_service.mermaid import styled_mermaid
+    from katra.mermaid import styled_mermaid
     from tests.factories import sample_report
 
     report = sample_report()
@@ -2293,7 +2291,7 @@ def test_the_diagram_draws_each_element_in_its_zone_and_each_flow_once(browser):
 def test_the_diagram_places_no_element_in_a_zone_the_model_does_not_state(browser):
     """Placement is stated, never inferred: an element with no stated zone is
     drawn outside every zone, and an inferred zone says so (#1884)."""
-    from analysis_service.system_model import Assumption
+    from katra.system_model import Assumption
     from tests.factories import sample_report
 
     report = sample_report()
@@ -2340,7 +2338,7 @@ def test_the_diagram_s_flows_and_labels_stay_clear_on_every_archived_model(brows
     join."""
     import glob
 
-    from analysis_service.report import Report
+    from katra.report import Report
 
     reports = {}
     for path in sorted(
@@ -2700,7 +2698,7 @@ def save_control(page) -> None:
 
 
 def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
-    from analysis_service.controls import (
+    from katra.controls import (
         ALIASES_FULL,
         MAX_CONTROL_ALIASES,
         MAX_CONTROL_ROWS,
@@ -2714,7 +2712,7 @@ def test_the_controls_page_refuses_an_alias_or_a_row_over_its_count(page):
         page.press("#alias-input", "Enter")
     aliases = page.locator(".aliases .tag").count()
     alias_refusal = page.inner_text("#editor-problem")
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     for unit in PACKAGES["asvs"].units[: MAX_CONTROL_ROWS + 1]:
         add_row(page, "asvs", unit.id)
@@ -3273,7 +3271,7 @@ def test_the_editor_keeps_its_picks_and_focus_across_a_redraw(page):
 
 
 def test_the_unit_tree_opens_by_chapter_and_finds_by_words(page):
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
 
     page.goto("/controls")
     new_control(page, "Rows")
@@ -4414,7 +4412,7 @@ def test_the_form_and_the_service_agree_on_a_control_that_changes_nothing(
     """The form's check (form_controls.js ``fits``) and the service's
     (``job_controls.changes_nothing``), held against each other over each
     kind of row, in a STRIDE-only analysis."""
-    from analysis_service.frameworks import PACKAGES
+    from katra.frameworks import PACKAGES
     from tests.test_webapp import posted
 
     page = zoned_page

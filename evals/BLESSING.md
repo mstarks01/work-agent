@@ -454,7 +454,7 @@ keep its name. `--list` prints the cases nobody has read.
 **Stop whenever you like.** The moment you post your own list, the app opens a
 **Draft Sitting** for that case and keeps your list, your marks, your missing
 list and your notes in it as you write them. It lives at
-`$XDG_STATE_HOME/work-agent/sittings/<login>/<case-id>.json`, or under
+`$XDG_STATE_HOME/katra/sittings/<login>/<case-id>.json`, or under
 `~/.local/state` where `XDG_STATE_HOME` is unset, outside this repository.
 It never merges — that is what keeps an unsigned own list out of a pull
 request. Close the browser, run the command again tomorrow, and the

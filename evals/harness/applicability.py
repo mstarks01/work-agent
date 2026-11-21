@@ -11,7 +11,7 @@ The shape of the answer differs too. STRIDE's scorer reports recall against an
 open list, and asks a person about whatever else a run produced, because "the
 corpus did not list it" cannot mean "it is wrong". A finite catalog does not
 change that on its own. A run at level ``L`` rules on
-:func:`~analysis_service.frameworks.asvs.catalog.requirements_for` and nothing
+:func:`~katra.frameworks.asvs.catalog.requirements_for` and nothing
 else, so every cell of a confusion matrix is *reachable* — but the complement
 of a case's reference set is a set of negatives only when a person read the
 case as complete (``reference_set == "exhaustive"``). On a sampled case an
@@ -37,17 +37,6 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Literal
 
-from analysis_service.claims import (
-    Claim,
-    FrameworkAnalysis,
-    FrameworkName,
-    RuledClaim,
-    ScopeEntry,
-    VerdictStatus,
-)
-from analysis_service.frameworks.asvs.catalog import requirements_for
-from analysis_service.frameworks.asvs.record import requirement_of
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness import attribution, audit
 from evals.harness.attribution import ObservedKind
 from evals.harness.rates import (
@@ -66,6 +55,17 @@ from evals.harness.reference import (
     ReferenceRequirement,
     diagnosable,
 )
+from katra.claims import (
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    RuledClaim,
+    ScopeEntry,
+    VerdictStatus,
+)
+from katra.frameworks.asvs.catalog import requirements_for
+from katra.frameworks.asvs.record import requirement_of
+from katra.sources import CARRIED_EVIDENCE_KINDS
 
 if TYPE_CHECKING:
     from evals.harness.instruments import Cases
@@ -257,7 +257,7 @@ def applied_requirements(claims: Sequence[RuledClaim]) -> tuple[set[str], set[st
     checks report a malformed ID, and counting it here as a miss would charge one
     defect to a metric that is not about it. Neither does a rejection that does
     not rule on its unit — a draft the critic sent back for its lane or as a
-    duplicate — because :meth:`~analysis_service.claims.RuledClaim.rules_on_unit`
+    duplicate — because :meth:`~katra.claims.RuledClaim.rules_on_unit`
     is the one reader of that distinction and it says the requirement was never
     answered.
     """
@@ -471,7 +471,7 @@ def satisfies(
     **``carried`` is read, never assumed**, and that is the whole reason this is
     a function rather than a lookup table. Which kinds of evidence become a
     **Scope Entry** is a policy
-    :data:`~analysis_service.sources.CARRIED_EVIDENCE_KINDS` sets, not a
+    :data:`~katra.sources.CARRIED_EVIDENCE_KINDS` sets, not a
     property of the kinds: a job carrying source code would keep a ``needs-code``
     proposal as a claim and rule it, exactly as it keeps a ``prose`` one today.
     A scorer that hard-coded *code, config and people are deferred* would invert
@@ -1022,7 +1022,7 @@ class ApplicabilityYield:
 
     Only ``rejected`` rulings count. A draft the critic sent back for its lane
     or as a duplicate says nothing about its requirement
-    (:meth:`~analysis_service.claims.RuledClaim.rules_on_unit`), so it can
+    (:meth:`~katra.claims.RuledClaim.rules_on_unit`), so it can
     neither destroy nor earn one.
 
     A rejection count alone reads as either working or breaking things.

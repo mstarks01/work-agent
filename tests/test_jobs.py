@@ -6,10 +6,10 @@ import logging
 
 import pytest
 
-from analysis_service.assertions import AssertionCatalog, AssertionRecord
-from analysis_service.execution import GraphFailed
-from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import (
+from katra.assertions import AssertionCatalog, AssertionRecord
+from katra.execution import GraphFailed
+from katra.frameworks import PACKAGES
+from katra.jobs import (
     DEADLINE_FAILURE_MESSAGE,
     GENERIC_FAILURE_MESSAGE,
     InMemoryJobStore,
@@ -23,17 +23,17 @@ from analysis_service.jobs import (
     StubPipelineRunner,
     execute_job,
 )
-from analysis_service.report import (
+from katra.report import (
     FrameworkSelection,
     InputRef,
     NodeRun,
     Report,
     TokenUsage,
 )
-from analysis_service.sources import Source
-from analysis_service.store_backends import build_store
-from analysis_service.store_settings import StoreConfigError
-from analysis_service.validation import ValidationIssue
+from katra.sources import Source
+from katra.store_backends import build_store
+from katra.store_settings import StoreConfigError
+from katra.validation import ValidationIssue
 from tests.factories import (
     admit,
     sample_selection,
@@ -178,22 +178,20 @@ class TestLifecycle:
 
 class TestBuildStore:
     def test_builds_configured_backend(self):
-        store = build_store({"ANALYSIS_JOB_STORE": "memory"})
+        store = build_store({"KATRA_JOB_STORE": "memory"})
         assert isinstance(store, InMemoryJobStore)
 
     def test_backend_selection_is_case_insensitive(self):
-        store = build_store({"ANALYSIS_JOB_STORE": "  Memory  "})
+        store = build_store({"KATRA_JOB_STORE": "  Memory  "})
         assert isinstance(store, InMemoryJobStore)
 
     def test_unset_backend_fails_closed(self):
-        with pytest.raises(StoreConfigError, match="ANALYSIS_JOB_STORE"):
+        with pytest.raises(StoreConfigError, match="KATRA_JOB_STORE"):
             build_store({})
 
     def test_unknown_backend_fails_closed(self):
-        with pytest.raises(
-            StoreConfigError, match="unknown value for ANALYSIS_JOB_STORE"
-        ):
-            build_store({"ANALYSIS_JOB_STORE": "redis"})
+        with pytest.raises(StoreConfigError, match="unknown value for KATRA_JOB_STORE"):
+            build_store({"KATRA_JOB_STORE": "redis"})
 
 
 class HangingRunner:
@@ -246,7 +244,7 @@ class TestExecuteJob:
                     report=outcome.report.model_copy(update={"analyses": []})
                 )
 
-        with caplog.at_level(logging.ERROR, logger="analysis_service.jobs"):
+        with caplog.at_level(logging.ERROR, logger="katra.jobs"):
             record = self.run_with(ForeignReportRunner())
 
         assert record is not None
@@ -266,7 +264,7 @@ class TestExecuteJob:
                     report=outcome.report.model_copy(update={"assertions": record})
                 )
 
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+        with caplog.at_level(logging.INFO, logger="katra.jobs"):
             record = self.run_with(CatalogRunner())
 
         (line,) = [
@@ -278,7 +276,7 @@ class TestExecuteJob:
         assert json.loads(line.split(": ", 1)[1])["rows"] == 0
 
     def test_a_job_that_ran_no_pass_logs_no_use(self, caplog):
-        with caplog.at_level(logging.INFO, logger="analysis_service.jobs"):
+        with caplog.at_level(logging.INFO, logger="katra.jobs"):
             self.run_with(StubPipelineRunner())
 
         assert not any(

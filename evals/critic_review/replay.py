@@ -8,8 +8,8 @@ drafts are fixed bytes a person signed, so the only thing that varies between
 two runs of this module is the critic.
 
 It sends the request the graph sends.
-:func:`~analysis_service.critic_round.critic_request` renders the instruction
-and the user turn over a :class:`~analysis_service.critic_round.CriticRound`
+:func:`~katra.critic_round.critic_request` renders the instruction
+and the user turn over a :class:`~katra.critic_round.CriticRound`
 built from the fixture drafts, and the job-wide keys are rendered by the same
 functions ``prepare`` writes them with. The fixtures carry no fan-in marks and
 no assertion catalog, so the round holds empty marks and no catalog, and that
@@ -33,12 +33,14 @@ from typing import Any, Protocol
 
 from google.genai import types
 
-from analysis_service.claims import AnalysisMarks, Ruling, UnknownKey
-from analysis_service.critic import complete_rulings, review_issues
-from analysis_service.critic_round import CriticRound, critic_request, rulings_of
-from analysis_service.execution import seed_state
-from analysis_service.frameworks import FrameworkPackage, schemas_for
-from analysis_service.graph import (
+from evals.critic_review.model import CriticFixture
+from evals.harness.alignment import singular
+from katra.claims import AnalysisMarks, Ruling, UnknownKey
+from katra.critic import complete_rulings, review_issues
+from katra.critic_round import CriticRound, critic_request, rulings_of
+from katra.execution import seed_state
+from katra.frameworks import FrameworkPackage, schemas_for
+from katra.graph import (
     STATE_BOUNDARY_CROSSINGS,
     STATE_INPUT_TEXT,
     STATE_SYSTEM_MODEL,
@@ -46,11 +48,9 @@ from analysis_service.graph import (
     render_crossings,
     render_model,
 )
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel
-from evals.critic_review.model import CriticFixture
-from evals.harness.alignment import singular
+from katra.markdown_loader import MarkdownLoader
+from katra.sources import Source
+from katra.system_model import SystemModel
 
 #: An async callable taking one composed instruction and user turn and returning
 #: the model's raw text. Injected so the mechanical half runs scripted and free.
@@ -131,9 +131,9 @@ def parse_rulings(raw: str, package: FrameworkPackage) -> list[Ruling]:
     flattering wrong answer available.
 
     **The graph's own reader, never a second one.**
-    :func:`~analysis_service.critic_round.rulings_of` is what the ``review``
+    :func:`~katra.critic_round.rulings_of` is what the ``review``
     node parses a critic's emission with, and this module exists to run that
-    critic outside the graph. The neutral :class:`~analysis_service.claims.Ruling`
+    critic outside the graph. The neutral :class:`~katra.claims.Ruling`
     refuses every real STRIDE ruling here: ``frameworks/stride/critic.md`` —
     which :func:`compose` loads — asks for a ``confidence`` on every ruling,
     and the neutral model is ``extra="forbid"``. A scripted ruling carries no
@@ -469,7 +469,7 @@ def score(
     """Compare what the critic ruled to what a reader signed.
 
     Runs the drafts and the rulings through
-    :func:`~analysis_service.critic.complete_rulings` first, so a fixture is
+    :func:`~katra.critic.complete_rulings` first, so a fixture is
     scored on the ruling that would have reached the report rather than on the
     critic's raw emission — the service fills ``related_unknowns`` and overrides
     a misfiled lane, and a measurement reading past that would grade a claim
@@ -513,7 +513,7 @@ class RecommendationReadingLike(Protocol):
     """The two fields this module reads off a package's recommendation reading.
 
     Structural rather than an import of STRIDE's
-    :class:`~analysis_service.frameworks.stride.record.RecommendationReading`,
+    :class:`~katra.frameworks.stride.record.RecommendationReading`,
     because a package declares its own and this module must not name one. What
     it replaces is ``Any``, which typed nothing: ``score`` reads both fields,
     so a package declaring a reading with a verdict and no words would have
@@ -548,7 +548,7 @@ async def replay(
 ) -> tuple[ReplayScore, list[str]]:
     """Compose, call, parse and score. Returns the score and any review problems.
 
-    The review problems are :func:`~analysis_service.critic.review_issues`'
+    The review problems are :func:`~katra.critic.review_issues`'
     own, run over the same drafts and rulings the graph would: a critic that
     drops a fixture or invents an ID fails the same mechanical check here as in
     a job, and the replay reports it rather than scoring around it.

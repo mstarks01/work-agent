@@ -14,15 +14,15 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import (
+from evals.harness.submit import run_command
+from katra.claims import FrameworkName
+from katra.frameworks import (
     CRITIC_DOC,
     LANE_CLOSING_DOC,
     OUTPUT_DOC,
     PACKAGES,
     SEVERITY_RUBRIC_DOC,
 )
-from evals.harness.submit import run_command
 from tests.source_tree import REPO_ROOT, matching, prompt_files
 from tests.test_workflow_lints import FILTERED_WORKFLOWS, _filter_paths
 
@@ -95,7 +95,7 @@ def test_the_code_paths_are_the_guides():
 @pytest.mark.parametrize(
     "path",
     [
-        "src/analysis_service/graph.py",
+        "src/katra/graph.py",
         "webapp/main.py",
         "evals/harness/run.py",
         "prompts/extract.md",
@@ -425,7 +425,7 @@ def test_a_package_module_asks_for_the_texts_the_package_declares(name):
     module directory asks for each text that package declares, and for no text
     of any other package."""
     asked = check.prompts_to_read(
-        [f"src/analysis_service/frameworks/{name}/record.py"], READERS, REPO_ROOT
+        [f"src/katra/frameworks/{name}/record.py"], READERS, REPO_ROOT
     )
     own = {prompt for prompt in asked if prompt.startswith("frameworks/")}
 
@@ -465,12 +465,9 @@ def test_each_prompt_has_a_module_that_decides_its_outcomes(prompt):
 
 def test_a_module_change_names_its_prompts():
     assert check.prompts_to_read(
-        ["docs/guide.md", "src/analysis_service/compact.py"], READERS, REPO_ROOT
+        ["docs/guide.md", "src/katra/compact.py"], READERS, REPO_ROOT
     ) == ["prompts/extract-compact.md"]
-    assert (
-        check.prompts_to_read(["src/analysis_service/report.py"], READERS, REPO_ROOT)
-        == []
-    )
+    assert check.prompts_to_read(["src/katra/report.py"], READERS, REPO_ROOT) == []
 
 
 def test_a_prompt_a_named_glob_covers_is_asked_for_once():
@@ -539,7 +536,7 @@ def test_a_module_change_with_no_prompt_read_is_refused(repo):
     the table pairs with the module."""
     _commit(repo, "prompts/extract-compact.md")
     base = run_command(["git", "rev-parse", "HEAD"], repo).strip()
-    head = _commit(repo, "src/analysis_service/compact.py")
+    head = _commit(repo, "src/katra/compact.py")
     read = f"{check.PROMPT_HEADING}\n\n- prompts/extract-compact.md: still true."
     assert _run(repo, base, head, FULL_BODY) == 1
     assert _run(repo, base, head, f"{FULL_BODY}\n\n{read}") == 0

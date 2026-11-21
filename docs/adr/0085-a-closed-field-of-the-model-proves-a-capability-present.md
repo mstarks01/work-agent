@@ -32,7 +32,7 @@ already holds does not ask the model for anything.
 ## Decision
 
 **Code states a capability present where a closed field of the model proves
-it.** `analysis_service.field_capabilities.FIELD_CAPABILITIES` holds 17 rows.
+it.** `katra.field_capabilities.FIELD_CAPABILITIES` holds 17 rows.
 Each row reads only fields with a closed set of values: an element's kind, a
 process's exposure and interface, the asset tags, a stated protocol of a
 family the protocol table names, and a control state. No row reads free text

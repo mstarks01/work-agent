@@ -14,7 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.assertions import (
+from evals.harness import population
+from evals.harness.run import COMMANDS
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -24,8 +26,6 @@ from analysis_service.assertions import (
     Subject,
     assertion_id,
 )
-from evals.harness import population
-from evals.harness.run import COMMANDS
 from tests.test_assertions import (
     FLOW,
     SOURCES,

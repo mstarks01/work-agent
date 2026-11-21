@@ -2,9 +2,9 @@
 
 import pytest
 
-from analysis_service.claims import LaneCoverage
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
 from evals.harness.coverage import aggregate_coverage, coverage_totals
+from katra.claims import LaneCoverage
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
 
 
 def row(lane_name, framework="stride", **overrides):

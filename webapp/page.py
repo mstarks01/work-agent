@@ -54,7 +54,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from analysis_service.errors import refusal_line
+from katra.errors import refusal_line
 
 #: Every template carries this in each inline ``<style>`` and ``<script>`` tag.
 #: A block added later without one simply stops running rather than running

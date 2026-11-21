@@ -15,7 +15,7 @@
 The first-run app held one `Run` record per analysis and a registry of them.
 `Run` carried the same fields as a `JobRecord`, and the app re-derived the
 status, the lock and the revision rules that `JobStore` already implements.
-Every answer route existed twice, once in `analysis_service.api` and once in
+Every answer route existed twice, once in `katra.api` and once in
 `webapp/main.py`, with the same steps in the same order, and every ADR since
 ADR 0053 cited two test suites for one rule. The two files changed in the
 same commit 34 times in the 300 commits before this one, and a test existed
@@ -34,7 +34,7 @@ module writes and starts a job for both surfaces.**
 > Where no store is set, the app uses a `sql` store on SQLite in its data
 > directory.
 
-- `analysis_service.job_answers` reads a job from the store, builds its
+- `katra.job_answers` reads a job from the store, builds its
   Answer State, stores a round, a draft or a correction, or creates the
   Resumed Job, admits it and starts it. It raises a typed refusal; the `/v1`
   routes map each to a problem response, the app to a page message.

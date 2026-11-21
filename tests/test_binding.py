@@ -13,12 +13,12 @@ import dataclasses
 
 import pytest
 
-from analysis_service.binding import NodeBinding, build_tier_adapters
-from analysis_service.graph import tier_node_by_graph_node
-from analysis_service.model_gate import ModelGateError, NoThinkingLevel
-from analysis_service.model_tiers import ModelConfigError, load_model_tiers
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
+from katra.binding import NodeBinding, build_tier_adapters
+from katra.graph import tier_node_by_graph_node
+from katra.model_gate import ModelGateError, NoThinkingLevel
+from katra.model_tiers import ModelConfigError, load_model_tiers
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, PROJECT_ROOT, repo_tiers, secret_env
 
 #: This install's whole selection. The node -> tier map is built per selection,
@@ -132,12 +132,12 @@ class TestReasoningTemperatureFloor:
         tiers = load_model_tiers(
             PROJECT_ROOT / "config" / "model_tiers.toml",
             env={
-                "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-                "ANALYSIS_MODEL_BASE_MODEL": model,
-                "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
-                "ANALYSIS_MODEL_STRONG_MODEL": model,
-                "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-                "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+                "KATRA_MODEL_BASE_VENDOR": "openai",
+                "KATRA_MODEL_BASE_MODEL": model,
+                "KATRA_MODEL_STRONG_VENDOR": "openai",
+                "KATRA_MODEL_STRONG_MODEL": model,
+                "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+                "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
             },
         )
         # ``build_tier_adapters`` rather than ``NodeBinding.from_configs``: the
@@ -147,7 +147,7 @@ class TestReasoningTemperatureFloor:
             tiers,
             load_sampling(config, env={}),
             load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
-            env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
+            env=secret_env("KATRA_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
         )
 
     def test_greedy_decoding_on_a_reasoning_model_fails_the_build(self, tmp_path):
@@ -181,22 +181,22 @@ class TestAThinkingLevelOnAModelThatTakesNone:
         tiers = load_model_tiers(
             PROJECT_ROOT / "config" / "model_tiers.toml",
             env={
-                "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-                "ANALYSIS_MODEL_BASE_MODEL": model,
-                "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
-                "ANALYSIS_MODEL_STRONG_MODEL": model,
-                "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-                "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+                "KATRA_MODEL_BASE_VENDOR": "openai",
+                "KATRA_MODEL_BASE_MODEL": model,
+                "KATRA_MODEL_STRONG_VENDOR": "openai",
+                "KATRA_MODEL_STRONG_MODEL": model,
+                "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+                "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
             },
         )
         return build_tier_adapters(
             tiers,
             load_sampling(
                 PROJECT_ROOT / "config" / "sampling.toml",
-                env={"ANALYSIS_SAMPLING_STRONG_THINKING": "high"},
+                env={"KATRA_SAMPLING_STRONG_THINKING": "high"},
             ),
             load_resilience(PROJECT_ROOT / "config" / "resilience.toml"),
-            env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
+            env=secret_env("KATRA_OPENAI_API_KEY_FILE", "sk-test-not-a-real-key"),
         )
 
     def test_the_build_refuses_it_and_names_the_tier_and_the_variable(self):
@@ -205,7 +205,7 @@ class TestAThinkingLevelOnAModelThatTakesNone:
 
         message = str(refused.value)
         assert refused.value.tier == "strong"
-        assert "ANALYSIS_SAMPLING_STRONG_THINKING" in message
+        assert "KATRA_SAMPLING_STRONG_THINKING" in message
         assert "gpt-4o" not in message
         assert "drop_params" not in message
 

@@ -1,7 +1,7 @@
 """The answer interface: one Answer State in, saved answers or a Resumed Job out.
 
 The ``/v1`` routes, the first-run app and the eval replay each build an
-:class:`~analysis_service.answer_state.AnswerState` from their own job record
+:class:`~katra.answer_state.AnswerState` from their own job record
 and map its refusals to their own status codes. These tests drive the state
 alone, so each rule fails here with no route between the test and the rule.
 """
@@ -12,8 +12,8 @@ from dataclasses import replace
 
 import pytest
 
-from analysis_service.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
-from analysis_service.answer_state import (
+from katra.answer_sets import NO_ANSWERS, AnswerSet, SentAnswers
+from katra.answer_state import (
     AlreadyResumed,
     Answers,
     AnswerState,
@@ -23,10 +23,10 @@ from analysis_service.answer_state import (
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.controls import Control, ControlDocument
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.job_controls import CopiedControl
-from analysis_service.sources import Source, SourceLimits
+from katra.controls import Control, ControlDocument
+from katra.fact_answers import FactAnswer
+from katra.job_controls import CopiedControl
+from katra.sources import Source, SourceLimits
 from tests.test_controls import fact
 from tests.test_pause import held
 

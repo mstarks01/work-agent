@@ -48,7 +48,7 @@ holds.
 `authentication`, `encryption_in_transit` and `encryption_at_rest`. The corpus
 states 21 values across them. The probe marks each value two ways. `A` marks a
 value that also states an absence, by the negation list
-`analysis_service.grounding._NEGATIONS` already uses. `S` marks a value that
+`katra.grounding._NEGATIONS` already uses. `S` marks a value that
 carries a separator, so a writer joined two clauses.
 
 | marks | case | attribute | value |

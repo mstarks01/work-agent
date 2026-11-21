@@ -20,12 +20,12 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import (
+from katra import (
     PipelineRejected,
     SourceLimits,
     StubPipelineRunner,
 )
-from analysis_service.validation import ValidationIssue
+from katra.validation import ValidationIssue
 from tests.factories import sample_selection, stand_in_engine
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"

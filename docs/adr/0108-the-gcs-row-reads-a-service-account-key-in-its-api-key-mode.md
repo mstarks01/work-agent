@@ -38,8 +38,8 @@ A static key has risks that the metadata server identity does not have:
 **The `api_key` mode of the `gcs` row reads one service account key file, and
 it accepts no other kind of credential file.**
 
-- `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names the file, and the `api_key`
-  mode requires it. `ANALYSIS_OBJECT_SERVICE_ACCOUNT_KEY`, which would hold the
+- `KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE` names the file, and the `api_key`
+  mode requires it. `KATRA_OBJECT_SERVICE_ACCOUNT_KEY`, which would hold the
   key itself, stops the startup. The `iam` mode refuses the file setting, as
   the `iam` mode of the `s3` row refuses its key files.
 - The row reads the file through `read_secret_file`, the one reader of a

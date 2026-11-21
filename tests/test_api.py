@@ -13,19 +13,19 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-from analysis_service.api import (
+from katra.api import (
     _REFUSALS,
     BodyLimitMiddleware,
     create_app,
     max_body_bytes,
 )
-from analysis_service.auth import AuthenticationError
-from analysis_service.budgets import BudgetPolicy
-from analysis_service.claims import FrameworkName
-from analysis_service.deployment import Deployment
-from analysis_service.engine import DEFAULT_CALLER
-from analysis_service.errors import MAX_RENDERED_ERRORS, ConfigError
-from analysis_service.jobs import (
+from katra.auth import AuthenticationError
+from katra.budgets import BudgetPolicy
+from katra.claims import FrameworkName
+from katra.deployment import Deployment
+from katra.engine import DEFAULT_CALLER
+from katra.errors import MAX_RENDERED_ERRORS, ConfigError
+from katra.jobs import (
     JOB_ID_PATTERN,
     RESTART_FAILURE_MESSAGE,
     AdmissionOutcome,
@@ -38,14 +38,14 @@ from analysis_service.jobs import (
     RefusalOutcome,
     StubPipelineRunner,
 )
-from analysis_service.parsing import ascii_int
-from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.principals import Identity
-from analysis_service.report import Report
-from analysis_service.sources import Source, SourceLimits
-from analysis_service.store_settings import StoreConfigError
-from analysis_service.validation import ValidationIssue
-from analysis_service.vendors import ProviderAuthError
+from katra.parsing import ascii_int
+from katra.pipeline import AdkPipelineRunner
+from katra.principals import Identity
+from katra.report import Report
+from katra.sources import Source, SourceLimits
+from katra.store_settings import StoreConfigError
+from katra.validation import ValidationIssue
+from katra.vendors import ProviderAuthError
 from tests.factories import (
     A_FACT_ANSWER,
     DEFAULT_FRAMEWORKS,
@@ -860,23 +860,23 @@ def completed_days_ago(store: InMemoryJobStore, days: int) -> str:
 
 
 class TestTheRetentionSweep:
-    """#1530: the app reads ``ANALYSIS_RETENTION_DAYS`` at startup, and the
+    """#1530: the app reads ``KATRA_RETENTION_DAYS`` at startup, and the
     sweep deletes each expired job."""
 
     def test_a_value_that_is_not_a_period_stops_the_startup_first(self, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "0")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "0")
         store = InMemoryJobStore()
         job = seed(store, "alice", "queued").id
         client, _ = make_client(store=store)
         with (
-            pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"),
+            pytest.raises(StoreConfigError, match="KATRA_RETENTION_DAYS"),
             client,
         ):
             pass
         assert asyncio.run(store.get(job)).status == "queued"
 
     def test_unset_keeps_every_job(self, monkeypatch):
-        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        monkeypatch.delenv("KATRA_RETENTION_DAYS", raising=False)
         store = InMemoryJobStore()
         job = completed_days_ago(store, 10_000)
         client, _ = make_client(store=store)
@@ -884,7 +884,7 @@ class TestTheRetentionSweep:
             assert client.get(f"/v1/jobs/{job}", headers=auth()).status_code == 200
 
     def test_the_sweep_starts_with_the_app(self, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "30")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "30")
         store = InMemoryJobStore()
         expired = completed_days_ago(store, 31)
         kept = completed_days_ago(store, 29)
@@ -1115,7 +1115,7 @@ class TestAdmissionOutcomes:
 
         def unconfigured(selection, entry):
             raise ProviderAuthError(
-                "vendor 'anthropic' needs ANALYSIS_ANTHROPIC_API_KEY_FILE; it is unset"
+                "vendor 'anthropic' needs KATRA_ANTHROPIC_API_KEY_FILE; it is unset"
             )
 
         client.app.state.runner_for = unconfigured
@@ -1126,8 +1126,8 @@ class TestAdmissionOutcomes:
 
         assert refused.status_code == 503
         assert refused.headers["content-type"] == "application/problem+json"
-        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" not in refused.text
-        assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" in caplog.text
+        assert "KATRA_ANTHROPIC_API_KEY_FILE" not in refused.text
+        assert "KATRA_ANTHROPIC_API_KEY_FILE" in caplog.text
         # No slot is held, so the ceiling of one still admits the next job.
         assert admitted.status_code == 201
 
@@ -1224,7 +1224,7 @@ class TestConcurrencyCeiling:
         store = InMemoryJobStore()
         seed(store, "alice", "running")
         client, _ = make_client(store=store, max_active_jobs=1)
-        with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
+        with caplog.at_level(logging.WARNING, logger="katra.api"):
             client.post("/v1/jobs", json=submission(), headers=auth())
         assert "alice" in caplog.text
         assert "at_ceiling" in caplog.text
@@ -1459,7 +1459,7 @@ class TestConsumptionBudgets:
     def test_a_refusal_is_logged_with_the_figure_the_response_withholds(self, caplog):
         tiny = self.TIGHT.model_copy(update={"global_max_tokens_per_window": 1})
         client, _ = make_client(budget=tiny)
-        with caplog.at_level(logging.WARNING, logger="analysis_service.api"):
+        with caplog.at_level(logging.WARNING, logger="katra.api"):
             client.post("/v1/jobs", json=submission(), headers=auth())
         refusal = next(r for r in caplog.records if "refused" in r.getMessage())
         assert UUID(refusal.args[0]).version == 4, "a refusal names the owner ID"

@@ -22,8 +22,8 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from analysis_service.parsing import Sha256Hex
-from analysis_service.sources import text_digest
+from katra.parsing import Sha256Hex
+from katra.sources import text_digest
 
 CASES_DIR = Path(__file__).resolve().parent / "cases"
 
@@ -136,7 +136,7 @@ class AdversarialCase(BaseModel):
         return digest_of(self.source_text()) == self.source_sha256
 
 
-#: The content digest of a text: :func:`~analysis_service.sources.text_digest`,
+#: The content digest of a text: :func:`~katra.sources.text_digest`,
 #: which the support spans that pin a quote to its source also call.
 digest_of = text_digest
 

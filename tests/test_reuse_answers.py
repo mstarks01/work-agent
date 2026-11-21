@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import asyncio
 
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import MAX_HELD_FACTS, FactAnswer
-from analysis_service.jobs import JobRecord
-from analysis_service.links import LinkAnswer
-from analysis_service.sources import Source
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.claims import UnknownRef
+from katra.fact_answers import MAX_HELD_FACTS, FactAnswer
+from katra.jobs import JobRecord
+from katra.links import LinkAnswer
+from katra.sources import Source
 from tests.factories import DESCRIPTION_TEXT, sample_selection
 from tests.test_api import auth, submission
 from tests.test_links import catalog_client

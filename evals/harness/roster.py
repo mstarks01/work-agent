@@ -26,8 +26,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast, get_args
 
-from analysis_service.parsing import is_version, strings
 from evals.harness import ledger
+from katra.parsing import is_version, strings
 
 EVALS_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ROSTER_PATH = EVALS_ROOT / "review" / "voters.toml"

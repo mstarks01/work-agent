@@ -14,16 +14,16 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.api import create_app
-from analysis_service.budgets import widest_llm_calls
-from analysis_service.certification import MANIFEST_VERSION
-from analysis_service.compact import (
+from katra import graph
+from katra.api import create_app
+from katra.budgets import widest_llm_calls
+from katra.certification import MANIFEST_VERSION
+from katra.compact import (
     COMPACT_FORMAT,
     FULL_FORMAT,
     CompactSystemModel,
 )
-from analysis_service.deployment import (
+from katra.deployment import (
     ASSERTIONS_VAR,
     BLESSED_FINGERPRINTS_VAR,
     CAPABILITY_READER_VAR,
@@ -35,21 +35,21 @@ from analysis_service.deployment import (
     ConfigPaths,
     Deployment,
 )
-from analysis_service.errors import ConfigError
-from analysis_service.framework_config import CARRIED_VAR, FrameworkConfigError
-from analysis_service.frameworks import PACKAGES, reads_capabilities
-from analysis_service.graph import FrameworkNodes
-from analysis_service.jobs import InMemoryJobStore
-from analysis_service.ladder import OUTPUT_TOOL_NAME
-from analysis_service.model_gate import (
+from katra.errors import ConfigError
+from katra.framework_config import CARRIED_VAR, FrameworkConfigError
+from katra.frameworks import PACKAGES, reads_capabilities
+from katra.graph import FrameworkNodes
+from katra.jobs import InMemoryJobStore
+from katra.ladder import OUTPUT_TOOL_NAME
+from katra.model_gate import (
     ModelGateError,
     emulates_structured_output,
     output_ceiling,
 )
-from analysis_service.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
-from analysis_service.model_tiers import ModelConfigError
-from analysis_service.system_model import EmittedSystemModel
-from analysis_service.vendors import ProviderAuthError, vendor_for
+from katra.model_tiers import SUPPORTED_VERSION as TIERS_SUPPORTED_VERSION
+from katra.model_tiers import ModelConfigError
+from katra.system_model import EmittedSystemModel
+from katra.vendors import ProviderAuthError, vendor_for
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     PROJECT_ROOT,
@@ -74,24 +74,24 @@ RECRITIC_NODE = _STRIDE.node(graph.RECRITIC_ROLE)
 # no credential material is passed at all — the one where getting the set wrong
 # is worth catching.
 VERTEX_TIERS = {
-    "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
-    "ANALYSIS_MODEL_BASE_MODEL": "gemini-2.5-flash",
-    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
-    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "KATRA_MODEL_BASE_VENDOR": "vertex",
+    "KATRA_MODEL_BASE_MODEL": "gemini-2.5-flash",
+    "KATRA_MODEL_STRONG_VENDOR": "vertex",
+    "KATRA_MODEL_STRONG_MODEL": "gemini-2.5-pro",
     # Vertex here too, keeping this module's subject to one credential mode.
     # The shipped node map points nothing at `review`, so this pair selects a
     # tier no node in these tests runs on — but it must still be selected, or
     # the tier config refuses to load at all.
-    "ANALYSIS_MODEL_REVIEW_VENDOR": "vertex",
-    "ANALYSIS_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
+    "KATRA_MODEL_REVIEW_VENDOR": "vertex",
+    "KATRA_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
 }
 
 # Building adapters for that selection needs these two present. They address the
 # deployment; neither is a credential, and no credentials file is named —
 # Vertex resolves its identity from the platform.
 VERTEX_ENV = VERTEX_TIERS | {
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    "KATRA_VERTEX_PROJECT": "test-project",
+    "KATRA_VERTEX_LOCATION": "us-central1",
 }
 
 
@@ -111,7 +111,7 @@ def test_from_env_resolves_the_repo_configs_without_credentials():
 
 def test_each_config_file_is_read_exactly_once(monkeypatch):
     """Each config file, model_tiers.toml among them, is read once."""
-    from analysis_service import deployment as module
+    from katra import deployment as module
 
     reads: list[str] = []
     for name in ("load_model_tiers", "load_sampling", "load_resilience"):
@@ -145,8 +145,8 @@ def test_a_path_variable_picks_the_file_and_never_layers_a_second(tmp_path):
 
 
 def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch):
-    """A wheel install bundles the text roots under analysis_service/_bundled/."""
-    from analysis_service import deployment as module
+    """A wheel install bundles the text roots under katra/_bundled/."""
+    from katra import deployment as module
 
     bundled_domains = tmp_path / "domains"
     bundled_domains.mkdir()
@@ -157,7 +157,7 @@ def test_default_dir_prefers_the_bundled_copy_when_present(tmp_path, monkeypatch
 
 def test_default_dir_falls_back_to_the_repo_copy_when_unbundled(tmp_path, monkeypatch):
     """An editable install has no _bundled/ -- every other test here relies on this."""
-    from analysis_service import deployment as module
+    from katra import deployment as module
 
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
 
@@ -193,13 +193,13 @@ def test_every_bundled_root_is_one_the_service_reads():
     """The other direction: a root bundled into every wheel and read by nothing
     is dead weight in the distribution, and the pair of these two tests is what
     keeps ``force-include`` and ``_default_dir`` describing one layout."""
-    from analysis_service import deployment as module
+    from katra import deployment as module
 
     manifest = tomllib.loads(
         (PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
     )
     included = {
-        target.removeprefix("analysis_service/_bundled/")
+        target.removeprefix("katra/_bundled/")
         for target in manifest["tool"]["hatch"]["build"]["targets"]["wheel"][
             "force-include"
         ].values()
@@ -218,7 +218,7 @@ def test_every_bundled_root_is_one_the_service_reads():
 def test_default_config_path_prefers_the_bundled_copy_when_present(
     tmp_path, monkeypatch
 ):
-    from analysis_service import deployment as module
+    from katra import deployment as module
 
     bundled_config = tmp_path / "config"
     bundled_config.mkdir()
@@ -232,7 +232,7 @@ def test_default_config_path_prefers_the_bundled_copy_when_present(
 def test_default_config_path_falls_back_to_the_repo_copy_when_unbundled(
     tmp_path, monkeypatch
 ):
-    from analysis_service import deployment as module
+    from katra import deployment as module
 
     monkeypatch.setattr(module, "_BUNDLED_DIR", tmp_path / "does-not-exist")
 
@@ -266,7 +266,7 @@ def test_from_env_fails_closed_on_a_missing_resilience_config(tmp_path):
 def test_the_environment_stays_out_of_repr_and_equality():
     """OWASP A09: a deployment in a log or a traceback must not carry a key."""
     deployment = Deployment.from_env(
-        env=VERTEX_ENV | secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-secret")
+        env=VERTEX_ENV | secret_env("KATRA_ANTHROPIC_API_KEY_FILE", "sk-secret")
     )
 
     assert "sk-secret" not in repr(deployment)
@@ -376,7 +376,7 @@ def test_the_optional_passes_table_states_each_pass_and_its_default():
     doc = Path(__file__).resolve().parents[1] / "docs" / "Configuration.md"
     section = doc.read_text(encoding="utf-8").split("### Optional passes\n", 1)[1]
     section = section.split("\n#", 1)[0]
-    row = re.compile(r"^\| `(ANALYSIS_[A-Z_]+)` \|[^|]*\|(.*)\|$", re.MULTILINE)
+    row = re.compile(r"^\| `(KATRA_[A-Z_]+)` \|[^|]*\|(.*)\|$", re.MULTILINE)
     rows = dict(row.findall(section))
     assert set(rows) == set(PASS_FLAGS)
     for var, text in rows.items():
@@ -524,7 +524,7 @@ def test_the_pipeline_binds_retry_and_timeout():
     assert isinstance(translator_of(critic.model), LiteLlm)
     # Zero on purpose: the library's retry layer is off so it cannot set the
     # provider SDK's max_retries from it, and the loop runs one level up in
-    # analysis_service.retry, where a shared budget can bound it.
+    # katra.retry, where a shared budget can bound it.
     assert translator_of(critic.model)._additional_args["num_retries"] == 0
     assert translator_of(critic.model)._additional_args["timeout"] == 300.0
     assert translator_of(critic.model)._additional_args[
@@ -535,22 +535,22 @@ def test_the_pipeline_binds_retry_and_timeout():
 OPENROUTER_ENV = {
     tier: "openrouter"
     for tier in (
-        "ANALYSIS_MODEL_BASE_VENDOR",
-        "ANALYSIS_MODEL_STRONG_VENDOR",
-        "ANALYSIS_MODEL_REVIEW_VENDOR",
+        "KATRA_MODEL_BASE_VENDOR",
+        "KATRA_MODEL_STRONG_VENDOR",
+        "KATRA_MODEL_REVIEW_VENDOR",
     )
 } | {
-    "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
-    "ANALYSIS_MODEL_STRONG_MODEL": "anthropic/claude-opus-4.7",
-    "ANALYSIS_MODEL_REVIEW_MODEL": "anthropic/claude-opus-4.7",
-    "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
-    **secret_env("ANALYSIS_OPENROUTER_API_KEY_FILE", "sk-or-test"),
+    "KATRA_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+    "KATRA_MODEL_STRONG_MODEL": "anthropic/claude-opus-4.7",
+    "KATRA_MODEL_REVIEW_MODEL": "anthropic/claude-opus-4.7",
+    "KATRA_MODEL_CHARGES_OPENROUTER": "direct",
+    **secret_env("KATRA_OPENROUTER_API_KEY_FILE", "sk-or-test"),
 }
 
 
 def test_a_declared_upstream_rides_the_adapter_as_the_request_body_pin():
     """The pin crosses the seam as ``extra_body``, which litellm merges into the body."""
-    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai"}
+    env = OPENROUTER_ENV | {"KATRA_MODEL_UPSTREAMS_OPENROUTER": "openai"}
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -561,7 +561,7 @@ def test_a_declared_upstream_rides_the_adapter_as_the_request_body_pin():
 
 def test_a_pin_on_a_slow_upstream_reads_that_upstream_bounds():
     """The flex row in ``config/resilience.toml``, read through the pin."""
-    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai/flex"}
+    env = OPENROUTER_ENV | {"KATRA_MODEL_UPSTREAMS_OPENROUTER": "openai/flex"}
     deployment = Deployment.from_env(env=env)
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
@@ -572,7 +572,7 @@ def test_a_pin_on_a_slow_upstream_reads_that_upstream_bounds():
 
 
 def test_a_pin_on_an_upstream_with_no_row_reads_the_base_timeout():
-    env = OPENROUTER_ENV | {"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai"}
+    env = OPENROUTER_ENV | {"KATRA_MODEL_UPSTREAMS_OPENROUTER": "openai"}
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -609,7 +609,7 @@ def test_a_variable_set_after_construction_belongs_to_the_next_deployment():
 
 
 def test_env_overrides_the_retry_attempts_without_touching_the_model():
-    deployment = Deployment.from_env(env=VERTEX_ENV | {"ANALYSIS_RETRY_ATTEMPTS": "5"})
+    deployment = Deployment.from_env(env=VERTEX_ENV | {"KATRA_RETRY_ATTEMPTS": "5"})
     pipeline = deployment.pipeline(DEFAULT_FRAMEWORKS)
     nodes = {node.name: node for node in pipeline.workflow.graph.nodes}
 
@@ -629,20 +629,20 @@ def test_building_the_pipeline_fails_closed_without_provider_credentials():
     """
     deployment = Deployment.from_env(env=VERTEX_TIERS)
 
-    with pytest.raises(ProviderAuthError, match="ANALYSIS_VERTEX_PROJECT"):
+    with pytest.raises(ProviderAuthError, match="KATRA_VERTEX_PROJECT"):
         deployment.pipeline(DEFAULT_FRAMEWORKS)
 
 
 def test_a_credential_error_never_echoes_the_secret():
     # OWASP A09: a key echoed into a log or an error has leaked.
     env = VERTEX_ENV | {
-        "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "KATRA_MODEL_BASE_VENDOR": "anthropic",
+        "KATRA_MODEL_BASE_MODEL": "claude-sonnet-4-6",
     }
     with pytest.raises(ProviderAuthError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
-    assert "ANALYSIS_ANTHROPIC_API_KEY_FILE" in str(excinfo.value)
+    assert "KATRA_ANTHROPIC_API_KEY_FILE" in str(excinfo.value)
 
 
 def test_an_offline_resolver_short_circuits_the_credential_check():
@@ -702,15 +702,15 @@ EMULATED_MODEL = "claude-opus-5"
 CLAUDE_NATIVE = "claude-opus-4-7"
 
 ANTHROPIC_ENV = {
-    "ANALYSIS_MODEL_BASE_VENDOR": "anthropic",
-    "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_5,
-    "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
-    "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_5,
-    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-    "ANALYSIS_MODEL_REVIEW_MODEL": CLAUDE_5,
+    "KATRA_MODEL_BASE_VENDOR": "anthropic",
+    "KATRA_MODEL_BASE_MODEL": CLAUDE_5,
+    "KATRA_MODEL_STRONG_VENDOR": "anthropic",
+    "KATRA_MODEL_STRONG_MODEL": CLAUDE_5,
+    "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+    "KATRA_MODEL_REVIEW_MODEL": CLAUDE_5,
     # A placeholder: the loader checks a variable is declared, never that it
     # authenticates, and nothing here reaches a provider.
-    **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
+    **secret_env("KATRA_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
 }
 
 NO_TEMPERATURE = """\
@@ -728,7 +728,7 @@ max_output_tokens = 8192
 # and the env override is the ordinary way that happens. The value is 1: the
 # provider library rejects 0 on these models by itself, so 1 is the value that
 # reaches our rule and proves it is load-bearing rather than redundant.
-BASE_TEMPERATURE_VAR = "ANALYSIS_SAMPLING_BASE_TEMPERATURE"
+BASE_TEMPERATURE_VAR = "KATRA_SAMPLING_BASE_TEMPERATURE"
 STATED_BASE = {BASE_TEMPERATURE_VAR: "1"}
 
 #: Every tier asks for native structured output and refuses the tool path.
@@ -744,8 +744,8 @@ TOOL_ONLY = NO_TEMPERATURE.replace(
 )
 
 EMULATED_ENV = VERTEX_ENV | {
-    "ANALYSIS_MODEL_BASE_MODEL": EMULATED_MODEL,
-    "ANALYSIS_MODEL_STRONG_MODEL": EMULATED_MODEL,
+    "KATRA_MODEL_BASE_MODEL": EMULATED_MODEL,
+    "KATRA_MODEL_STRONG_MODEL": EMULATED_MODEL,
 }
 
 
@@ -780,8 +780,8 @@ def test_the_shipped_sampling_builds_on_a_claude_that_removed_temperature():
     pipeline = Deployment.from_env(
         env=ANTHROPIC_ENV
         | {
-            "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-            "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+            "KATRA_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+            "KATRA_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
         }
     ).pipeline(DEFAULT_FRAMEWORKS)
 
@@ -798,8 +798,8 @@ def test_the_temperature_gate_is_keyed_on_the_model_not_the_vendor():
         VERTEX_ENV
         | STATED_BASE
         | {
-            "ANALYSIS_MODEL_BASE_VENDOR": "vertex",
-            "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_5,
+            "KATRA_MODEL_BASE_VENDOR": "vertex",
+            "KATRA_MODEL_BASE_MODEL": CLAUDE_5,
         }
     )
 
@@ -812,9 +812,9 @@ def test_unsetting_temperature_lets_the_same_selection_build(tmp_path):
     path = tmp_path / "sampling.toml"
     path.write_text(NO_TEMPERATURE, encoding="utf-8")
     env = ANTHROPIC_ENV | {
-        "ANALYSIS_SAMPLING": str(path),
-        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "KATRA_SAMPLING": str(path),
+        "KATRA_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "KATRA_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -829,7 +829,7 @@ def test_asking_for_more_output_than_the_model_serves_fails_the_build():
     passes an over-ceiling value and the serving model rejects it on node one.
     Gemini 2.5 publishes 65,535, so this asks for more.
     """
-    env = VERTEX_ENV | {"ANALYSIS_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "200000"}
+    env = VERTEX_ENV | {"KATRA_SAMPLING_BASE_MAX_OUTPUT_TOKENS": "200000"}
 
     with pytest.raises(ModelGateError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -875,7 +875,7 @@ def test_the_strong_cap_fits_every_model_selectable_on_that_tier(vendor, model):
 
 def test_a_value_exactly_at_the_ceiling_still_builds():
     """The gate bounds the ask at the ceiling, not below it."""
-    env = VERTEX_ENV | {"ANALYSIS_SAMPLING_STRONG_MAX_OUTPUT_TOKENS": "65535"}
+    env = VERTEX_ENV | {"KATRA_SAMPLING_STRONG_MAX_OUTPUT_TOKENS": "65535"}
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
@@ -919,7 +919,7 @@ def test_native_refuses_a_model_without_native_schema_support(tmp_path):
     Temperature is unset so the 4.7 rule cannot fire first and mask which check
     is under test.
     """
-    env = EMULATED_ENV | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
+    env = EMULATED_ENV | {"KATRA_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
 
     with pytest.raises(ModelGateError) as excinfo:
         Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -931,7 +931,7 @@ def test_native_refuses_a_model_without_native_schema_support(tmp_path):
 
 def test_auto_sends_an_emulated_pair_s_schema_as_a_tool_call(tmp_path):
     """ADR 0058: the model builds, and the tier runs the forced tool path."""
-    env = EMULATED_ENV | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE)}
+    env = EMULATED_ENV | {"KATRA_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE)}
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
 
@@ -949,8 +949,8 @@ def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
     every generation, including ones the direct vendor serves natively.
     """
     env = VERTEX_ENV | {
-        "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE),
+        "KATRA_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+        "KATRA_SAMPLING": _sampling_file(tmp_path, NO_TEMPERATURE),
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -961,9 +961,9 @@ def test_vertex_hosted_claude_is_emulated_and_so_takes_the_tool_path(tmp_path):
 def test_tool_forces_the_tool_path_on_a_model_with_native_output(tmp_path):
     """The case the map gets wrong: it marks a model native that a provider refuses."""
     env = ANTHROPIC_ENV | {
-        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, TOOL_ONLY),
-        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "KATRA_SAMPLING": _sampling_file(tmp_path, TOOL_ONLY),
+        "KATRA_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "KATRA_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -979,9 +979,9 @@ def test_a_tier_with_thinking_does_not_force_the_tool(tmp_path):
         "max_output_tokens = 8192\n", 'max_output_tokens = 8192\nthinking = "low"\n'
     )
     env = ANTHROPIC_ENV | {
-        "ANALYSIS_SAMPLING": _sampling_file(tmp_path, thinking),
-        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "KATRA_SAMPLING": _sampling_file(tmp_path, thinking),
+        "KATRA_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "KATRA_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -1029,9 +1029,9 @@ def test_an_unconstrained_tier_suppresses_the_schema_on_the_adapter(tmp_path):
     path = tmp_path / "sampling.toml"
     path.write_text(UNCONSTRAINED_BASE, encoding="utf-8")
     env = ANTHROPIC_ENV | {
-        "ANALYSIS_SAMPLING": str(path),
-        "ANALYSIS_MODEL_BASE_MODEL": CLAUDE_NATIVE,
-        "ANALYSIS_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
+        "KATRA_SAMPLING": str(path),
+        "KATRA_MODEL_BASE_MODEL": CLAUDE_NATIVE,
+        "KATRA_MODEL_STRONG_MODEL": CLAUDE_NATIVE,
     }
 
     pipeline = Deployment.from_env(env=env).pipeline(DEFAULT_FRAMEWORKS)
@@ -1069,13 +1069,11 @@ def test_the_schema_gate_is_scoped_to_tiers_that_send_a_schema(tmp_path):
 
     with pytest.raises(ModelGateError, match='structured_output = "native"'):
         Deployment.from_env(
-            env=EMULATED_ENV
-            | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
+            env=EMULATED_ENV | {"KATRA_SAMPLING": _sampling_file(tmp_path, NATIVE_ONLY)}
         ).pipeline(DEFAULT_FRAMEWORKS)
 
     pipeline = Deployment.from_env(
-        env=EMULATED_ENV
-        | {"ANALYSIS_SAMPLING": _sampling_file(tmp_path, unconstrained)}
+        env=EMULATED_ENV | {"KATRA_SAMPLING": _sampling_file(tmp_path, unconstrained)}
     ).pipeline(DEFAULT_FRAMEWORKS)
 
     assert pipeline.node_models[graph.EXTRACT_NODE] == f"vertex_ai/{EMULATED_MODEL}"
@@ -1091,8 +1089,8 @@ def test_claude_4_6_still_accepts_a_stated_temperature():
         ANTHROPIC_ENV
         | STATED_BASE
         | {
-            "ANALYSIS_MODEL_BASE_MODEL": "claude-sonnet-4-6",
-            "ANALYSIS_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
+            "KATRA_MODEL_BASE_MODEL": "claude-sonnet-4-6",
+            "KATRA_MODEL_STRONG_MODEL": "claude-sonnet-4-6",
         }
     )
 
@@ -1168,13 +1166,13 @@ def test_require_certified_is_off_unless_explicitly_affirmative():
     assert Deployment.from_env(env=VERTEX_TIERS).gate.require_certified is False
     assert (
         Deployment.from_env(
-            env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "no"}
+            env=VERTEX_TIERS | {"KATRA_REQUIRE_CERTIFIED": "no"}
         ).gate.require_certified
         is False
     )
     assert (
         Deployment.from_env(
-            env=VERTEX_TIERS | {"ANALYSIS_REQUIRE_CERTIFIED": "true"}
+            env=VERTEX_TIERS | {"KATRA_REQUIRE_CERTIFIED": "true"}
         ).gate.require_certified
         is True
     )
@@ -1212,7 +1210,7 @@ def test_config_paths_are_repo_relative_by_default():
     paths = ConfigPaths.from_env({})
 
     # Three text roots: the prompts, the shared domains root, and each
-    # package's own text under ANALYSIS_FRAMEWORKS_DIR. The knowledge corpus
+    # package's own text under KATRA_FRAMEWORKS_DIR. The knowledge corpus
     # lives in its package and has no root of its own.
     assert paths.prompts == PROJECT_ROOT / "prompts"
     assert paths.domains == PROJECT_ROOT / "domains"

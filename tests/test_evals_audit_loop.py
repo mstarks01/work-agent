@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
 from evals.harness import audit
+from katra.frameworks import PACKAGES
 
 REVISION = "0" * 40
 TEMPLATE = (

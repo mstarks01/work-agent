@@ -7,7 +7,7 @@ one cross-boundary flow and one intra-zone flow, one recorded assumption.
 The claim-shaped factories here are **STRIDE's**, because STRIDE is the package
 this repository carries and a fixture has to build something concrete. What they
 are built *into* is neutral: :func:`sample_analysis` fills one
-:class:`~analysis_service.frameworks.stride.record.StrideAnalysis` block and
+:class:`~katra.frameworks.stride.record.StrideAnalysis` block and
 :func:`sample_report` wraps it in the envelope beside the job's own selection,
 so a test that means to talk about the envelope can hold a second block without
 going through here.
@@ -45,14 +45,14 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from analysis_service import frameworks as framework_registry
-from analysis_service.answer_sets import AnswerSet
-from analysis_service.answer_state import AnswerState
-from analysis_service.binding import NodeBinding
-from analysis_service.budgets import BudgetPolicy
-from analysis_service.certification import MANIFEST_VERSION, BlessedManifest
-from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
-from analysis_service.claims import (
+from katra import frameworks as framework_registry
+from katra.answer_sets import AnswerSet
+from katra.answer_state import AnswerState
+from katra.binding import NodeBinding
+from katra.budgets import BudgetPolicy
+from katra.certification import MANIFEST_VERSION, BlessedManifest
+from katra.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from katra.claims import (
     Ground,
     Mitigation,
     ProposedVerdict,
@@ -62,17 +62,17 @@ from analysis_service.claims import (
     UnknownRef,
     Verdict,
 )
-from analysis_service.compact import FULL_FORMAT, ExtractionFormat
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.engine import Engine
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.frameworks import PACKAGES, FrameworkName, FrameworkPackage
-from analysis_service.frameworks.asvs.record import (
+from katra.compact import FULL_FORMAT, ExtractionFormat
+from katra.conformance import REFERENCE_MODELS
+from katra.engine import Engine
+from katra.fact_answers import FactAnswer
+from katra.frameworks import PACKAGES, FrameworkName, FrameworkPackage
+from katra.frameworks.asvs.record import (
     DraftRequirementRuling,
     RequirementProposal,
     RequirementRulingProposal,
 )
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks.stride.record import (
     LANES_OF_VERB,
     STRIDE_VERSION,
     DraftThreat,
@@ -81,38 +81,38 @@ from analysis_service.frameworks.stride.record import (
     ThreatProposal,
     ThreatRuling,
 )
-from analysis_service.graph import (
+from katra.graph import (
     CAPABILITIES_NODE,
     ENTRY_EXTRACT,
     Entry,
     Pipeline,
     build_pipeline,
 )
-from analysis_service.identity import build_identity, execution_fingerprint
-from analysis_service.jobs import Checkpoint, InMemoryJobStore, PipelineRunner
-from analysis_service.links import LinkAnswer
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_tiers import (
+from katra.identity import build_identity, execution_fingerprint
+from katra.jobs import Checkpoint, InMemoryJobStore, PipelineRunner
+from katra.links import LinkAnswer
+from katra.markdown_loader import MarkdownLoader
+from katra.model_tiers import (
     ModelTierConfig,
     TierName,
     charges_env_var_for,
     credentials_env_var_for,
     load_model_tiers,
 )
-from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.principals import Identity, Principal
-from analysis_service.provider import InProcessExecutor
-from analysis_service.report import (
+from katra.pipeline import AdkPipelineRunner
+from katra.principals import Identity, Principal
+from katra.provider import InProcessExecutor
+from katra.report import (
     FrameworkSelection,
     InputRef,
     Job,
     NodeRun,
     Report,
 )
-from analysis_service.retry import ATTEMPTS_METADATA_KEY
-from analysis_service.sampling import SamplingConfig, load_sampling
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source, SourceLimits
-from analysis_service.system_model import (
+from katra.retry import ATTEMPTS_METADATA_KEY
+from katra.sampling import SamplingConfig, load_sampling
+from katra.sources import DEFAULT_DESCRIPTION_LABEL, Source, SourceLimits
+from katra.system_model import (
     Assumption,
     DataFlow,
     DataStore,
@@ -122,7 +122,7 @@ from analysis_service.system_model import (
     SystemModel,
     TrustBoundary,
 )
-from analysis_service.vendors import (
+from katra.vendors import (
     ChargeMode,
     CredentialMode,
     VendorName,
@@ -156,22 +156,22 @@ EVAL_MODEL = "vertex_ai/fake-pro-001"
 # the vendors are
 # named so the binding and the gate see a realistic pair, not so a model runs.
 TEST_TIER_ENV: dict[str, str] = {
-    "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-    "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
-    "ANALYSIS_MODEL_STRONG_VENDOR": "vertex",
-    "ANALYSIS_MODEL_STRONG_MODEL": "gemini-2.5-pro",
+    "KATRA_MODEL_BASE_VENDOR": "openai",
+    "KATRA_MODEL_BASE_MODEL": "gpt-4.1-mini",
+    "KATRA_MODEL_STRONG_VENDOR": "vertex",
+    "KATRA_MODEL_STRONG_MODEL": "gemini-2.5-pro",
     # A third vendor on `review`, so the tier is not accidentally covered by
     # whatever `strong` happens to select. The shipped node map leaves criticism
     # on `strong`, so nothing here runs on this pair until a test moves it —
     # which is the point: an unexercised tier that is also unselectable would
     # hide every defect in selecting it.
-    "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-    "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+    "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+    "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
     # The assertion pass runs by default (ADR 0075). The scripted sweeps that
     # read this env script the lanes and the critic and no ``assert`` node, so
     # they turn it off; a test of the pass sets it on.
-    "ANALYSIS_ASSERTIONS": "false",
-    "ANALYSIS_CAPABILITY_READER": "false",
+    "KATRA_ASSERTIONS": "false",
+    "KATRA_CAPABILITY_READER": "false",
 }
 
 _KEY_DIR = Path(tempfile.mkdtemp(prefix="analysis-test-keys-"))
@@ -213,10 +213,10 @@ def declared_env(vendor: VendorName, mode: CredentialMode) -> dict[str, str]:
 # No Google credentials file. Vertex runs under platform identity and passes no
 # credential material, so the registry names none to declare.
 TEST_CREDENTIAL_ENV: dict[str, str] = {
-    **secret_env("ANALYSIS_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
-    **secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
-    "ANALYSIS_VERTEX_PROJECT": "test-project",
-    "ANALYSIS_VERTEX_LOCATION": "us-central1",
+    **secret_env("KATRA_ANTHROPIC_API_KEY_FILE", "sk-ant-not-a-real-key"),
+    **secret_env("KATRA_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
+    "KATRA_VERTEX_PROJECT": "test-project",
+    "KATRA_VERTEX_LOCATION": "us-central1",
 }
 
 
@@ -280,12 +280,12 @@ def tiers_for(
     base, strong = models or REFERENCE_MODELS[vendor]
     entry = vendor_for(vendor)
     env = {
-        "ANALYSIS_MODEL_BASE_VENDOR": vendor,
-        "ANALYSIS_MODEL_BASE_MODEL": base,
-        "ANALYSIS_MODEL_STRONG_VENDOR": vendor,
-        "ANALYSIS_MODEL_STRONG_MODEL": strong,
-        "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+        "KATRA_MODEL_BASE_VENDOR": vendor,
+        "KATRA_MODEL_BASE_MODEL": base,
+        "KATRA_MODEL_STRONG_VENDOR": vendor,
+        "KATRA_MODEL_STRONG_MODEL": strong,
+        "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+        "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
     }
     if len(entry.credential_modes) > 1:
         chosen = entry.credential_modes[0] if mode is None else mode
@@ -366,7 +366,7 @@ async def new_principal(store: Any, owner_id: str) -> Principal | None:
 async def admit(store: Any, record: Any) -> Any:
     """Put ``record`` in ``store`` without exercising the ceiling.
 
-    :meth:`~analysis_service.jobs.JobStore.reserve` is the only way in, by
+    :meth:`~katra.jobs.JobStore.reserve` is the only way in, by
     design — the protocol carries no unconditional create, so a backend cannot
     offer one the API might race on. A test that is seeding rather than
     measuring a bound passes bounds it cannot reach. A refused seed fails
@@ -386,7 +386,7 @@ async def admit(store: Any, record: Any) -> Any:
 #: A job ID of the minted shape that no store holds.
 MISSING_JOB = "job-" + "0" * 32
 #: Job IDs of another shape than
-#: :meth:`~analysis_service.jobs.JobRecord.create` mints. A ``$``-anchored
+#: :meth:`~katra.jobs.JobRecord.create` mints. A ``$``-anchored
 #: match passes the last one, and only ``fullmatch`` refuses it.
 MALFORMED_JOB_IDS = (
     "job-missing",
@@ -565,7 +565,7 @@ def carrying(monkeypatch: Any, package: FrameworkPackage) -> None:
     """Register one package under its own name for the length of a test.
 
     Patches the registry rather than the name it is read through:
-    :func:`~analysis_service.frameworks.package_for` reads the module global, and
+    :func:`~katra.frameworks.package_for` reads the module global, and
     the graph holds no package of its own.
     """
     monkeypatch.setattr(
@@ -580,7 +580,7 @@ def repo_package_loaders(
 ) -> dict[FrameworkName, MarkdownLoader]:
     """One loader per selected package, rooted where this repo ships its text.
 
-    The third of :func:`~analysis_service.graph.build_pipeline`'s three roots, and
+    The third of :func:`~katra.graph.build_pipeline`'s three roots, and
     the only one that is per framework. Built here so a test naming a selection
     does not also have to know that a package's text lives at
     ``frameworks/<name>/``.
@@ -607,7 +607,7 @@ all of them.
 
 #: A process three hops from the login flow the sample draft's grounds name:
 #: it reads the orders store, which is itself two hops from the login. So it
-#: sits past the fan-in bound (:data:`~analysis_service.fan_in.BOUND_HOPS`).
+#: sits past the fan-in bound (:data:`~katra.fan_in.BOUND_HOPS`).
 REPORTING_JOB = "process:reporting-job"
 
 
@@ -796,7 +796,7 @@ def sample_proposal(
 
     ``framework`` and ``framework_version`` are excluded alongside ``id``: all
     three are the *service's* to stamp, composed by
-    :func:`~analysis_service.evidence.resolve_proposals` from the package it is
+    :func:`~katra.evidence.resolve_proposals` from the package it is
     resolving for, so a proposal carrying them would be an agent asserting its
     own provenance.
     """
@@ -1024,7 +1024,7 @@ def claims_json(*claims: BaseModel) -> str:
 
     The key is ``claims`` rather than ``threats`` because one shared
     ``prompts/analyze.md`` serves every registered framework's lane agents; see
-    :class:`~analysis_service.claims.ProposalBatch`.
+    :class:`~katra.claims.ProposalBatch`.
     """
     return json.dumps({"claims": [claim.model_dump(mode="json") for claim in claims]})
 
@@ -1034,7 +1034,7 @@ def translator_of(model):
 
     One reader for what is otherwise a chain every test would spell for itself.
     ``build_tier_adapters`` returns an
-    :class:`~analysis_service.provider.ExecutedLlm`, and the translator holding
+    :class:`~katra.provider.ExecutedLlm`, and the translator holding
     the credential, the constructor kwargs and the client sits on the provider
     side of its seam. A test asking what reached LiteLLM is asking about that
     object.
@@ -1079,7 +1079,7 @@ def _injecting_client_class(client_cls: type, client: Any) -> type:
     """``client_cls``, handing litellm ``client`` instead of a real connection.
 
     Takes the class rather than naming one, the way
-    :func:`analysis_service.charges.charge_capturing_client_class` does — the
+    :func:`katra.charges.charge_capturing_client_class` does — the
     translator under test may be carrying either ADK's own client or the
     charge-capturing subclass, and this must not care which.
     """
@@ -1121,7 +1121,7 @@ def inject_transport(
     differently.
     """
     # Deferred, and not a style choice: importing ``litellm`` at module level
-    # here would sort above ``analysis_service`` and so could pull the library
+    # here would sort above ``katra`` and so could pull the library
     # in before ``model_gate`` pins its model-cost map to the installed copy.
     # ``binding`` defers its own ADK import for the same ordering.
     from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
@@ -1399,7 +1399,7 @@ def scripted_pipeline(
     capability reader an empty reading.
 
     ``frameworks`` is the selection the graph is built for, because a graph is
-    built for one selection (:func:`~analysis_service.graph.build_pipeline`). The returned
+    built for one selection (:func:`~katra.graph.build_pipeline`). The returned
     map covers whatever LLM nodes that selection produced.
 
     ``sampling`` substitutes another *legal* deployment's decoding params for
@@ -1489,7 +1489,7 @@ class ScriptedFramework:
 
 
 #: One scripted fixture per package, keyed by framework and checked against
-#: :data:`~analysis_service.frameworks.PACKAGES` in ``test_framework_neutrality``.
+#: :data:`~katra.frameworks.PACKAGES` in ``test_framework_neutrality``.
 #: A test that runs the real graph over every pair reads this rather than
 #: naming a package, so a new package joins the run by adding an entry.
 SCRIPTED_FRAMEWORKS: Mapping[FrameworkName, ScriptedFramework] = MappingProxyType(

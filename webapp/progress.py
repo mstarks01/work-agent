@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Literal, get_args
 
-from analysis_service.graph import (
+from katra.graph import (
     ENTRY_EXTRACT,
     ENTRY_HEAD_ONLY,
     Entry,
@@ -23,8 +23,8 @@ from analysis_service.graph import (
     entry_steps,
     step_by_graph_node,
 )
-from analysis_service.job_state import JobState, RunOrigin, RunStart, run_start_of
-from analysis_service.jobs import JobEvent, JobRecord, completed_nodes, is_follow_up
+from katra.job_state import JobState, RunOrigin, RunStart, run_start_of
+from katra.jobs import JobEvent, JobRecord, completed_nodes, is_follow_up
 
 #: Which progress line a run gets: ``to-questions`` where the run stops to ask
 #: a person, and ``to-report`` for each other run.
@@ -162,7 +162,7 @@ def progress_line(
     ``record`` is a job whose ``state`` has the page status ``running``: a
     job in flight, or a paused job that this process continues, whose line
     says what the run that continues it does first. ``origin`` is its
-    :func:`~analysis_service.job_state.run_origin`. Raises
+    :func:`~katra.job_state.run_origin`. Raises
     :class:`ValueError` for each other state, and :class:`KeyError` for an
     event whose node no graph of the job's selection holds.
 

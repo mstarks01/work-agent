@@ -10,11 +10,11 @@ which is a live failure for a repository edit.
 So both directions are checked here, along with the structure the composition
 depends on and the token caps that keep parallel lanes affordable.
 
-**Over :data:`~analysis_service.frameworks.PACKAGES`, not over one directory.**
+**Over :data:`~katra.frameworks.PACKAGES`, not over one directory.**
 Both packages ship a corpus and every check below runs over both, so a new
 package's corpus is linted with no edit here (#272). A package shipping none is
 still covered: it writes two empty tables and the gate passes it vacuously,
-which is the shape :class:`~analysis_service.frameworks.KnowledgeTables`
+which is the shape :class:`~katra.frameworks.KnowledgeTables`
 describes. A check that names one package's directory would leave another
 package's documents unlinted.
 """
@@ -25,9 +25,9 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
-from analysis_service.knowledge import MAX_CASES, MAX_NOTES
-from analysis_service.markdown_loader import (
+from katra.frameworks import PACKAGES
+from katra.knowledge import MAX_CASES, MAX_NOTES
+from katra.markdown_loader import (
     MarkdownLoader,
     estimate_tokens,
     split_sections,
@@ -49,7 +49,7 @@ NOTE_SECTION_HEADINGS = ("When this applies", "What to look for", "Guardrails")
 # last on purpose — a reader who stops after two sections has the answer.
 CASE_SECTION_HEADINGS = ("Pattern", "Considered", "Ruling", "Why", "What decided it")
 
-# Per document, and deliberately not in ``analysis_service.token_caps``. That
+# Per document, and deliberately not in ``katra.token_caps``. That
 # table alarms on drift over the *static* instruction, where a file growing is
 # only a thing to look at. These two are a real ceiling: a note rides in the
 # job-varying block, lanes retrieve independently, and what one job sends is
@@ -65,7 +65,7 @@ RETRIEVED_CORPUS_CEILING = 4000
 
 #: Packages shipping no corpus at all. Vacuous rather than exempt: every check
 #: below runs and finds nothing to check, which is what
-#: :class:`~analysis_service.frameworks.KnowledgeTables` means by "the gate passes
+#: :class:`~katra.frameworks.KnowledgeTables` means by "the gate passes
 #: it vacuously". Recorded so a reader knows the silence is the contract and not
 #: a lint that stopped running.
 #:

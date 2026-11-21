@@ -15,12 +15,12 @@ from collections.abc import Mapping
 import pytest
 from google.adk.models.base_llm import BaseLlm
 
-from analysis_service import graph
-from analysis_service.assertions import AssertionRecord
-from analysis_service.deployment import Deployment
-from analysis_service.sampling import load_sampling
 from evals.harness import modes
 from evals.harness.artifact import REPO_ROOT
+from katra import graph
+from katra.assertions import AssertionRecord
+from katra.deployment import Deployment
+from katra.sampling import load_sampling
 from tests.factories import EVAL_MODEL, ScriptedLlm, emitted
 from tests.test_deployment import VERTEX_ENV
 from tests.test_evals_modes import scripted_assertions
@@ -47,7 +47,7 @@ def head_pipeline(corpus_case, models: dict[str, ScriptedLlm], **overrides: str)
         )
         return models[tier_node]
 
-    env = dict(VERTEX_ENV) | {"ANALYSIS_ASSERTIONS": "true"}
+    env = dict(VERTEX_ENV) | {"KATRA_ASSERTIONS": "true"}
     return modes.build_eval_pipeline(
         graph.ENTRY_HEAD_ONLY,
         frameworks=("stride",),
@@ -76,7 +76,7 @@ class TestTheHeadOnlyGraph:
                 graph.ENTRY_HEAD_ONLY,
                 frameworks=("stride",),
                 deployment=Deployment.from_env(
-                    env=VERTEX_ENV | {"ANALYSIS_ASSERTIONS": "false"}
+                    env=VERTEX_ENV | {"KATRA_ASSERTIONS": "false"}
                 ),
                 resolve_model=lambda tier_node: ScriptedLlm(
                     model=EVAL_MODEL, reply="{}", seen=[]

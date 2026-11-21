@@ -15,8 +15,8 @@ branch for the reason ``docs/agents/framework-parity.md`` gives: a node added
 tomorrow has to land in exactly one phase, and
 ``tests/test_evals_audit.py`` compares the table against the three registries
 that hold the real names — the ``*_NODE`` constants of
-:mod:`analysis_service.graph`, its :data:`~analysis_service.graph.ROLES`, and
-the lane node of every lane in :data:`~analysis_service.frameworks.PACKAGES`.
+:mod:`katra.graph`, its :data:`~katra.graph.ROLES`, and
+the lane node of every lane in :data:`~katra.frameworks.PACKAGES`.
 A node covered by no phase fails there rather than being attributed by whoever
 is reading.
 
@@ -71,12 +71,12 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
-from analysis_service.parsing import non_negative, strings
 from evals.harness.history import current_commit
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import DEFAULT_CORPUS, load_corpus
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
+from katra.parsing import non_negative, strings
 
 #: Where the ledger lives: one JSONL file per audit, named by its audit ID.
 #: Per audit rather than one shared file for the reason the vote ledger is per

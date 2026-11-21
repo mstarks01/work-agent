@@ -1,7 +1,7 @@
 """Compare orders of a report's follow-up questions at a matched number of choices.
 
 A report asks the open facts its conditional findings wait on (ADR 0054), in
-the order :func:`~analysis_service.questions.follow_up_order` sets (ADR 0055).
+the order :func:`~katra.questions.follow_up_order` sets (ADR 0055).
 The #1289 review of 2026-10-01 asked what "most important first" should mean:
 the most findings completed at each step, or the most important finding's
 facts first, even where they are two. This command answers that offline, for
@@ -9,13 +9,13 @@ an owner who answers from the top and stops after a number of choices.
 
 **What an order is worth is read off archived reports.** A conditional finding
 is complete when every open fact it waits on is answered
-(:func:`~analysis_service.questions.follow_up_needs` reads them). The count is
+(:func:`~katra.questions.follow_up_needs` reads them). The count is
 by band, as each package ranks its findings. It is a count of dependency sets
 an order completes, never a count of findings an answer changes.
 
 **Effort is choices**: one a facet for a question answered in facets, and one
 for every other question. :data:`EFFORTS` counts the facets two ways: the
-facets the page asks (:attr:`~analysis_service.questions.FactQuestion.asks`,
+facets the page asks (:attr:`~katra.questions.FactQuestion.asks`,
 ADR 0112), and every facet of the kind, as the page asked them before. A fact
 the page does not ask, such as an attribute the model states, counts every
 facet under both.
@@ -34,11 +34,14 @@ from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from pathlib import Path
 
-from analysis_service.claims import UnknownKey
-from analysis_service.critic import complete_rulings
-from analysis_service.critic_round import rulings_of
-from analysis_service.frameworks import SCHEMAS
-from analysis_service.questions import (
+from evals.harness.archive import case_suffix
+from evals.harness.bundle import read_report
+from evals.harness.run_record import run_record
+from katra.claims import UnknownKey
+from katra.critic import complete_rulings
+from katra.critic_round import rulings_of
+from katra.frameworks import SCHEMAS
+from katra.questions import (
     Basis,
     Finding,
     FollowUpNeeds,
@@ -47,10 +50,7 @@ from analysis_service.questions import (
     follow_up_needs,
     follow_up_order,
 )
-from analysis_service.report import Report
-from evals.harness.archive import case_suffix
-from evals.harness.bundle import read_report
-from evals.harness.run_record import run_record
+from katra.report import Report
 
 #: The owner effort, in choices, at which each order is read.
 BUDGETS = (1, 2, 3, 5, 10, 15, 20)
@@ -72,7 +72,7 @@ def _completing(
 ) -> list[UnknownKey]:
     """The facts in the order that completes the most important findings first.
 
-    ``band`` is each finding's :class:`~analysis_service.frameworks.Band`
+    ``band`` is each finding's :class:`~katra.frameworks.Band`
     order. Where one question completes findings, the next is the one that
     completes the most in the highest band, then in the next band down, and so
     on: one critical finding before three low ones, with no weights. Where
@@ -210,9 +210,9 @@ def with_rulings(report: Report, rulings: Path) -> Report:
     """The report with one critic sample's verdicts on its drafts.
 
     Each ruling is completed against its draft as the service completes it
-    (:func:`~analysis_service.critic.complete_rulings`), so a draft that rests
+    (:func:`~katra.critic.complete_rulings`), so a draft that rests
     on an unstated fact reads ``needs-info`` here as it would in a report.
-    The sample is parsed by :func:`~analysis_service.critic_round.rulings_of`, as the
+    The sample is parsed by :func:`~katra.critic_round.rulings_of`, as the
     graph parses a critic's emission.
     """
     emitted = json.loads(rulings.read_text(encoding="utf-8"))["claims"]

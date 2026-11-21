@@ -10,7 +10,7 @@ one to watch first: it runs one small job rather than the thirteen-case corpus, 
 it answers "does Vertex serve this graph" for cents, on every merge to `main`.
 
 This covers **Vertex only**, because that is what `evals-live.yml` selects in
-its `ANALYSIS_MODEL_*` block. The shipped configuration selects no vendor at all
+its `KATRA_MODEL_*` block. The shipped configuration selects no vendor at all
 — see [Configuration](../docs/Configuration.md#models-and-vendors) — so the
 workflow names one, and this setup follows that choice rather than the other way
 round. Point those variables at Anthropic or OpenAI and the CI credential

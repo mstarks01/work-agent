@@ -11,10 +11,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from analysis_service.claims import FrameworkName
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
 from evals.harness.early_rounds import replay
+from katra.claims import FrameworkName
+from katra.report import Report
+from katra.system_model import SystemModel
 
 
 def main(out: Path, root: Path = Path("evals")) -> None:

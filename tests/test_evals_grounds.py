@@ -11,21 +11,21 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.claims import (
-    DroppedClaim,
-    Ground,
-    RepairedQuote,
-    UnverifiedGround,
-)
-from analysis_service.fan_in import DraftJoinError, fan_in
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from evals.harness.grounds import (
     GroundMisShape,
     aggregate_grounds,
     classify_failure,
     measure_grounds,
 )
+from katra.claims import (
+    DroppedClaim,
+    Ground,
+    RepairedQuote,
+    UnverifiedGround,
+)
+from katra.fan_in import DraftJoinError, fan_in
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import STRIDE_VERSION, DraftThreat
 from tests.eval_factories import draft_threat
 from tests.factories import sample_proposal, valid_model
 from tests.test_fan_in import LABEL as DESCRIPTION_LABEL
@@ -113,7 +113,7 @@ class TestMeasureGrounds:
         the record is counted rather than dropped from the measurement."""
         from typing import get_args
 
-        from analysis_service.claims import GroundKind
+        from katra.claims import GroundKind
 
         measurement = measure_grounds(
             "case-a", "stride", [], [], dropped=(), repaired=(), quotes_checked=True

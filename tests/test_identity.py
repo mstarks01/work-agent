@@ -11,8 +11,8 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-from analysis_service.conformance import REFERENCE_MODELS
-from analysis_service.identity import (
+from katra.conformance import REFERENCE_MODELS
+from katra.identity import (
     BUILD_DISTRIBUTIONS,
     IDENTITY_VERSION,
     BuildIdentityError,
@@ -22,8 +22,8 @@ from analysis_service.identity import (
     fingerprint,
     served_trust_for,
 )
-from analysis_service.sampling import TierSampling
-from analysis_service.vendors import (
+from katra.sampling import TierSampling
+from katra.vendors import (
     VENDOR_NAMES,
     CredentialMode,
     Vendor,
@@ -32,7 +32,7 @@ from analysis_service.vendors import (
 
 # Deliberately not the installed versions: a fixture that happened to match the
 # running install would let a recomputation that ignores the recorded map pass.
-BUILD = {"analysis-service": "0.0.1", "google-adk": "0.0.2", "litellm": "0.0.3"}
+BUILD = {"katra": "0.0.1", "google-adk": "0.0.2", "litellm": "0.0.3"}
 INSTRUCTIONS = "ab" * 32
 OTHER_INSTRUCTIONS = "cd" * 32
 
@@ -199,7 +199,7 @@ class TestBuildIdentity:
         # bump the field exists to catch, so it raises instead.
         build_identity.cache_clear()
         monkeypatch.setattr(
-            "analysis_service.identity.BUILD_DISTRIBUTIONS",
+            "katra.identity.BUILD_DISTRIBUTIONS",
             (*BUILD_DISTRIBUTIONS, "no-such-distribution"),
         )
         with pytest.raises(BuildIdentityError, match="no-such-distribution"):

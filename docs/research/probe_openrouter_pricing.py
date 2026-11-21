@@ -25,7 +25,7 @@ serves is not knowable before the call.
 
 **The map this reads is the pinned one.** litellm fetches its cost map from
 ``BerriAI/litellm@main`` at import unless ``LITELLM_LOCAL_MODEL_COST_MAP`` is
-set first, and :mod:`analysis_service.model_gate` sets it. So the module-level
+set first, and :mod:`katra.model_gate` sets it. So the module-level
 import of the harness above is what makes leg 2 a statement about the map the
 estimate path actually reads. A probe that imported ``litellm`` on its own
 would measure the network's map instead, and the two differ: the fetched map
@@ -46,7 +46,7 @@ from typing import Any
 
 import httpx
 
-from analysis_service.vendors import vendor_for
+from katra.vendors import vendor_for
 from evals.harness.prices import unit_prices
 
 #: The base litellm's pinned ``main.py`` falls back to for this provider. It is

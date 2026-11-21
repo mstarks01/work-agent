@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from analysis_service.detected_facts import detected_facts
+from katra.detected_facts import detected_facts
 from tests.factories import valid_model
 from tests.test_api import auth
 from tests.test_links import catalog_client

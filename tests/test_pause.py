@@ -16,10 +16,10 @@ import json
 import pytest
 from starlette.requests import ClientDisconnect
 
-from analysis_service import graph
-from analysis_service.assertions import AssertionRecord
-from analysis_service.frameworks import PACKAGES
-from analysis_service.jobs import (
+from katra import graph
+from katra.assertions import AssertionRecord
+from katra.frameworks import PACKAGES
+from katra.jobs import (
     TERMINAL_STATUSES,
     Checkpoint,
     InMemoryJobStore,
@@ -28,9 +28,9 @@ from analysis_service.jobs import (
     Resumption,
     execute_job,
 )
-from analysis_service.pipeline import AdkPipelineRunner, entry_of
-from analysis_service.report import NodeRun
-from analysis_service.sources import Source
+from katra.pipeline import AdkPipelineRunner, entry_of
+from katra.report import NodeRun
+from katra.sources import Source
 from tests.factories import (
     DESCRIPTION_TEXT,
     adk_runner,
@@ -323,7 +323,7 @@ class TestTheEventStreamCap:
 
     @pytest.mark.parametrize("spec", ["2.0", "2.4"])
     def test_a_subject_past_the_cap_is_refused_and_every_slot_comes_back(self, spec):
-        from analysis_service.api import MAX_EVENT_STREAMS_PER_OWNER
+        from katra.api import MAX_EVENT_STREAMS_PER_OWNER
 
         client, store = catalog_client()
         app = client.app
@@ -359,7 +359,7 @@ class TestThePausePathIsCertified:
     FP = "a" * 64
 
     def gate(self, blessed=(), require_certified=True):
-        from analysis_service.certification import (
+        from katra.certification import (
             MANIFEST_VERSION,
             BlessedManifest,
             CertificationGate,
@@ -409,7 +409,7 @@ class TestThePausePathIsCertified:
 
     @pytest.mark.parametrize("parent_certified", [True, False])
     def test_a_resumed_run_answers_for_its_parent_too(self, parent_certified):
-        from analysis_service.certification import CertifyResult, UncertifiedNode
+        from katra.certification import CertifyResult, UncertifiedNode
 
         pipeline, _ = scripted_pipeline({}, entry=graph.ENTRY_RESUME)
         parent = (
@@ -440,7 +440,7 @@ class TestThePausePathIsCertified:
         assert result.complete
 
     def test_a_waiting_job_s_questions_and_answers_follow_the_gate(self):
-        from analysis_service.certification import CertifyResult, UncertifiedNode
+        from katra.certification import CertifyResult, UncertifiedNode
 
         client, store = catalog_client()
         client.app.state.certification = self.gate()
@@ -459,7 +459,7 @@ class TestThePausePathIsCertified:
         assert questions.json()["uncertified_nodes"][0]["node"] == "extract"
 
     def test_the_resumed_job_carries_its_parent_s_verdict(self):
-        from analysis_service.certification import CertifyResult
+        from katra.certification import CertifyResult
 
         client, store = catalog_client()
         job = waiting(store)

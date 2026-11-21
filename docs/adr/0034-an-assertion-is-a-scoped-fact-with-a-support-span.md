@@ -114,7 +114,7 @@ that word one mechanism differently produce two IDs, and matching them is an
 explicit alignment step whose unresolved cases stay visible.
 
 **5. Code locates a span. A model never states an offset.** Extraction proposes
-a quote. `analysis_service.grounding` decides whether the quote is in the source,
+a quote. `katra.grounding` decides whether the quote is in the source,
 and code records the offsets of the span it found. That keeps one reader for
 "is this quote in this source", so a span and a **Ground** can never disagree
 about the same quote. A quote that does not verify yields no span, and the

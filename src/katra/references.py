@@ -1,0 +1,108 @@
+"""Which known name is a model's reference spelling of?
+
+This module answers one question mechanically, and it is the companion to
+:mod:`katra.grounding`. That module decides whether a quoted span is
+really in the source it names. This one decides whether an identifier a model
+emitted is really one the job already holds. Both exist because a model asked to
+echo a string back does not always echo it byte for byte, and neither difference
+is a judgement anybody should use a prompt on.
+
+It is a leaf, and imports nothing from this package, because both the validity
+gate and the critic's seams need it and the gate runs long before a threat
+exists. The functions that apply it to a particular schema live with that
+schema's own checks: draft and ruling references in
+:mod:`katra.critic`, and an element's ``source_label`` in
+:func:`~katra.system_model.normalize_element_ids`.
+
+It is not a resolver. It never finds the element a reference meant. It only
+recognizes the one it already names, under a spelling the job's own construction
+rules make equivalent. A reference that names nothing comes back empty, and the
+caller's check reports it as a reference that names nothing.
+
+The fold is two rungs, case and whitespace. Each rung of the quote ladder is a
+concession that loses some measured precision. These two almost never lose any,
+and the uniqueness guard, rather than the argument for why, is what makes them
+safe.
+
+The argument comes first, because it says how often the guard binds. An element
+ID is ``derive_element_id``'s output, and every ID a validated model carries
+equals it: the gate's ``id-mismatch`` rule enforces that for every element, on
+every path, whether or not the caller asked for normalization, and its
+``empty-slug`` rule refuses each element that has no derived ID. That output runs
+through :func:`~katra.system_model.normalize_name`, which lowercases
+the name, elides an apostrophe and maps every other character outside
+``[a-z0-9]`` to ``-``. An ID therefore carries neither an uppercase character
+nor a space, and folding one cannot merge two elements a run could otherwise
+tell apart.
+
+Source labels are the caller's bytes rather than derived slugs, so the argument
+does not hold for them at all. ``"System description"`` and ``"SYSTEM
+DESCRIPTION"`` are two distinct labels a job may legally carry at once. Under a
+fold alone they would be one label. Under the guard, the reference matches two
+known spellings, resolves to neither, and is left for the caller's check exactly
+as an unresolvable reference is.
+
+This module refuses two further rungs. Its readers are the draft references a
+lane emits, the ruling references a critic emits, and an element's source
+label. It refuses them for the reason ``grounding`` refuses
+punctuation-blindness: no measurement shows what either rung does to
+precision. Two other readers take one rung each, in their own code, for a
+reason each one states.
+
+* Bare slug — reading ``store:web-app`` as ``process:web-app`` because only one
+  element has that slug. A lane or critic reference does not take it, because
+  the prefix is not spelling there. An agent that filed a process as a data
+  store reasoned about a different kind of thing, and a threat's meaning turns
+  on which it was. A flow endpoint at extraction takes it, through
+  :func:`~katra.system_model.follow_by_slug` (ADR 0089,
+  ``docs/adr/0089-a-mistyped-flow-endpoint-follows-the-one-element-with-its-slug.md``).
+  There the model named the element and mistyped its prefix, and an endpoint
+  can only be an entity, a process or a store.
+* Name to ID — turning ``"Web App"`` into ``process:web-app`` through
+  ``normalize_name``. A lane or critic reference does not take it, because the
+  lane and critic prompts spell every element as its ID. The assertion pass
+  takes it for a graph-bound subject, through
+  :func:`~katra.assertions._named`. There the model writes a subject
+  as a name, such as ``core services`` for ``boundary:core-services``, and an
+  **Element ID** is the slug of the element's name. ``_named`` reads only the
+  element types that the subject type accepts, and it refuses a slug that two
+  such elements share.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Collection
+
+
+def fold(reference: str) -> str:
+    """The spelling-insensitive key two references share iff they name one thing."""
+    return " ".join(reference.split()).casefold()
+
+
+def canonical(reference: str, known: Collection[str]) -> str:
+    """The spelling in ``known`` that ``reference`` names, or ``""`` for none.
+
+    Exact first, so a reference that is already canonical never depends on the
+    fold. Then the fold, and **only when exactly one known spelling shares it**:
+    two candidates mean the reference does not determine which, and guessing
+    between them is the one thing this module must not do.
+    """
+    if reference in known:
+        return reference
+    folded = fold(reference)
+    matches = [name for name in known if fold(name) == folded]
+    return matches[0] if len(matches) == 1 else ""
+
+
+def snap(reference: str, known: Collection[str]) -> str:
+    """``reference`` in its canonical spelling, or unchanged when it names none.
+
+    Left alone rather than blanked, because the caller's check is what reports
+    an unresolvable reference and it can only name what it was given. Blanking
+    would turn "cites an element the model does not contain" into a shape error
+    about an empty string.
+    """
+    return canonical(reference, known) or reference
+
+
+__all__ = ["canonical", "fold", "snap"]

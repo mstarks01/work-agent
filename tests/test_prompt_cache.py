@@ -16,10 +16,11 @@ import pytest
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 
-from analysis_service.binding import build_tier_adapters
-from analysis_service.execution import _usage_of
-from analysis_service.model_tiers import TierName
-from analysis_service.prompt_cache import (
+from evals.harness.prices import UnitPrices, unit_prices
+from katra.binding import build_tier_adapters
+from katra.execution import _usage_of
+from katra.model_tiers import TierName
+from katra.prompt_cache import (
     BREAKPOINT_FIELD,
     CACHE_WRITE_METADATA_KEY,
     EXPLICIT,
@@ -29,11 +30,10 @@ from analysis_service.prompt_cache import (
     remember_stable_prefix,
     stable_prefix,
 )
-from analysis_service.report import TokenUsage
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
-from analysis_service.vendors import VendorName, vendor_for
-from evals.harness.prices import UnitPrices, unit_prices
+from katra.report import TokenUsage
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
+from katra.vendors import VendorName, vendor_for
 from tests.factories import PROJECT_ROOT, inject_transport, secret_env, tiers_for
 
 pytestmark = pytest.mark.usefixtures("supplied_transport")

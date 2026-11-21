@@ -47,7 +47,7 @@ the team uses is not part of the application. `database` needs a named query
 language or database technology. Text that gives the model orders states
 nothing.
 
-**It is off by default.** `ANALYSIS_CAPABILITY_READER=true` turns it on. A
+**It is off by default.** `KATRA_CAPABILITY_READER=true` turns it on. A
 tiers file must name the `capabilities` node's tier whether it is on or off,
 as it does for `assert`.
 

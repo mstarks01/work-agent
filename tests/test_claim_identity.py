@@ -35,8 +35,6 @@ import itertools
 
 import pytest
 
-from analysis_service.claim_identity import endpoint_targets
-from analysis_service.system_model import ModelIndex, TrustBoundary
 from evals import verify_corpus
 from evals.harness.fingerprint import key_claim
 from evals.harness.identity import (
@@ -46,6 +44,8 @@ from evals.harness.identity import (
     endpoint_form,
 )
 from evals.harness.reference import GoldenCase, ReferenceThreat, load_corpus
+from katra.claim_identity import endpoint_targets
+from katra.system_model import ModelIndex, TrustBoundary
 
 #: Corpus pairs the scorer's matcher credits as one claim and the ledger keys as
 #: two. Both answers are right: the matcher takes a subset because two writers
@@ -233,7 +233,7 @@ class TestTheFourReadersOfOnePlace:
                     )
 
         assert disagreements == [], (
-            "analysis_service.claim_identity.endpoint_targets and"
+            "katra.claim_identity.endpoint_targets and"
             " evals.harness.identity.endpoint_form fold one claim's citations"
             f" into two different places: {disagreements}. They are one rule"
             " with two readers, so the service would call two claims one finding"
@@ -402,7 +402,7 @@ class TestTwoSiblingFlowsAreTwoPlaces:
     """Case 13's REST requests and WebSocket run between one pair (ADR 0061)."""
 
     def test_only_a_flow_with_a_sibling_is_a_channel(self):
-        from analysis_service.claim_identity import cited_channels
+        from katra.claim_identity import cited_channels
 
         assert cited_channels(ON_REST, SIBLING_FLOWS) == {
             "flow:process:console>process:api>requests"
@@ -440,7 +440,7 @@ class TestTwoSiblingFlowsAreTwoPlaces:
         )
 
     def test_one_shared_control_does_not_join_two_channels(self):
-        from analysis_service.claim_identity import distinct_mechanisms
+        from katra.claim_identity import distinct_mechanisms
 
         rest = {"authentication", "flow:process:console>process:api>requests"}
         socket = {"authentication", "flow:process:console>process:api>status"}

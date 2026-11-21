@@ -5,7 +5,7 @@ import statistics
 import sys
 from pathlib import Path
 
-REPO = Path("/home/me/work-agent")
+REPO = Path("/home/me/katra")
 OUT = REPO / "evals/runs/20261106T-vendor-claim"
 CASE = "12-overclaiming-supplier-portal"
 

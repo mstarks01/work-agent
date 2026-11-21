@@ -22,12 +22,12 @@ from typing import TypeGuard, get_args
 
 import pytest
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
-from analysis_service.sql_store import DIGEST_COLUMNS
 from evals.harness.critic_replay import UNRULED
 from evals.harness.critic_yield import FATES, OMITTED
 from evals.harness.prices import UnitPrices
+from katra.analysis import CONTROL_ATTRIBUTES
+from katra.claims import UNKNOWN_KEY_FIELDS, CriticStep, Ruling
+from katra.sql_store import DIGEST_COLUMNS
 from tests.source_tree import (
     EXPERIMENTS_LEFT_OUT,
     PYTHON,
@@ -102,10 +102,10 @@ def test_each_store_choice_has_one_reader():
         )
 
     assert _sites(chooses("JOB_STORES")) == [
-        ("src/analysis_service/store_backends.py", "job_store_name")
+        ("src/katra/store_backends.py", "job_store_name")
     ]
     assert _sites(chooses("OBJECT_STORES")) == [
-        ("src/analysis_service/objects.py", "object_store_name")
+        ("src/katra/objects.py", "object_store_name")
     ]
 
 
@@ -135,7 +135,7 @@ def test_a_case_s_requirement_records_have_one_filter():
 #: ``refuse_entry``, with the reason: it loads no corpus.
 CONFIG_REFUSERS: dict[Site, str] = {
     ("evals/critic_review/__main__.py", "main"): "it reads the tiers and no corpus",
-    ("src/analysis_service/migrations/__main__.py", "main"): (
+    ("src/katra/migrations/__main__.py", "main"): (
         "it reads the database settings and no corpus"
     ),
 }
@@ -205,7 +205,7 @@ def test_each_variable_name_is_spelled_once():
     ``*_VAR`` constant that holds it. A message and a table read the constant,
     so a rename moves every site. A docstring is prose and is not read."""
     names = _variable_names()
-    assert "ANALYSIS_OBJECT_STORE" in names
+    assert "KATRA_OBJECT_STORE" in names
     spelled = re.compile(
         r"\b(?:"
         + "|".join(map(re.escape, sorted(names, key=len, reverse=True)))
@@ -234,7 +234,7 @@ _XDG_PLACE = re.compile(r"^XDG_|(?:^|[/~])\.(?:config|local)(?:/|$)")
 def test_an_xdg_variable_has_one_reader():
     """Only ``XDG_BASES`` names an XDG base directory variable or its default
     in the home directory, and each call of ``xdg_dir`` names a row of it."""
-    from analysis_service import config_files
+    from katra import config_files
 
     sites = []
     for path in FILES:
@@ -287,7 +287,7 @@ def test_the_store_defaults_have_one_merge():
 #: why it cannot ask ``refused_var``.
 NOT_A_KEY: dict[Site, str] = {
     ("webapp/settings_page.py", "_deployment_settings"): (
-        "the label of every store variable, ANALYSIS_DATABASE_CA_FILE among"
+        "the label of every store variable, KATRA_DATABASE_CA_FILE among"
         " them, which names a CA certificate and no key"
     ),
 }
@@ -305,7 +305,7 @@ def _strips_file_suffix(node: ast.AST) -> bool:
 def test_the_file_suffix_of_a_key_variable_has_one_reader():
     """Only ``refused_var`` strips the suffix of a key variable."""
     readers = set(_sites(_strips_file_suffix)) - NOT_A_KEY.keys()
-    assert readers == {("src/analysis_service/config_files.py", "refused_var")}
+    assert readers == {("src/katra/config_files.py", "refused_var")}
 
 
 def test_each_declared_site_still_strips():
@@ -399,7 +399,7 @@ def test_the_critic_round_is_the_one_caller_of_the_critic_primitives():
     """Only ``critic_round`` calls what builds a view, merges a re-ask or assembles."""
     sites = _sites(lambda node: any(_calls(node, name) for name in CRITIC_PRIMITIVES))
     assert sites
-    assert {path for path, _ in sites} == {"src/analysis_service/critic_round.py"}
+    assert {path for path, _ in sites} == {"src/katra/critic_round.py"}
 
 
 def test_a_flow_map_names_its_siblings_once():
@@ -412,7 +412,7 @@ def test_a_flow_map_names_its_siblings_once():
     assert _sites(lambda node: _calls(node, "sibling_flows")) == [
         ("evals/harness/identity.py", "of_graph"),
         ("evals/harness/reference.py", "_case_flows"),
-        ("src/analysis_service/claim_identity.py", "cited_channels"),
+        ("src/katra/claim_identity.py", "cited_channels"),
     ]
 
 
@@ -424,8 +424,8 @@ def test_a_reports_rows_have_one_reader():
     because it holds a catalog and no Report.
     """
     assert _sites(lambda node: _calls(node, "row_controls")) == [
-        ("src/analysis_service/claim_identity.py", "report_rows"),
-        ("src/analysis_service/fixes.py", "missing_rows"),
+        ("src/katra/claim_identity.py", "report_rows"),
+        ("src/katra/fixes.py", "missing_rows"),
     ]
 
 
@@ -467,34 +467,32 @@ def test_a_zone_has_one_reader():
             names_the_prefix(side) for side in (node.left, *node.comparators)
         )
 
-    assert _sites(tests_a_zone) == [("src/analysis_service/system_model.py", "is_zone")]
+    assert _sites(tests_a_zone) == [("src/katra/system_model.py", "is_zone")]
 
 
 def test_kept_text_has_one_reader():
     """Only ``keeps_text`` asks whether text keeps a character under ``normalize``."""
     tests = _tests_truth_of(lambda node: _calls(node, "normalize"))
-    assert _sites(tests) == [("src/analysis_service/grounding.py", "keeps_text")]
+    assert _sites(tests) == [("src/katra/grounding.py", "keeps_text")]
 
 
 #: Each site that cuts a text at a separator in ``_NEWLINE_SEPARATORS``, with
 #: the reason. A line split of an uploaded text calls
-#: :func:`~analysis_service.owner_files.text_lines`.
+#: :func:`~katra.owner_files.text_lines`.
 NEWLINE_SPLITS: dict[Site, str] = {
     (".github/scripts/five_class_read.py", "rendered"): (
         "CommonMark ends a line only at \\n, \\r\\n or \\r, and the body's"
         " \\r\\n and \\r become \\n first"
     ),
-    ("src/analysis_service/config_files.py", "read_settings"): (
+    ("src/katra/config_files.py", "read_settings"): (
         "a \\r or a Unicode line separator stays in a settings line, where the"
         " key pattern or the value rule refuses it"
     ),
-    ("src/analysis_service/evidence.py", "catalog_refs"): (
+    ("src/katra/evidence.py", "catalog_refs"): (
         "the inverse of the \\n join of render_catalog's rows"
     ),
-    ("src/analysis_service/graph.py", "unfence"): (
-        "the inverse of the \\n join of render_fenced"
-    ),
-    ("src/analysis_service/sources.py", "diagram_header"): (
+    ("src/katra/graph.py", "unfence"): ("the inverse of the \\n join of render_fenced"),
+    ("src/katra/sources.py", "diagram_header"): (
         "diagram_reader/read.mjs splits a Mermaid text on the same string, and"
         " tests/test_sources.py runs both on one set of headers"
     ),
@@ -548,7 +546,7 @@ def test_a_text_has_one_line_split():
     assert _sites(_splits_on_newline) == sorted(NEWLINE_SPLITS)
 
 
-#: The fields of :class:`~analysis_service.claims.UnknownRef` that spell a
+#: The fields of :class:`~katra.claims.UnknownRef` that spell a
 #: kind of fact.
 SPELLING_FIELDS = frozenset(
     {"element_id", "attribute", "subject", "assertion", "question", "capability"}
@@ -557,7 +555,7 @@ SPELLING_FIELDS = frozenset(
 #: Each function that tests two spelling fields in one test, and why the test
 #: does not decide a kind.
 FIELD_PAIR_READERS: dict[Site, str] = {
-    ("src/analysis_service/critic.py", "_unresolved_unknown_ref_issues"): (
+    ("src/katra/critic.py", "_unresolved_unknown_ref_issues"): (
         "it runs after the one-spelling check and the ``kind`` route, and asks"
         " whether the entry states any text at all"
     ),
@@ -592,9 +590,7 @@ def _tests_a_spelling(node: ast.AST) -> bool:
 def test_the_kind_of_an_open_fact_has_one_reader():
     """Only ``UnknownRef.spellings`` tests a spelling field for its truth, and
     ``UnknownRef.kind`` routes on what it returns."""
-    assert _sites(_tests_a_spelling) == [
-        ("src/analysis_service/claims.py", "spellings")
-    ]
+    assert _sites(_tests_a_spelling) == [("src/katra/claims.py", "spellings")]
 
 
 def test_the_kind_of_an_open_fact_is_not_read_from_two_fields():
@@ -618,8 +614,8 @@ _SENT_KEY = (
 #: Each function beside ``key_ref`` that reads which part of an open fact's
 #: key is which, and why. Every other site asks ``key_ref``.
 SENT_KEY_READERS: dict[Site, str] = {
-    ("src/analysis_service/fact_answers.py", "_facet_value"): _SENT_KEY,
-    ("src/analysis_service/fact_answers.py", "_one_spelling"): _SENT_KEY,
+    ("src/katra/fact_answers.py", "_facet_value"): _SENT_KEY,
+    ("src/katra/fact_answers.py", "_one_spelling"): _SENT_KEY,
 }
 
 
@@ -650,7 +646,7 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     part by name.
 
     The lint refuses an index or a slice of a key, an unpack of a key, and a
-    ``zip`` with :data:`~analysis_service.claims.UNKNOWN_KEY_FIELDS`. A local
+    ``zip`` with :data:`~katra.claims.UNKNOWN_KEY_FIELDS`. A local
     named ``key`` counts where it is unpacked into six names, because other
     keys share the name. The test modules stay out: a test reads a part of a
     key to state what it expects of a fixture, and no running code follows it.
@@ -658,14 +654,14 @@ def test_the_layout_of_an_open_facts_key_has_one_reader():
     sites = set(_sites(_reads_a_key_by_position))
     assert SENT_KEY_READERS.keys() <= sites
     assert sites - SENT_KEY_READERS.keys() == {
-        ("src/analysis_service/fact_answers.py", "key_ref")
+        ("src/katra/fact_answers.py", "key_ref")
     }, "read a key's parts by key_ref"
 
 
 def test_the_place_of_a_pydantic_error_has_one_reader():
     """Only ``error_place`` joins the ``loc`` of a pydantic error into a place."""
     readers = set(_sites(_reads_loc)) - LOC_READERS.keys()
-    assert readers == {("src/analysis_service/errors.py", "error_place")}
+    assert readers == {("src/katra/errors.py", "error_place")}
 
 
 #: The reason of each site that hands a model's own key back to that model.
@@ -684,17 +680,17 @@ _OWN_FILE = (
 #: does not ask ``error_place``. ``error_place`` drops the key of an
 #: ``extra_forbidden`` error, so that a place never names an extra field.
 LOC_READERS: dict[Site, str] = {
-    ("src/analysis_service/claims.py", "of"): _MODEL_KEY,
-    ("src/analysis_service/compact.py", "expand"): _MODEL_KEY,
-    ("src/analysis_service/provider.py", "schema_errors"): _MODEL_KEY,
-    ("src/analysis_service/validation.py", "parse_and_validate"): _MODEL_KEY,
-    ("src/analysis_service/config_files.py", "validation_problems"): _OWN_FILE,
+    ("src/katra/claims.py", "of"): _MODEL_KEY,
+    ("src/katra/compact.py", "expand"): _MODEL_KEY,
+    ("src/katra/provider.py", "schema_errors"): _MODEL_KEY,
+    ("src/katra/validation.py", "parse_and_validate"): _MODEL_KEY,
+    ("src/katra/config_files.py", "validation_problems"): _OWN_FILE,
     ("evals/harness/reference.py", "_case_refusal"): _OWN_FILE,
-    ("src/analysis_service/fact_writes.py", "_check_attribute_values"): (
+    ("src/katra/fact_writes.py", "_check_attribute_values"): (
         "it names the attribute an answer filled, the last part of a place"
         " that the model's own fields make"
     ),
-    ("src/analysis_service/sql_store.py", "_unparsed"): (
+    ("src/katra/sql_store.py", "_unparsed"): (
         "the service wrote the stored row, and the log names its key so that"
         " an operator finds it"
     ),
@@ -702,10 +698,10 @@ LOC_READERS: dict[Site, str] = {
         "it asks whether the error sits on one grounds entry, by index, and"
         " makes no place"
     ),
-    ("src/analysis_service/answer_bodies.py", "_question_of"): (
+    ("src/katra/answer_bodies.py", "_question_of"): (
         "it finds the fact answer the error sits in, by index, and makes no place"
     ),
-    ("src/analysis_service/answer_bodies.py", "over_a_bound"): (
+    ("src/katra/answer_bodies.py", "over_a_bound"): (
         "it asks whether the error sits on a list of the body itself, and"
         " makes no place"
     ),
@@ -713,7 +709,7 @@ LOC_READERS: dict[Site, str] = {
         "it names a mark by its position where the place holds the mark's key,"
         " because the key is caller text; ``error_place`` then makes the place"
     ),
-    ("src/analysis_service/api.py", "_body_refused"): (
+    ("src/katra/api.py", "_body_refused"): (
         "it puts the reader's places under ``body``, where every other"
         " refusal of a request body sits; ``error_place`` then makes the place"
     ),
@@ -729,7 +725,7 @@ def _reads_loc(node: ast.AST) -> bool:
 #: Each function that renders the entries of ``shown_errors`` itself, and why
 #: it does not ask ``refusal_line``.
 SHOWN_ERROR_READERS: dict[Site, str] = {
-    ("src/analysis_service/api.py", "_invalid_body"): (
+    ("src/katra/api.py", "_invalid_body"): (
         "it returns each place and rule as one object of a problem response,"
         " and makes no line"
     ),
@@ -744,7 +740,7 @@ def test_the_line_of_a_refusal_has_one_maker():
     """Only ``refusal_line`` joins the entries of ``shown_errors`` into a line."""
     readers = set(_sites(lambda node: _calls(node, "shown_errors")))
     assert readers - SHOWN_ERROR_READERS.keys() == {
-        ("src/analysis_service/errors.py", "refusal_line")
+        ("src/katra/errors.py", "refusal_line")
     }, "make the line of a refusal with refusal_line"
 
 
@@ -752,17 +748,17 @@ def test_an_archived_report_has_one_reader():
     """Only ``read_report`` parses a report the harness reads from a file.
 
     A bare parse stops a command with a pydantic traceback on an archive that
-    today's :class:`~analysis_service.report.Report` refuses. ``read_report``
+    today's :class:`~katra.report.Report` refuses. ``read_report``
     refuses it in one line that names the file and the field.
     """
     readers = set(_sites(_parses_a_report)) - REPORT_PARSERS.keys()
     assert readers == {("evals/harness/bundle.py", "read_report")}
 
 
-#: Each function that parses a :class:`~analysis_service.report.Report` and
+#: Each function that parses a :class:`~katra.report.Report` and
 #: does not ask ``read_report``, and why.
 REPORT_PARSERS: dict[Site, str] = {
-    ("src/analysis_service/sql_store.py", "report"): (
+    ("src/katra/sql_store.py", "report"): (
         "the job store reads a report from a job row, and refuses one that"
         " does not parse as UnreadableSchema (ADR 0095)"
     ),
@@ -817,7 +813,7 @@ def test_a_drafts_direction_has_one_field():
     report with no such field, so each direction that code reads comes
     from this one field."""
     assert _classes_holding(_states_a_direction) == [
-        ("src/analysis_service/frameworks/asvs/record.py", "RequirementProposal")
+        ("src/katra/frameworks/asvs/record.py", "RequirementProposal")
     ]
 
 
@@ -869,7 +865,7 @@ def test_an_evidence_file_by_id_has_one_reader():
             )
         )
 
-    assert _sites(compares) == [("src/analysis_service/controls.py", "file")]
+    assert _sites(compares) == [("src/katra/controls.py", "file")]
 
 
 def test_a_served_report_has_one_reader():
@@ -903,7 +899,7 @@ def test_a_known_mark_has_one_reader():
 
 def _config_defaults() -> frozenset[str]:
     """The name of each repo default that ``CONFIG_PATHS`` pairs with a variable."""
-    tree = parse(REPO_ROOT / "src/analysis_service/deployment.py")
+    tree = parse(REPO_ROOT / "src/katra/deployment.py")
     [table] = (
         node.value
         for node in tree.body
@@ -920,7 +916,7 @@ def _config_defaults() -> frozenset[str]:
 #: Each function that reads a repo default of ``CONFIG_PATHS`` without
 #: ``config_path``, and why.
 CONFIG_DEFAULT_READERS: dict[Site, str] = {
-    ("src/analysis_service/deployment.py", MODULE_OWNER): (
+    ("src/katra/deployment.py", MODULE_OWNER): (
         "``CONFIG_PATHS`` pairs each default with its variable here"
     ),
     ("evals/harness/exemplar_verbs.py", "lane_verbs"): (
@@ -957,7 +953,7 @@ def test_a_config_path_has_one_reader():
     """Each function that reads a default of ``CONFIG_PATHS`` asks ``config_path``."""
     readers = set(_sites(_reads_a_config_default)) - CONFIG_DEFAULT_READERS.keys()
     assert readers == {
-        ("src/analysis_service/deployment.py", "from_env"),
+        ("src/katra/deployment.py", "from_env"),
         ("webapp/settings_view.py", "lookup"),
     }
     callers = set(_sites(lambda node: _calls(node, "config_path")))
@@ -1011,16 +1007,16 @@ ID_DERIVERS: dict[Site, str] = {
         "it builds a flow ID at the identity version of the ID it relabels,"
         " which ``derive_element_id`` does not take"
     ),
-    ("src/analysis_service/carried_renames.py", "_renamed_id"): (
+    ("src/katra/carried_renames.py", "_renamed_id"): (
         "it builds a carried flow ID again with a renamed endpoint, at the"
         " identity version of the ID it rebuilds, which ``derive_element_id``"
         " does not take, and it holds no element"
     ),
-    ("src/analysis_service/assertions.py", "subject_id"): (
+    ("src/katra/assertions.py", "subject_id"): (
         "a non-graph subject is no element, and its ID takes the derivation an"
         " element ID has from its type prefix and its name"
     ),
-    ("src/analysis_service/controls.py", "_scope_id"): (
+    ("src/katra/controls.py", "_scope_id"): (
         "a Control's scope holds a name and aliases of an element type, not an"
         " element, and a match asks for the ID each name derives (ADR 0124)"
     ),
@@ -1039,7 +1035,7 @@ def _derives_an_id(node: ast.AST) -> bool:
 def test_an_element_id_has_one_deriver():
     """Only ``derive_element_id`` derives the ID an element's name implies."""
     derivers = set(_sites(_derives_an_id)) - ID_DERIVERS.keys()
-    assert derivers == {("src/analysis_service/system_model.py", "derive_element_id")}
+    assert derivers == {("src/katra/system_model.py", "derive_element_id")}
 
 
 def _slugs_after_a_prefix(node: ast.AST) -> bool:
@@ -1074,19 +1070,19 @@ def test_an_id_slug_is_spelled_only_in_the_system_model():
     sites = _sites(_slugs_after_a_prefix)
     assert NOT_AN_ID_SLUG.keys() <= set(sites)
     assert [site for site in sites if site not in NOT_AN_ID_SLUG] == [
-        ("src/analysis_service/system_model.py", "_build_v1"),
-        ("src/analysis_service/system_model.py", "make_element_id"),
+        ("src/katra/system_model.py", "_build_v1"),
+        ("src/katra/system_model.py", "make_element_id"),
     ]
 
 
 #: Each function that reads a password field, or tests a key for the word
 #: ``password``, for another rule than whether a URL holds a password.
 NOT_THE_PASSWORD_RULE: dict[Site, str] = {
-    ("src/analysis_service/s3_objects.py", "_endpoint"): (
+    ("src/katra/s3_objects.py", "_endpoint"): (
         "the object endpoint refuses any user part, a password among them,"
         " and a path, a query or a fragment"
     ),
-    ("src/analysis_service/sql_store.py", "_postgres"): (
+    ("src/katra/sql_store.py", "_postgres"): (
         "it calls the password row of the database credentials, which reads"
         " the password file"
     ),
@@ -1105,7 +1101,7 @@ def test_a_url_password_has_one_reader():
     """Only ``holds_password`` decides whether a URL holds a password, so the
     Settings page never shows a URL that the startup refuses as one."""
     readers = set(_sites(_reads_a_password)) - NOT_THE_PASSWORD_RULE.keys()
-    assert readers == {("src/analysis_service/store_settings.py", "holds_password")}
+    assert readers == {("src/katra/store_settings.py", "holds_password")}
 
 
 def test_each_declared_site_still_reads_a_password():
@@ -1126,9 +1122,7 @@ def _words_a_connection(node: ast.AST) -> bool:
 
 def test_a_flow_as_a_place_has_one_wording():
     """Only ``flow_words`` says how a **Data Flow** reads as a place."""
-    assert _sites(_words_a_connection) == [
-        ("src/analysis_service/open_facts.py", "flow_words")
-    ]
+    assert _sites(_words_a_connection) == [("src/katra/open_facts.py", "flow_words")]
 
 
 def _words_a_resting_reason(node: ast.AST) -> bool:
@@ -1138,9 +1132,7 @@ def _words_a_resting_reason(node: ast.AST) -> bool:
 
 def test_the_reason_a_claim_rests_on_has_one_writer():
     """Only ``rests_on`` writes the sentence, so every copy keeps its bound."""
-    assert _sites(_words_a_resting_reason) == [
-        ("src/analysis_service/claims.py", "rests_on")
-    ]
+    assert _sites(_words_a_resting_reason) == [("src/katra/claims.py", "rests_on")]
 
 
 #: The names a comparison of an attacker position uses: the parameters of
@@ -1194,8 +1186,8 @@ def _spells_an_assertion_id(node: ast.AST) -> bool:
 def test_an_assertion_id_has_one_encoder_and_one_decoder():
     """Only ``assertion_id`` spells an ID and only ``read_assertion_id`` reads one."""
     assert _sites(_spells_an_assertion_id) == [
-        ("src/analysis_service/assertions.py", "assertion_id"),
-        ("src/analysis_service/assertions.py", "read_assertion_id"),
+        ("src/katra/assertions.py", "assertion_id"),
+        ("src/katra/assertions.py", "read_assertion_id"),
     ]
 
 
@@ -1212,7 +1204,7 @@ def _declares_a_max_length(node: ast.AST, *names: str) -> TypeGuard[ast.Call]:
 
 #: The modules that declare the /v1 body models: a job's submission, and the
 #: answer bodies both drivers read through ``answer_bodies``.
-_V1_MODELS = ("src/analysis_service/api.py", "src/analysis_service/answer_bodies.py")
+_V1_MODELS = ("src/katra/api.py", "src/katra/answer_bodies.py")
 
 #: Each name a /v1 model declares as a list's ``max_length``: the bounds the
 #: web app reads through those models.
@@ -1268,10 +1260,10 @@ def _validates_an_answer(node: ast.AST) -> bool:
 #: Each site that validates an answer the service itself wrote, and where that
 #: answer comes from. No request body reaches one.
 STORED_ANSWER_READERS: dict[Site, str] = {
-    ("src/analysis_service/fact_answers.py", "merged_facts"): (
+    ("src/katra/fact_answers.py", "merged_facts"): (
         "builds one facet answer from two answers admission already read"
     ),
-    ("src/analysis_service/graph.py", "_resolve_assertions"): (
+    ("src/katra/graph.py", "_resolve_assertions"): (
         "reads the answers the driver seeded in the graph state, which admission wrote"
     ),
     ("evals/harness/withheld.py", "load_answer_file"): "reads a corpus answer file",
@@ -1292,7 +1284,7 @@ def test_an_answer_body_has_one_reader():
     ``/v1`` routes and the first-run app both call it, so one site applies
     the keys, shapes and bounds a body meets."""
     assert set(_sites(_validates_an_answer)) == STORED_ANSWER_READERS.keys()
-    assert ("src/analysis_service/answer_bodies.py", "_read") in _sites(
+    assert ("src/katra/answer_bodies.py", "_read") in _sites(
         partial(_calls, name="model_validate")
     )
 
@@ -1377,15 +1369,15 @@ def test_a_new_job_is_created_and_admitted_in_job_answers():
     builds a record for an in-process run, which no store admits.
     """
     assert _sites(_mints_a_job) == [
-        ("src/analysis_service/engine.py", "_build_job"),
-        ("src/analysis_service/job_answers.py", "amend"),
-        ("src/analysis_service/job_answers.py", "answer"),
-        ("src/analysis_service/job_answers.py", "submit"),
+        ("src/katra/engine.py", "_build_job"),
+        ("src/katra/job_answers.py", "amend"),
+        ("src/katra/job_answers.py", "answer"),
+        ("src/katra/job_answers.py", "submit"),
     ]
     assert _sites(_starts_a_job) == [
-        ("src/analysis_service/job_answers.py", "amend"),
-        ("src/analysis_service/job_answers.py", "answer"),
-        ("src/analysis_service/job_answers.py", "submit"),
+        ("src/katra/job_answers.py", "amend"),
+        ("src/katra/job_answers.py", "answer"),
+        ("src/katra/job_answers.py", "submit"),
     ]
 
 
@@ -1406,7 +1398,7 @@ _SHARED_BOUNDS: dict[str, str] = {
 #: Each field of a :data:`_SHARED_BOUNDS` name that holds another bound, and
 #: why.
 OTHER_BOUND: dict[tuple[str, str], str] = {
-    ("src/analysis_service/claims.py", "element_id"): (
+    ("src/katra/claims.py", "element_id"): (
         "an unresolved element mark keeps the reference as the model wrote it,"
         " which names no Element ID; the producer cuts it at"
         " ELEMENT_REF_MAX_CHARS"
@@ -1470,9 +1462,7 @@ def _spells_a_digest_shape(node: ast.AST) -> bool:
 def test_the_shape_of_a_digest_is_spelled_once():
     """Only ``parsing.Sha256Hex`` spells the shape, and each model field that
     holds a digest reads it."""
-    assert _sites(_spells_a_digest_shape) == [
-        ("src/analysis_service/parsing.py", MODULE_OWNER)
-    ]
+    assert _sites(_spells_a_digest_shape) == [("src/katra/parsing.py", MODULE_OWNER)]
 
 
 def _digests_a_source_text(node: ast.AST) -> bool:
@@ -1515,7 +1505,7 @@ def test_a_lane_doc_name_is_spelled_once():
     """Only ``frameworks`` spells a lane's two file names; the loader names,
     the package gate and the roster writer read the declarations."""
     assert set(_sites(_spells_a_lane_doc)) - NOT_A_LANE_DOC.keys() == {
-        ("src/analysis_service/frameworks/__init__.py", MODULE_OWNER)
+        ("src/katra/frameworks/__init__.py", MODULE_OWNER)
     }
 
 
@@ -1558,15 +1548,15 @@ def test_a_unit_price_rate_name_is_spelled_only_where_it_is_declared():
 #: module that declares it. A second module that declares the name gives one
 #: name two meanings.
 _ONE_MEANING: dict[str, str] = {
-    "Candidate": "src/analysis_service/candidates.py",
-    "Capability": "src/analysis_service/capabilities.py",
+    "Candidate": "src/katra/candidates.py",
+    "Capability": "src/katra/capabilities.py",
     "Disposition": "",
-    "Revision": "src/analysis_service/answer_state.py",
-    "Report": "src/analysis_service/report.py",
-    "Source": "src/analysis_service/sources.py",
+    "Revision": "src/katra/answer_state.py",
+    "Report": "src/katra/report.py",
+    "Source": "src/katra/sources.py",
     "Standing": "evals/harness/roster.py",
-    "Verdict": "src/analysis_service/claims.py",
-    "fold": "src/analysis_service/references.py",
+    "Verdict": "src/katra/claims.py",
+    "fold": "src/katra/references.py",
 }
 
 
@@ -1612,9 +1602,9 @@ def test_an_object_digest_is_read_through_its_column_table():
     ``DIGEST_COLUMNS``. A save hands ``check_save`` the report digest it
     compares the stored digest with. Other models hold a field of the same
     name, so the lint reads the store's module."""
-    store = [REPO_ROOT / "src/analysis_service/sql_store.py"]
+    store = [REPO_ROOT / "src/katra/sql_store.py"]
     assert _sites(_reads_an_object_digest_off_a_row, store) == [
-        ("src/analysis_service/sql_store.py", "save")
+        ("src/katra/sql_store.py", "save")
     ]
 
 
@@ -1634,13 +1624,13 @@ def test_a_secret_file_has_one_reader():
     JSON key of the ``gcs`` row, ``read_secret_file`` with its own error class,
     so the mode rule of a secret file has one reader."""
     assert _sites(_reads_a_secret_file) == [
-        ("src/analysis_service/config_files.py", "read_secret_file")
+        ("src/katra/config_files.py", "read_secret_file")
     ]
 
 
 #: A module path under the service package, and a prompt path: the two halves
 #: of a pairing that only ``.github/scripts/prompt_outcomes.toml`` states.
-_MODULE_PATH = re.compile(r"^src/analysis_service/")
+_MODULE_PATH = re.compile(r"^src/katra/")
 _PROMPT_PATH = re.compile(r"^(?:prompts|frameworks)/.*\.md$")
 
 
@@ -1756,7 +1746,7 @@ def test_a_need_that_names_no_facet_has_one_reader():
     the rule again, each to a finding absent from a question's ``needs``.
     """
     assert _sites(_falls_back_to_every_facet) == [
-        ("src/analysis_service/fact_answers.py", "needed_facets")
+        ("src/katra/fact_answers.py", "needed_facets")
     ]
 
 
@@ -1781,7 +1771,7 @@ def test_a_request_body_has_one_reader():
 
 
 def test_a_dropped_claim_is_built_only_by_its_constructor():
-    """``DroppedClaim(...)`` past :meth:`~analysis_service.claims.DroppedClaim.of`
+    """``DroppedClaim(...)`` past :meth:`~katra.claims.DroppedClaim.of`
     is the second reader of the bounds that ``of`` cuts each agent-written value
     to. A producer that raises on a long value costs the job the report the
     mark exists to preserve."""
@@ -1817,11 +1807,11 @@ def test_the_raw_body_guard_has_one_reader():
     searched = (*FILES, *source_files(*TESTS))
 
     assert _sites(_applies_the_body_slack, searched) == [
-        ("src/analysis_service/api.py", "max_body_bytes")
+        ("src/katra/api.py", "max_body_bytes")
     ]
     assert _sites(lambda node: _calls(node, "max_body_bytes")) == [
-        ("src/analysis_service/api.py", "create_app"),
-        ("src/analysis_service/api.py", "max_control_body_bytes"),
+        ("src/katra/api.py", "create_app"),
+        ("src/katra/api.py", "max_control_body_bytes"),
         ("webapp/main.py", "_job_body"),
     ]
     assert _sites(lambda node: _calls(node, "max_control_body_bytes")) == [
@@ -2451,9 +2441,7 @@ def _gets_source_texts(node: ast.AST) -> bool:
 def test_a_job_s_source_texts_are_mapped_once():
     """Only ``source_texts`` maps a job's sources to their texts; the service
     and the harness call it."""
-    assert _sites(_maps_label_to_text) == [
-        ("src/analysis_service/execution.py", "source_texts")
-    ]
+    assert _sites(_maps_label_to_text) == [("src/katra/execution.py", "source_texts")]
 
 
 def test_the_silent_causes_are_spelled_once():
@@ -2478,19 +2466,19 @@ def _reads_the_lanes_of_a_capture(node: ast.AST) -> bool:
 ONE_READERS: dict[str, _OneReader] = {
     "how the parked quotes_checked key reads, absence included": _OneReader(
         _gets_parked_quotes_checked,
-        ("src/analysis_service/graph.py", "parked_quotes_checked"),
+        ("src/katra/graph.py", "parked_quotes_checked"),
         {},
         "",
     ),
     "how a block's quotes_checked reads, null included": _OneReader(
         _reads_quotes_checked,
-        ("src/analysis_service/claims.py", "quote_check_ran"),
+        ("src/katra/claims.py", "quote_check_ran"),
         {
-            ("src/analysis_service/fan_in.py", "join_drafts"): (
+            ("src/katra/fan_in.py", "join_drafts"): (
                 "it computes the value from the source map and branches on the"
                 " bool it computed; no None reaches it"
             ),
-            ("src/analysis_service/critic_round.py", "summary"): (
+            ("src/katra/critic_round.py", "summary"): (
                 "it reads CriticRound.quotes_checked, a bool every builder sets"
                 " by keyword; no None reaches it"
             ),
@@ -2503,7 +2491,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a session state that holds no map of source texts": _OneReader(
         _reads_absent_source_texts,
-        ("src/analysis_service/graph.py", "seeded_source_texts"),
+        ("src/katra/graph.py", "seeded_source_texts"),
         {},
         "",
     ),
@@ -2520,13 +2508,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the refusal category a response body states": _OneReader(
         lambda node: isinstance(node, ast.Constant) and node.value == "stop_details",
-        ("src/analysis_service/refusal_categories.py", "refusal_category_of"),
+        ("src/katra/refusal_categories.py", "refusal_category_of"),
         {},
         "src/",
     ),
     "whether a refused quote may take the source's span": _OneReader(
         lambda node: _calls(node, "repair_prepared"),
-        ("src/analysis_service/grounding.py", "faithful_repair"),
+        ("src/katra/grounding.py", "faithful_repair"),
         {},
         "",
     ),
@@ -2619,13 +2607,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a flow's label": _OneReader(
         _reads_a_flow_label,
-        ("src/analysis_service/system_model.py", "flow_label"),
+        ("src/katra/system_model.py", "flow_label"),
         {},
         "",
     ),
     "the steps that reach the control step": _OneReader(
         _tests_the_control_step,
-        ("src/analysis_service/critic.py", "_reaches_control_step"),
+        ("src/katra/critic.py", "_reaches_control_step"),
         {},
         "",
     ),
@@ -2648,12 +2636,12 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "how many spellings a fact reference uses": _OneReader(
         _counts_spellings,
-        ("src/analysis_service/claims.py", "sound"),
+        ("src/katra/claims.py", "sound"),
         {
-            ("src/analysis_service/claims.py", "mixed"): (
+            ("src/katra/claims.py", "mixed"): (
                 "the other count of the same spellings: more than one"
             ),
-            ("src/analysis_service/critic.py", "_unresolved_unknown_ref_issues"): (
+            ("src/katra/critic.py", "_unresolved_unknown_ref_issues"): (
                 "the refusal of a mixed entry says how many spellings it uses"
             ),
         },
@@ -2661,31 +2649,31 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "an assumed trust zone": _OneReader(
         _finds_an_assumed_zone,
-        ("src/analysis_service/system_model.py", "assumed_zone_elements"),
+        ("src/katra/system_model.py", "assumed_zone_elements"),
         {},
         "",
     ),
     "the place a question's limit counts": _OneReader(
         _places_a_field_question,
-        ("src/analysis_service/answer_state.py", "limit_place"),
+        ("src/katra/answer_state.py", "limit_place"),
         {},
         "",
     ),
     "the turn rule": _OneReader(
         _counts_a_charge,
-        ("src/analysis_service/answer_state.py", "whose_turn"),
+        ("src/katra/answer_state.py", "whose_turn"),
         {},
         "",
     ),
     "what a job's Controls resolve to": _OneReader(
         lambda node: _calls(node, "default_resolution"),
-        ("src/analysis_service/job_controls.py", "resolutions"),
+        ("src/katra/job_controls.py", "resolutions"),
         {},
         "",
     ),
     "what a draft is shown of the Controls": _OneReader(
         lambda node: _calls(node, "reaches"),
-        ("src/analysis_service/job_controls.py", "shown_controls"),
+        ("src/katra/job_controls.py", "shown_controls"),
         {},
         "",
     ),
@@ -2695,7 +2683,7 @@ ONE_READERS: dict[str, _OneReader] = {
             and isinstance(node.ctx, ast.Load)
             and node.id in {"AMBIGUOUS_CONTROL_LEADS", "UNCERTAIN_CONTROL_LEADS"}
         ),
-        ("src/analysis_service/validation.py", "ambiguous_lead"),
+        ("src/katra/validation.py", "ambiguous_lead"),
         {},
         "",
     ),
@@ -2707,48 +2695,48 @@ ONE_READERS: dict[str, _OneReader] = {
                 for part in ast.walk(node)
             )
         ),
-        ("src/analysis_service/job_controls.py", "row_outcome"),
+        ("src/katra/job_controls.py", "row_outcome"),
         {},
         "",
     ),
     "what a job's Controls write": _OneReader(
         lambda node: _calls(node, "_stated_value"),
-        ("src/analysis_service/job_controls.py", "control_facts"),
+        ("src/katra/job_controls.py", "control_facts"),
         {},
         "",
     ),
     "the rung of a held answer": _OneReader(
         lambda node: _calls(node, "FactOrigin"),
-        ("src/analysis_service/answer_state.py", "fact_origin"),
+        ("src/katra/answer_state.py", "fact_origin"),
         {},
         "",
     ),
     "what a new analysis carries": _OneReader(
         _renames_the_carried_answers,
-        ("src/analysis_service/jobs.py", "held_answers"),
+        ("src/katra/jobs.py", "held_answers"),
         {},
         "",
     ),
     "whether a quote names where it sits": _OneReader(
         lambda node: _calls(node, "placements"),
-        ("src/analysis_service/assertions.py", "ambiguous_quote"),
+        ("src/katra/assertions.py", "ambiguous_quote"),
         {},
         "",
     ),
     "which values the control diagnostic measures": _OneReader(
         _walks_the_scoped_controls,
-        ("src/analysis_service/basis.py", "control_measurability"),
+        ("src/katra/basis.py", "control_measurability"),
         {},
         "",
     ),
     "a framework's own text of a unit": _OneReader(
         _reads_a_unit_text,
-        ("src/analysis_service/frameworks/asvs/record.py", "text_of_unit"),
+        ("src/katra/frameworks/asvs/record.py", "text_of_unit"),
         {
-            ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_text"): (
+            ("src/katra/frameworks/asvs/catalog.py", "requirement_text"): (
                 "the package's catalog reader, which text_of_unit calls"
             ),
-            ("src/analysis_service/frameworks/asvs/catalog.py", "published_text"): (
+            ("src/katra/frameworks/asvs/catalog.py", "published_text"): (
                 "the package's catalog reader of each grain, which text_of_unit calls"
             ),
             ("evals/build_review_docs.py", "_standard"): (
@@ -2760,7 +2748,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a bare secret beside its file variable": _OneReader(
         lambda node: _calls(node, "refused_var"),
-        ("src/analysis_service/config_files.py", "refuse_bare_secret"),
+        ("src/katra/config_files.py", "refuse_bare_secret"),
         {
             ("webapp/settings_page.py", "_credential_settings"): (
                 "it names a key's setting on the page from the variable, and it"
@@ -2775,13 +2763,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "when a part waits on its parent": _OneReader(
         lambda node: _calls(node, "asked_parent"),
-        ("src/analysis_service/early_questions.py", "waiting_parts"),
+        ("src/katra/early_questions.py", "waiting_parts"),
         {
-            ("src/analysis_service/early_questions.py", "capability_questions"): (
+            ("src/katra/early_questions.py", "capability_questions"): (
                 "it orders the capability questions under their parents, and"
                 " decides no wait"
             ),
-            ("src/analysis_service/early_questions.py", "depth"): (
+            ("src/katra/early_questions.py", "depth"): (
                 "it counts a question's depth for the order, and decides no wait"
             ),
         },
@@ -2789,9 +2777,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a submission or a read-back": _OneReader(
         _marks_a_read_back,
-        ("src/analysis_service/fact_answers.py", "read_back"),
+        ("src/katra/fact_answers.py", "read_back"),
         {
-            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
+            ("src/katra/fact_answers.py", MODULE_OWNER): (
                 "the context a read-back passes, which the stores write"
             ),
         },
@@ -2799,15 +2787,15 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a place's identity": _OneReader(
         _opens_an_answered_row,
-        ("src/analysis_service/assertions.py", "place_identity"),
+        ("src/katra/assertions.py", "place_identity"),
         {},
         "",
     ),
     "a fact's history": _OneReader(
         lambda node: _is_constant(node, "unanswered"),
-        ("src/analysis_service/fact_answers.py", "fact_status"),
+        ("src/katra/fact_answers.py", "fact_status"),
         {
-            ("src/analysis_service/fact_answers.py", MODULE_OWNER): (
+            ("src/katra/fact_answers.py", MODULE_OWNER): (
                 "the FactStatus type that declares the set of histories"
             ),
             ("webapp/page_words.py", MODULE_OWNER): (
@@ -2819,9 +2807,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "how a published catalog ranks a requirement": _OneReader(
         _reads_a_requirement_level,
-        ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_band"),
+        ("src/katra/frameworks/asvs/catalog.py", "requirement_band"),
         {
-            ("src/analysis_service/frameworks/asvs/catalog.py", "requirement_level"): (
+            ("src/katra/frameworks/asvs/catalog.py", "requirement_level"): (
                 "the level lookup that requirement_band calls"
             ),
         },
@@ -2829,7 +2817,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "an open protocol for a web precondition": _OneReader(
         lambda node: _calls(node, "states_a_protocol"),
-        ("src/analysis_service/frameworks/asvs/rules.py", "_protocol_unsettled"),
+        ("src/katra/frameworks/asvs/rules.py", "_protocol_unsettled"),
         {
             ("evals/harness/alignment.py", "protocol_state"): (
                 "it reduces a protocol to stated or silent for the scorer, and"
@@ -2840,33 +2828,33 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether a resumed job locks its parent": _OneReader(
         lambda node: _loads(node, "NON_LOCKING_STATUSES"),
-        ("src/analysis_service/jobs.py", "locks_its_parent"),
+        ("src/katra/jobs.py", "locks_its_parent"),
         {},
         "",
     ),
     "the admission bounds": _OneReader(
         _compares_an_admission_bound,
-        ("src/analysis_service/jobs.py", "check_bounds"),
+        ("src/katra/jobs.py", "check_bounds"),
         {},
         "",
     ),
     "a model's family past its gateways": _OneReader(
         lambda node: _loads(node, "_GATEWAY_PREFIX"),
-        ("src/analysis_service/vendors.py", "family_identifier"),
+        ("src/katra/vendors.py", "family_identifier"),
         {},
         "",
     ),
     "whether a flow's protocol is a basis": _OneReader(
         _finds_a_stated_protocol,
-        ("src/analysis_service/protocol_defaults.py", "stated_protocol_flows"),
+        ("src/katra/protocol_defaults.py", "stated_protocol_flows"),
         {},
         "",
     ),
     "the bound a pinned upstream takes": _OneReader(
         lambda node: _loads_attribute(node, "bounds_by_upstream"),
-        ("src/analysis_service/resilience.py", "_pinned"),
+        ("src/katra/resilience.py", "_pinned"),
         {
-            ("src/analysis_service/resilience.py", "_check_upstream_keys"): (
+            ("src/katra/resilience.py", "_check_upstream_keys"): (
                 "it checks the table's keys when the file loads, and reads no bound"
             ),
         },
@@ -2874,13 +2862,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether an element ID is unique": _OneReader(
         _counts_element_ids,
-        ("src/analysis_service/system_model.py", "duplicate_ids"),
+        ("src/katra/system_model.py", "duplicate_ids"),
         {},
         "",
     ),
     "an endpoint that follows a slug": _OneReader(
         _compares_a_slug,
-        ("src/analysis_service/system_model.py", "follow_by_slug"),
+        ("src/katra/system_model.py", "follow_by_slug"),
         {
             ("evals/harness/replay.py", "_node_fate"): (
                 "it labels a missed reference node in an eval replay, and"
@@ -2891,19 +2879,19 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether a model takes the cache breakpoint": _OneReader(
         _reads_a_cache_rule,
-        ("src/analysis_service/vendors.py", "caches_prompt_prefix"),
+        ("src/katra/vendors.py", "caches_prompt_prefix"),
         {},
         "",
     ),
     "a cloud resource identifier": _OneReader(
         lambda node: _loads(node, "_RESOURCE_FORMS"),
-        ("src/analysis_service/vendors.py", "_resource_form"),
+        ("src/katra/vendors.py", "_resource_form"),
         {},
         "",
     ),
     "a text's digest": _OneReader(
         partial(_digests, read="encode"),
-        ("src/analysis_service/sources.py", "text_digest"),
+        ("src/katra/sources.py", "text_digest"),
         {},
         "",
     ),
@@ -2928,7 +2916,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the settings a credential mode reads": _OneReader(
         lambda node: _loads_attribute(node, "mode_reads"),
-        ("src/analysis_service/objects.py", "reads_in"),
+        ("src/katra/objects.py", "reads_in"),
         {},
         "",
     ),
@@ -2938,29 +2926,29 @@ ONE_READERS: dict[str, _OneReader] = {
             and len(node.args) == 3
             and _loads(node.args[1], "OBJECT_CREDENTIALS_VAR")
         ),
-        ("src/analysis_service/objects.py", "_named_mode"),
+        ("src/katra/objects.py", "_named_mode"),
         {},
         "",
     ),
     "which process migrates a database": _OneReader(
         lambda node: _loads_attribute(node, "first_run_migrates"),
-        ("src/analysis_service/sql_store.py", "migrator"),
+        ("src/katra/sql_store.py", "migrator"),
         {},
         "",
     ),
     "a key file of the s3 store": _OneReader(
         lambda node: _loads(node, "S3_KEY_FILES"),
-        ("src/analysis_service/s3_objects.py", "_key_pair"),
+        ("src/katra/s3_objects.py", "_key_pair"),
         {
-            ("src/analysis_service/objects.py", MODULE_OWNER): (
+            ("src/katra/objects.py", MODULE_OWNER): (
                 "the s3 row names the key files as settings it reads, and the"
                 " settings that only the api_key mode reads"
             ),
-            ("src/analysis_service/s3_objects.py", "_credential_mode"): (
+            ("src/katra/s3_objects.py", "_credential_mode"): (
                 "it refuses a key set by its own name beside each key file, and"
                 " leaves a key file of another mode to refuse_unread"
             ),
-            ("src/analysis_service/settings_variables.py", "secret_vars"): (
+            ("src/katra/settings_variables.py", "secret_vars"): (
                 "it lists the key files among the settings that hold a secret,"
                 " and refuses nothing"
             ),
@@ -2969,17 +2957,17 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "a key file of the gcs store": _OneReader(
         lambda node: _loads(node, "GCS_KEY_FILE_VAR"),
-        ("src/analysis_service/gcs_objects.py", "_service_account"),
+        ("src/katra/gcs_objects.py", "_service_account"),
         {
-            ("src/analysis_service/objects.py", MODULE_OWNER): (
+            ("src/katra/objects.py", MODULE_OWNER): (
                 "the gcs row names the key file as a setting it reads, and as the"
                 " setting that only the api_key mode reads"
             ),
-            ("src/analysis_service/gcs_objects.py", "from_env"): (
+            ("src/katra/gcs_objects.py", "from_env"): (
                 "it refuses a key set by its own name beside the key file, and"
                 " leaves the key file in the iam mode to refuse_unread"
             ),
-            ("src/analysis_service/settings_variables.py", "secret_vars"): (
+            ("src/katra/settings_variables.py", "secret_vars"): (
                 "it lists the key file among the settings that hold a secret,"
                 " and refuses nothing"
             ),
@@ -2994,19 +2982,19 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether a catalog passes": _OneReader(
         lambda node: _calls(node, "catalog_issues"),
-        ("src/analysis_service/assertions.py", "over"),
+        ("src/katra/assertions.py", "over"),
         {},
         "",
     ),
     "which rows a record loses": _OneReader(
         lambda node: _loads(node, "GATE_REFUSALS"),
-        ("src/analysis_service/assertions.py", "refusals"),
+        ("src/katra/assertions.py", "refusals"),
         {},
         "",
     ),
     "which proposed row a record loses": _OneReader(
         lambda node: _loads_attribute(node, "proposed_row"),
-        ("src/analysis_service/assertions.py", "resolved"),
+        ("src/katra/assertions.py", "resolved"),
         {
             ("evals/harness/population.py", "population"): (
                 "it copies the proposed row of each refusal into a population"
@@ -3017,9 +3005,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether a catalog row is an answer": _OneReader(
         _compares_an_origin,
-        ("src/analysis_service/assertions.py", "answered"),
+        ("src/katra/assertions.py", "answered"),
         {
-            ("src/analysis_service/validation.py", "_citation_issues"): (
+            ("src/katra/validation.py", "_citation_issues"): (
                 "it reads whether an answer stated a capability statement, and"
                 " reads no catalog row"
             ),
@@ -3028,22 +3016,22 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "which value says a control is not there": _OneReader(
         _reads_a_no_answer,
-        ("src/analysis_service/assertions.py", "missing_value"),
+        ("src/katra/assertions.py", "missing_value"),
         {},
         "",
     ),
     "is this control missing": _OneReader(
         _compares_a_value_with_absent,
-        ("src/analysis_service/assertions.py", "states_missing"),
+        ("src/katra/assertions.py", "states_missing"),
         {
-            ("src/analysis_service/assertions.py", "_compatible"): (
+            ("src/katra/assertions.py", "_compatible"): (
                 "it asks whether two values can hold at once, and decides no"
                 " missing control"
             ),
-            ("src/analysis_service/evidence.py", "_open_question_gloss"): (
+            ("src/katra/evidence.py", "_open_question_gloss"): (
                 "it spells the value a lane reads, and decides no missing control"
             ),
-            ("src/analysis_service/evidence.py", "_assertion_gloss"): (
+            ("src/katra/evidence.py", "_assertion_gloss"): (
                 "it spells the value a lane reads, and decides no missing control"
             ),
         },
@@ -3051,9 +3039,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "which settled rows the Evidence Catalog carries": _OneReader(
         lambda node: _loads(node, "SETTLING_REASONS"),
-        ("src/analysis_service/assertions.py", "offered"),
+        ("src/katra/assertions.py", "offered"),
         {
-            ("src/analysis_service/assertions.py", "catalog_coverage"): (
+            ("src/katra/assertions.py", "catalog_coverage"): (
                 "it counts the attributes that the catalog settles for a"
                 " coverage figure, and chooses no row"
             ),
@@ -3071,9 +3059,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the band-and-units order": _OneReader(
         lambda node: _loads_attribute(node, "framework_bands"),
-        ("src/analysis_service/early_questions.py", "standing"),
+        ("src/katra/early_questions.py", "standing"),
         {
-            ("src/analysis_service/answer_state.py", "passes_floor"): (
+            ("src/katra/answer_state.py", "passes_floor"): (
                 "it lets a question past the floor of its kind by its band, and"
                 " orders nothing"
             ),
@@ -3084,9 +3072,9 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: (
             _loads(node, "ZONE_FACTS") or _loads_attribute(node, "informed_by")
         ),
-        ("src/analysis_service/early_questions.py", "reads"),
+        ("src/katra/early_questions.py", "reads"),
         {
-            ("src/analysis_service/early_questions.py", "_early_questions"): (
+            ("src/katra/early_questions.py", "_early_questions"): (
                 "it passes each rule's informed_by to reads, and tests no part"
             ),
         },
@@ -3094,15 +3082,15 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether a selection reads capabilities": _OneReader(
         lambda node: _calls(node, "capability_keys"),
-        ("src/analysis_service/frameworks/__init__.py", "reads_capabilities"),
+        ("src/katra/frameworks/__init__.py", "reads_capabilities"),
         {},
         "",
     ),
     "a requirement's decision": _OneReader(
         lambda node: _calls(node, "applicability_for"),
-        ("src/analysis_service/frameworks/asvs/record.py", "applicability"),
+        ("src/katra/frameworks/asvs/record.py", "applicability"),
         {
-            ("src/analysis_service/frameworks/asvs/record.py", "open_capabilities"): (
+            ("src/katra/frameworks/asvs/record.py", "open_capabilities"): (
                 "it lists the capabilities whose answer would change a decision,"
                 " and decides no requirement"
             ),
@@ -3111,9 +3099,9 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the pieces of a cut quote": _OneReader(
         lambda node: _loads(node, "_ELLIPSIS"),
-        ("src/analysis_service/grounding.py", "fragments"),
+        ("src/katra/grounding.py", "fragments"),
         {
-            ("src/analysis_service/grounding.py", "_needle_of"): (
+            ("src/katra/grounding.py", "_needle_of"): (
                 "it refuses a cut quote as the needle of a repair, and splits no quote"
             ),
         },
@@ -3121,13 +3109,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "which kind a fact is": _OneReader(
         lambda node: _loads(node, "_KIND_ORDER"),
-        ("src/analysis_service/claims.py", "kind"),
+        ("src/katra/claims.py", "kind"),
         {},
         "",
     ),
     "the schema rule a model takes": _OneReader(
         lambda node: _loads_attribute(node, "schema_rules"),
-        ("src/analysis_service/vendors.py", "schema_rule"),
+        ("src/katra/vendors.py", "schema_rule"),
         {},
         "",
     ),
@@ -3137,13 +3125,13 @@ ONE_READERS: dict[str, _OneReader] = {
             and bool(node.args)
             and _loads(node.args[0], "prefixes")
         ),
-        ("src/analysis_service/store_settings.py", "refuse_unread"),
+        ("src/katra/store_settings.py", "refuse_unread"),
         {},
         "",
     ),
     "the frameworks a job names": _OneReader(
         lambda node: _calls(node, "NotCarried"),
-        ("src/analysis_service/selection.py", "resolve_names"),
+        ("src/katra/selection.py", "resolve_names"),
         {},
         "",
     ),
@@ -3166,7 +3154,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the tier of each graph node": _OneReader(
         _merges_the_shared_tier_nodes,
-        ("src/analysis_service/graph.py", "tier_node_by_graph_node"),
+        ("src/katra/graph.py", "tier_node_by_graph_node"),
         {},
         "",
     ),
@@ -3178,24 +3166,24 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "what a job asks about": _OneReader(
         lambda node: _calls(node, "checkpoint"),
-        ("src/analysis_service/job_answers.py", "answerable"),
+        ("src/katra/job_answers.py", "answerable"),
         {},
         "",
     ),
     "whether a job has ended": _OneReader(
-        _ends_a_job, ("src/analysis_service/jobs.py", "ended"), {}, ""
+        _ends_a_job, ("src/katra/jobs.py", "ended"), {}, ""
     ),
     "whether an attribute is open": _OneReader(
         _opens_an_attribute,
-        ("src/analysis_service/open_facts.py", "open_attribute"),
+        ("src/katra/open_facts.py", "open_attribute"),
         {},
         "",
     ),
     "which listed question a list may rank": _OneReader(
         lambda node: _joins(node, "_open", "passes_floor"),
-        ("src/analysis_service/answer_state.py", "_rankable"),
+        ("src/katra/answer_state.py", "_rankable"),
         {
-            ("src/analysis_service/answer_state.py", "question_set"): (
+            ("src/katra/answer_state.py", "question_set"): (
                 "it holds back the questions an undecided gate would ask, and"
                 " the open questions below the floor, which no list ranks"
             ),
@@ -3204,7 +3192,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "what a proposal comes to": _OneReader(
         lambda node: _calls(node, "_resolve"),
-        ("src/analysis_service/assertions.py", "resolved"),
+        ("src/katra/assertions.py", "resolved"),
         {},
         "",
     ),
@@ -3219,13 +3207,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "whether two references are the same": _OneReader(
         _spells_an_unknown_key,
-        ("src/analysis_service/claims.py", "key"),
+        ("src/katra/claims.py", "key"),
         {},
         "",
     ),
     "why a part of an owned job is missing": _OneReader(
         lambda node: _calls(node, "JobDataMissing"),
-        ("src/analysis_service/job_answers.py", "missing"),
+        ("src/katra/job_answers.py", "missing"),
         {},
         "",
     ),
@@ -3235,7 +3223,7 @@ ONE_READERS: dict[str, _OneReader] = {
             and isinstance(node.op, ast.Sub)
             and _loads(node.value, "UNIVERSAL_TERMS")
         ),
-        ("src/analysis_service/assertions.py", "subjects_of"),
+        ("src/katra/assertions.py", "subjects_of"),
         {},
         "",
     ),
@@ -3243,15 +3231,15 @@ ONE_READERS: dict[str, _OneReader] = {
         lambda node: (
             _calls(node, "Path") and bool(node.args) and _calls(node.args[0], "strip")
         ),
-        ("src/analysis_service/deployment.py", "config_path"),
+        ("src/katra/deployment.py", "config_path"),
         {},
         "",
     ),
     "a Report's rows": _OneReader(
         lambda node: _calls(node, "row_controls"),
-        ("src/analysis_service/claim_identity.py", "report_rows"),
+        ("src/katra/claim_identity.py", "report_rows"),
         {
-            ("src/analysis_service/fixes.py", "missing_rows"): (
+            ("src/katra/fixes.py", "missing_rows"): (
                 "it holds a catalog and no Report, so it reads the row controls"
                 " of the catalog itself"
             ),
@@ -3267,13 +3255,13 @@ ONE_READERS: dict[str, _OneReader] = {
                 or any(_loads(part, "REGISTRY") for part in ast.walk(node))
             )
         ),
-        ("src/analysis_service/claim_identity.py", "row_controls"),
+        ("src/katra/claim_identity.py", "row_controls"),
         {},
         "",
     ),
     "whether a report may be served": _OneReader(
         lambda node: _calls(node, "NotCompleted"),
-        ("src/analysis_service/job_answers.py", "servable"),
+        ("src/katra/job_answers.py", "servable"),
         {},
         "",
     ),
@@ -3283,7 +3271,7 @@ ONE_READERS: dict[str, _OneReader] = {
             and isinstance(node.value, str)
             and "unknown value for " in node.value
         ),
-        ("src/analysis_service/store_settings.py", "closed_setting"),
+        ("src/katra/store_settings.py", "closed_setting"),
         {},
         "",
     ),
@@ -3306,13 +3294,13 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "why a finding is still conditional": _OneReader(
         lambda node: _calls(node, "waits_on"),
-        ("src/analysis_service/report_conditions.py", "conditions"),
+        ("src/katra/report_conditions.py", "conditions"),
         {
-            ("src/analysis_service/report_conditions.py", "rests_on"): (
+            ("src/katra/report_conditions.py", "rests_on"): (
                 "it asks whether a claim rests on a corrected fact, and writes"
                 " no condition"
             ),
-            ("src/analysis_service/questions.py", "follow_up_needs"): (
+            ("src/katra/questions.py", "follow_up_needs"): (
                 "it lists the open facts a draft waits on as questions to ask,"
                 " and writes no condition"
             ),
@@ -3342,7 +3330,7 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the keys of an object store": _OneReader(
         _lists_a_store,
-        ("src/analysis_service/sql_store.py", "sweep_orphans"),
+        ("src/katra/sql_store.py", "sweep_orphans"),
         {},
         "",
     ),
@@ -3354,25 +3342,25 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the carried frameworks variable": _OneReader(
         _reads_the_carried_variable,
-        ("src/analysis_service/framework_config.py", "load_frameworks"),
+        ("src/katra/framework_config.py", "load_frameworks"),
         {},
         "",
     ),
     "the capabilities the sources state": _OneReader(
         lambda node: _calls(node, "with_stated_capabilities"),
-        ("src/analysis_service/graph.py", "stated"),
+        ("src/katra/graph.py", "stated"),
         {},
         "",
     ),
     "the split of a lane's proposals into kept and deferred": _OneReader(
         lambda node: _calls(node, "partition_proposals"),
-        ("src/analysis_service/fan_in.py", "fan_in"),
+        ("src/katra/fan_in.py", "fan_in"),
         {},
         "",
     ),
     "the render of a job's sources": _OneReader(
         lambda node: _calls(node, "render_sources"),
-        ("src/analysis_service/execution.py", "seed_state"),
+        ("src/katra/execution.py", "seed_state"),
         {
             ("evals/adversarial/verify.py", "fencing_issues"): (
                 "it renders sources to check the fence around them, and it"
@@ -3383,15 +3371,15 @@ ONE_READERS: dict[str, _OneReader] = {
     ),
     "the predicate a part of a question kind writes": _OneReader(
         lambda node: _is_attribute(node, "predicate", "facet", "kind"),
-        ("src/analysis_service/question_kinds.py", "parts"),
+        ("src/katra/question_kinds.py", "parts"),
         {},
         "",
     ),
     "the predicates the assertion pass extracts": _OneReader(
         lambda node: _is_attribute(node, "extracted"),
-        ("src/analysis_service/assertions.py", MODULE_OWNER),
+        ("src/katra/assertions.py", MODULE_OWNER),
         {},
-        "src/analysis_service/",
+        "src/katra/",
     ),
 }
 
@@ -3432,9 +3420,7 @@ def test_which_verdict_waits_has_one_rule():
     compared = set(_sites(lambda node: _compares_with(node, "needs-info")))
     read = set(_sites(lambda node: _loads_attribute(node, "related_unknowns")))
 
-    assert sorted(compared & read) == [
-        ("src/analysis_service/claims.py", "_check_shape")
-    ]
+    assert sorted(compared & read) == [("src/katra/claims.py", "_check_shape")]
 
 
 def test_the_gate_and_done_tests_of_a_question_have_one_reader():
@@ -3447,7 +3433,7 @@ def test_the_gate_and_done_tests_of_a_question_have_one_reader():
             and _loads_attribute(node.operand, "gates")
         )
 
-    assert _sites(not_a_gate) == [("src/analysis_service/answer_state.py", "_open")]
+    assert _sites(not_a_gate) == [("src/katra/answer_state.py", "_open")]
 
 
 def test_an_expected_requirement_has_one_reader():
@@ -3516,12 +3502,12 @@ def test_a_subjects_table_has_one_reader():
 
 def test_the_job_state_is_the_one_reader_of_whether_a_run_stops_to_ask():
     """An envelope holds no resumption, so ``pauses_to_ask`` on it is wrong for
-    a Resumed Job. :func:`~analysis_service.job_state.job_state` is the
+    a Resumed Job. :func:`~katra.job_state.job_state` is the
     reader. ``waits_for_answers`` reads only a job that waits for answers,
     which holds no resumption."""
     assert _sites(lambda node: _calls(node, "pauses_to_ask")) == [
-        ("src/analysis_service/job_state.py", "job_state"),
-        ("src/analysis_service/job_state.py", "waits_for_answers"),
+        ("src/katra/job_state.py", "job_state"),
+        ("src/katra/job_state.py", "waits_for_answers"),
     ]
 
 
@@ -3531,9 +3517,9 @@ def test_a_graph_contradiction_is_read_in_the_assertion_layer():
     ``test_each_caller_of_settled_has_a_reason`` holds the callers of
     ``settled``."""
     assert _sites(lambda node: _calls(node, "contradictions")) == [
-        ("src/analysis_service/assertions.py", "_contradicted_ids"),
-        ("src/analysis_service/assertions.py", "contradicted_attributes"),
-        ("src/analysis_service/assertions.py", "contradiction_issues"),
+        ("src/katra/assertions.py", "_contradicted_ids"),
+        ("src/katra/assertions.py", "contradicted_attributes"),
+        ("src/katra/assertions.py", "contradiction_issues"),
     ]
 
 
@@ -3544,9 +3530,9 @@ def test_the_attributes_the_rows_hold_open_have_one_reader():
     field the catalog does not offer as a fact is one question a submitter
     may answer."""
     assert _sites(lambda node: _calls(node, "held_open_attributes")) == [
-        ("src/analysis_service/evidence.py", "_held_open_attributes"),
-        ("src/analysis_service/open_facts.py", "fact_routes"),
-        ("src/analysis_service/open_facts.py", "open_attribute"),
+        ("src/katra/evidence.py", "_held_open_attributes"),
+        ("src/katra/open_facts.py", "fact_routes"),
+        ("src/katra/open_facts.py", "open_attribute"),
     ]
 
 
@@ -3555,7 +3541,7 @@ def test_a_row_value_has_one_graph_spelling():
     row's value, so the projection, its qualification and the graph
     comparison spell one value the same way."""
     assert _sites(lambda node: _calls(node, "_written")) == [
-        ("src/analysis_service/assertions.py", "_graph_spelling"),
+        ("src/katra/assertions.py", "_graph_spelling"),
     ]
 
 
@@ -3563,8 +3549,8 @@ def test_the_rows_that_make_a_value_have_one_reader():
     """``_value_rows`` names the rows that make an attribute's value, so the
     projection and the graph comparison read the same rows."""
     assert _sites(lambda node: _calls(node, "_value_rows")) == [
-        ("src/analysis_service/assertions.py", "_projected"),
-        ("src/analysis_service/assertions.py", "contradictions"),
+        ("src/katra/assertions.py", "_projected"),
+        ("src/katra/assertions.py", "contradictions"),
     ]
 
 
@@ -3572,20 +3558,20 @@ def test_the_rows_that_make_a_value_have_one_reader():
 #: that holds a model and asks which rows are facts against it reads
 #: ``uncontradicted`` instead.
 SETTLED_CALLERS: dict[tuple[str, str], str] = {
-    ("src/analysis_service/assertions.py", "answer"): (
+    ("src/katra/assertions.py", "answer"): (
         "the typed query over the catalog, which holds no model"
     ),
-    ("src/analysis_service/assertions.py", "catalog_coverage"): (
+    ("src/katra/assertions.py", "catalog_coverage"): (
         "counts subjects that are not graph-bound, which no graph attribute"
         " can contradict"
     ),
-    ("src/analysis_service/assertions.py", "contradicted"): (
+    ("src/katra/assertions.py", "contradicted"): (
         "builds the model-aware rule from the catalog rule"
     ),
-    ("src/analysis_service/assertions.py", "uncontradicted"): (
+    ("src/katra/assertions.py", "uncontradicted"): (
         "builds the model-aware rule from the catalog rule"
     ),
-    ("src/analysis_service/links.py", "link_questions"): (
+    ("src/katra/links.py", "link_questions"): (
         "counts facts about a principal, which reach no graph field"
     ),
 }
@@ -3618,10 +3604,10 @@ UNROUTED_FACT_READERS: dict[tuple[str, str], str] = {
     ("evals/critic_review/replay.py", "score"): (
         "counts whether a draft cites an open fact, which asks no question"
     ),
-    ("src/analysis_service/claims.py", "settled_by_grounds"): (
+    ("src/katra/claims.py", "settled_by_grounds"): (
         "builds the ruling from the draft's grounds, which name rows by identity"
     ),
-    ("src/analysis_service/critic.py", "complete_rulings"): (
+    ("src/katra/critic.py", "complete_rulings"): (
         "fills the ruling from the draft's grounds, which name rows by identity"
     ),
 }
@@ -3640,9 +3626,9 @@ def test_each_reader_of_waiting_facts_reads_them_as_asked():
         lambda node: _calls(node, "routed")
     )
     assert _sites(lambda node: _calls(node, "fact_routes")) == [
-        ("src/analysis_service/questions.py", "follow_up_needs"),
-        ("src/analysis_service/report_conditions.py", "conditions"),
-        ("src/analysis_service/report_conditions.py", "corrected_findings"),
+        ("src/katra/questions.py", "follow_up_needs"),
+        ("src/katra/report_conditions.py", "conditions"),
+        ("src/katra/report_conditions.py", "corrected_findings"),
     ]
 
 
@@ -3650,7 +3636,7 @@ def test_the_row_an_answer_settles_has_one_reader():
     """Only ``answered_row`` matches a key against a row's place, so the
     admission check, the answer forms and the writer find one row."""
     assert _sites(_compares_a_place) == [
-        ("src/analysis_service/fact_answers.py", "answered_row"),
+        ("src/katra/fact_answers.py", "answered_row"),
     ]
 
 

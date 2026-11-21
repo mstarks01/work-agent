@@ -7,12 +7,12 @@ read. One call answers what the critic makes of those drafts again, or of
 drafts ``run.py descendants`` changed or injected.
 
 **The graph's readers, never a second copy.** The request is
-:func:`~analysis_service.critic_round.critic_request` over a
-:class:`~analysis_service.critic_round.CriticRound` built from
+:func:`~katra.critic_round.critic_request` over a
+:class:`~katra.critic_round.CriticRound` built from
 ``<case>.drafts.json``, the repaired quotes and unverified grounds the report's
 block carries, and the report's assertion catalog. ``{system_model}`` and
 ``{boundary_crossings}`` are the job-wide keys ``<case>.lanes.json`` captured.
-The answer is parsed by :func:`~analysis_service.critic_round.rulings_of`.
+The answer is parsed by :func:`~katra.critic_round.rulings_of`.
 ``tests/test_evals_critic_replay.py`` holds the rebuilt request against the one
 a real graph run sent.
 
@@ -33,34 +33,6 @@ from typing import Any, Literal
 
 from google.genai import types
 
-from analysis_service.assertions import AssertionRecord
-from analysis_service.claims import (
-    AnalysisMarks,
-    Claim,
-    FrameworkAnalysis,
-    FrameworkName,
-    Ruling,
-    VerdictStatus,
-    quote_check_ran,
-)
-from analysis_service.critic import complete_rulings, review_issues
-from analysis_service.critic_round import CriticRound, critic_request, rulings_of
-from analysis_service.deployment import Deployment
-from analysis_service.execution import seed_state
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.graph import (
-    CRITIC_ROLE,
-    STATE_ASSERTION_CATALOG,
-    STATE_BOUNDARY_CROSSINGS,
-    STATE_INPUT_TEXT,
-    STATE_SYSTEM_MODEL,
-    STATE_VALID_MODEL,
-    FrameworkNodes,
-    parked_quotes_checked,
-)
-from analysis_service.job_controls import AppliedControl
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import (
     CORPUS_DIR,
     EvalArtifact,
@@ -83,6 +55,34 @@ from evals.harness.node_call import NodeCall, node_call, spent_line
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import CorpusError, load_case, refuse_holdout
 from evals.harness.run_record import loaded, run_record_for
+from katra.assertions import AssertionRecord
+from katra.claims import (
+    AnalysisMarks,
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    Ruling,
+    VerdictStatus,
+    quote_check_ran,
+)
+from katra.critic import complete_rulings, review_issues
+from katra.critic_round import CriticRound, critic_request, rulings_of
+from katra.deployment import Deployment
+from katra.execution import seed_state
+from katra.frameworks import PACKAGES, schemas_for
+from katra.graph import (
+    CRITIC_ROLE,
+    STATE_ASSERTION_CATALOG,
+    STATE_BOUNDARY_CROSSINGS,
+    STATE_INPUT_TEXT,
+    STATE_SYSTEM_MODEL,
+    STATE_VALID_MODEL,
+    FrameworkNodes,
+    parked_quotes_checked,
+)
+from katra.job_controls import AppliedControl
+from katra.markdown_loader import MarkdownLoader
+from katra.system_model import SystemModel
 
 
 @dataclass(frozen=True)
@@ -93,8 +93,8 @@ class Archived:
     drafts: list[Claim]
     marks: AnalysisMarks
     #: Whether the fan-in ran the quote check: from the block through
-    #: :func:`~analysis_service.claims.quote_check_ran`, or from a failure
-    #: dump through :func:`~analysis_service.graph.parked_quotes_checked`.
+    #: :func:`~katra.claims.quote_check_ran`, or from a failure
+    #: dump through :func:`~katra.graph.parked_quotes_checked`.
     quotes_checked: bool
     #: This framework's block of the case's report, or ``None`` where the case
     #: failed before it wrote one, and the material came from its failure dump.

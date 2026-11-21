@@ -22,7 +22,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-from analysis_service import (
+from katra import (
     Engine,
     EngineInputError,
     PipelineCompleted,

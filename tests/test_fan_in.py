@@ -4,15 +4,15 @@ import time
 
 import pytest
 
-from analysis_service import critic, fan_in
-from analysis_service.assertions import (
+from katra import critic, fan_in
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
     Subject,
     assertion_id,
 )
-from analysis_service.claims import (
+from katra.claims import (
     MAX_ABSENT_PER_PROPOSAL,
     MAX_CLAIMS_PER_BATCH,
     MENTION_MAX_CHARS,
@@ -20,13 +20,13 @@ from analysis_service.claims import (
     Mitigation,
     QuoteCandidate,
 )
-from analysis_service.fan_in import DraftJoinError, join_drafts, snap_drafts
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.asvs.record import RequirementProposal
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS, DEFAULT_DESCRIPTION_LABEL
-from analysis_service.validation import MAX_ELEMENTS
+from katra.fan_in import DraftJoinError, join_drafts, snap_drafts
+from katra.frameworks import PACKAGES, schemas_for
+from katra.frameworks.asvs.record import RequirementProposal
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import MAX_SEQUENCE, DraftThreat
+from katra.sources import CARRIED_EVIDENCE_KINDS, DEFAULT_DESCRIPTION_LABEL
+from katra.validation import MAX_ELEMENTS
 from tests.factories import (
     REPORTING_JOB,
     SCRIPTED_FRAMEWORKS,
@@ -319,7 +319,7 @@ class TestGroundReferences:
     Every failure here is fatal. There is no re-ask path for a category agent's
     drafts — ``repair`` is extraction-only and ``recritic`` is critic-only — so
     an unresolved reference kills the job. The rule is
-    :func:`analysis_service.evidence.ground_issues`: a ground is one the
+    :func:`katra.evidence.ground_issues`: a ground is one the
     catalog derived from this model holds, and the same reader runs over every
     report that loads.
     """
@@ -694,7 +694,7 @@ class TestQuoteVerification:
         them under a half-second body bound must finish in about that, where
         the per-scan bound alone would let them run for three scans.
         """
-        from analysis_service import grounding
+        from katra import grounding
 
         monkeypatch.setattr(grounding, "MAX_REPAIR_SECONDS_PER_BODY", 0.5)
         quote = " ".join(["ab"] * 133)
@@ -1024,14 +1024,14 @@ class TestTheGroundsBoundTheCitedElements:
     def test_the_reason_states_the_bound_the_check_reads(self):
         """``BEYOND_GROUNDS`` writes the bound in words, so it is held to
         ``BOUND_HOPS``, which ``within_bound`` reads."""
-        from analysis_service.claims import BEYOND_GROUNDS
-        from analysis_service.fan_in import BOUND_HOPS
+        from katra.claims import BEYOND_GROUNDS
+        from katra.fan_in import BOUND_HOPS
 
         words = {1: "one", 2: "two", 3: "three"}
         assert BEYOND_GROUNDS.startswith(f"more than {words[BOUND_HOPS]} hops ")
 
     def test_an_element_three_hops_away_is_dropped_and_marked(self, model):
-        from analysis_service.claims import BEYOND_GROUNDS
+        from katra.claims import BEYOND_GROUNDS
 
         drafts = {
             "spoofing": [sample_draft(affected_element_ids=[CROSSING, REPORTING_JOB])]
@@ -1059,7 +1059,7 @@ class TestTheGroundsBoundTheCitedElements:
         assert joined.marks.unresolved_references == []
 
     def test_a_claim_on_quotes_alone_is_bounded_by_what_its_prose_cites(self, model):
-        from analysis_service.claims import BEYOND_GROUNDS
+        from katra.claims import BEYOND_GROUNDS
 
         drafts = {
             "spoofing": [

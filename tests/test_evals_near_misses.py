@@ -11,7 +11,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals.harness import near_misses
 from evals.harness.losses import CaseLosses, Loss
 from evals.harness.reference import (
@@ -21,6 +20,7 @@ from evals.harness.reference import (
     flows_by_case,
     load_case,
 )
+from katra.system_model import SystemModel, normalize_element_ids
 from tests.eval_factories import draft_threat
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"

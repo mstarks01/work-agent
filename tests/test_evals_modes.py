@@ -18,30 +18,30 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
-from analysis_service.deployment import Deployment
 from evals.harness import modes
 from evals.harness.alignment import Alignment, Pair
 from evals.harness.reference import load_case, load_corpus
 from evals.harness.structural import report_issues
+from katra.deployment import Deployment
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"
-from analysis_service.analysis import control_state, states_a_protocol
-from analysis_service.assertions import ABSENT, projection_fields
-from analysis_service.basis import IN_SCOPE
-from analysis_service.certification import fingerprints_of
-from analysis_service.claims import (
+from katra.analysis import control_state, states_a_protocol
+from katra.assertions import ABSENT, projection_fields
+from katra.basis import IN_SCOPE
+from katra.certification import fingerprints_of
+from katra.claims import (
     AnalysisMarks,
     Mitigation,
     Severity,
     SharedElementName,
 )
-from analysis_service.evidence import evidence_catalog
-from analysis_service.frameworks import package_for
-from analysis_service.frameworks.stride.record import (
+from katra.evidence import evidence_catalog
+from katra.frameworks import package_for
+from katra.frameworks.stride.record import (
     STRIDE_CATEGORIES,
     _threat_id,
 )
-from analysis_service.graph import (
+from katra.graph import (
     ENTRY_ASSERT_ONLY,
     ENTRY_EXTRACT,
     ENTRY_EXTRACT_ONLY,
@@ -53,11 +53,11 @@ from analysis_service.graph import (
     Pipeline,
     tier_node_by_graph_node,
 )
-from analysis_service.grounding import verify_quote
-from analysis_service.report import Report
-from analysis_service.sampling import load_sampling
-from analysis_service.sources import Source
-from analysis_service.system_model import (
+from katra.grounding import verify_quote
+from katra.report import Report
+from katra.sampling import load_sampling
+from katra.sources import Source
+from katra.system_model import (
     FLOW_DELIMITER,
     UNKNOWN,
     ZONE_ATTRIBUTE,
@@ -67,7 +67,7 @@ from analysis_service.system_model import (
     make_flow_id,
     normalize_element_ids,
 )
-from analysis_service.validation import validate
+from katra.validation import validate
 from tests.eval_factories import ruled_position
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
@@ -112,7 +112,7 @@ def reaching_refs(case, element_ids) -> list[str]:
     kind of ground. Where nothing reaches every element the best partial reach
     is cited, and the drop of the rest is the point.
     """
-    from analysis_service.system_model import ModelIndex
+    from katra.system_model import ModelIndex
 
     catalog = evidence_catalog(case.model)
     index = ModelIndex.of(case.model)
@@ -349,14 +349,14 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     """The eval report is the production shape or it measures a different one.
 
     The pinned set is the guard, and it is pinned rather than derived on
-    purpose: every field an :class:`~analysis_service.graph.Analysis` and a
-    :class:`~analysis_service.report.Report` share is one the eval seam has
+    purpose: every field an :class:`~katra.graph.Analysis` and a
+    :class:`~katra.report.Report` share is one the eval seam has
     to be *asked* to carry, and a field added to both without a decision here
     can be computed at the fan-in for a sweep that then reads an empty list
     for it.
 
     The marks are pinned through
-    :class:`~analysis_service.claims.AnalysisMarks`, which is the one field
+    :class:`~katra.claims.AnalysisMarks`, which is the one field
     an ``Analysis`` holds them on.
     """
     pipeline = build(case, ENTRY_PREPARE, {})
@@ -383,7 +383,7 @@ def test_an_eval_report_carries_every_field_production_stamps(case):
     # which is a fact about this run rather than a field the seam forgot.
     assert run.report.model_repair is None
     # The decision for ``assertions``: the harness builds its graphs through
-    # the deployment, so a sweep on an install that sets ``ANALYSIS_ASSERTIONS``
+    # the deployment, so a sweep on an install that sets ``KATRA_ASSERTIONS``
     # runs the pass and records the catalog the way a job does. This graph was
     # built without it, and the envelope says so with ``None``.
     assert run.report.assertions is None
@@ -571,7 +571,7 @@ class TestAProjectionIsComparedTheWayItsFieldSays:
     CASE = "01-payments-checkout"
 
     def resolved(self, golden, rows):
-        from analysis_service.assertions import AssertionRecord, CatalogProposal
+        from katra.assertions import AssertionRecord, CatalogProposal
 
         sources = {source.label: source.text for source in golden.sources}
         return AssertionRecord.of(
@@ -1391,7 +1391,7 @@ class TestTheInitiatorReadingOfAnExtraction:
 
     def model(self, flows):
         """A blessed model carrying only what the reading walks: its flows."""
-        from analysis_service.system_model import SystemModel
+        from katra.system_model import SystemModel
 
         case = load_case(CORPUS / "07-cicd-store-deploy")
         return SystemModel.model_validate(
@@ -1635,8 +1635,8 @@ def test_the_named_types_are_the_registry_less_flows_and_zones():
     """
     from typing import get_args
 
-    from analysis_service.system_model import DataFlow, Element, TrustBoundary
     from evals.harness.modes import NAMED_TYPES
+    from katra.system_model import DataFlow, Element, TrustBoundary
 
     every = {element.id_prefix for element in get_args(Element)}
     coined = {DataFlow.id_prefix, TrustBoundary.id_prefix}
@@ -1846,7 +1846,7 @@ def test_extraction_mode_checks_excerpts_against_the_sources(case):
     """The gate rule production runs, with its input.
 
     ``run_extraction`` passes the sources to ``parse_and_validate``, because
-    :func:`analysis_service.validation._citation_issues` returns early when
+    :func:`katra.validation._citation_issues` returns early when
     there are none. Without them, an invented quote would pass here and fail
     inside a job, and the mode would grade extractions against a weaker gate
     than the one that ships.

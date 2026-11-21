@@ -11,10 +11,10 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.answer_state import question_set
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.system_model import SystemModel
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.answer_state import question_set
+from katra.fact_answers import FactAnswer
+from katra.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
 

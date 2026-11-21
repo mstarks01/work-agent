@@ -8,7 +8,7 @@ how severe anything is. Every such decision is this repository's own.
 This document is the list of those decisions. It exists because the report's
 disclaimer says "STRIDE threat model", and a reader who knows the published
 method will otherwise assume choices nobody made on their behalf. `STRIDE_VERSION`
-in `src/analysis_service/frameworks/stride/record.py` names the version of what
+in `src/katra/frameworks/stride/record.py` names the version of what
 is written here, and moves when any of it changes.
 
 ## What is the published method
@@ -35,7 +35,7 @@ Each of these is a choice with a reason. None is required by STRIDE, and a
 different tool may reasonably choose otherwise.
 
 **A closed set of 21 action verbs.** A finding names one attacker action from
-`analysis_service.actions.ACTION_VERBS`, grouped into families. STRIDE names
+`katra.actions.ACTION_VERBS`, grouped into families. STRIDE names
 categories, not actions. The vocabulary exists so two spellings of one attack
 compare equal without a model call — it is half of what
 `evals/harness/fingerprint.py` keys a finding on — and it is what lets a human

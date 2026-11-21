@@ -12,7 +12,7 @@
 // whether a facet offers "I don't know" over a known answer; `contextOf(q)`,
 // the lines under a question's "?"; `notes(row)`, nodes under a row's title;
 // `extras(row)`, nodes after a row's input, such as a skip button; and
-// `hueOf(id)`, an element's hue (analysis_service.element_hues) or undefined.
+// `hueOf(id)`, an element's hue (katra.element_hues) or undefined.
 //
 // A row is the page's own object: `{ q, kind, node }`, `kind` "fact" or
 // "link". Drawing sets `row.read`, the answer as the service takes it or
@@ -774,7 +774,7 @@ const shareable = (a, b) => {
 // The heading of the box of link questions, on both pages and in the export.
 const LINK_GROUP_HEADING = "Match each user, team or account to a part of your system";
 // An element as a tag in its colour (`hue`, from
-// analysis_service.element_hues), its ID on hover; with no hue, a grey tag.
+// katra.element_hues), its ID on hover; with no hue, a grey tag.
 // The report page and the question rows draw each element tag here.
 const elementTag = (name, id, hue) => {
   const tag = document.createElement("span");

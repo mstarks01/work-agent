@@ -24,11 +24,11 @@ from __future__ import annotations
 import pytest
 from google.adk.agents import LlmAgent
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
-from analysis_service.graph import Pipeline
-from analysis_service.markdown_loader import estimate_tokens
 from evals.harness.instruction import SHARED, NodeInstruction, artifact, collect, totals
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
+from katra.graph import Pipeline
+from katra.markdown_loader import estimate_tokens
 from tests.factories import scripted_pipeline
 
 

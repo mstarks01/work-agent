@@ -22,9 +22,9 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.actions import ACTION_VERBS
-from analysis_service.frameworks import package_for
-from analysis_service.frameworks.stride.record import LANES_OF_VERB, STRIDE_VERSION
+from katra.actions import ACTION_VERBS
+from katra.frameworks import package_for
+from katra.frameworks.stride.record import LANES_OF_VERB, STRIDE_VERSION
 
 PROFILE = Path(__file__).resolve().parents[1] / "docs" / "STRIDE-Profile.md"
 
@@ -79,7 +79,7 @@ def test_the_deviations_it_claims_are_deviations_the_code_makes(profile):
     the four the code can answer for directly; the rest are design statements a
     reader checks.
     """
-    assert "`analysis_service.actions.ACTION_VERBS`" in profile
+    assert "`katra.actions.ACTION_VERBS`" in profile
     # A legal-verb table exists, and it is what makes "one category per finding"
     # enforceable rather than conventional.
     assert LANES_OF_VERB, "the profile claims a legal-verb table and there is none"

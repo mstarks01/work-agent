@@ -1,10 +1,10 @@
 """The retry loop and the shared budget that keeps it from becoming a storm.
 
 Driven against a fake **executor** rather than a fake translator. The loop runs
-above :mod:`analysis_service.provider`'s seam, so what a test has to supply is
+above :mod:`katra.provider`'s seam, so what a test has to supply is
 one method returning results or raising — no provider library, no credential
 and no request. The adapter itself is the shipped
-:class:`~analysis_service.provider.ExecutedLlm`.
+:class:`~katra.provider.ExecutedLlm`.
 
 The litellm exception *types* are real, because the classification is the one
 part that genuinely depends on them.
@@ -26,14 +26,14 @@ from litellm.exceptions import RateLimitType
 
 # Imported through ``model_gate`` so the model-cost map is pinned before
 # anything here reaches litellm's own tables.
-from analysis_service import model_gate  # noqa: F401
-from analysis_service.provider import (
+from katra import model_gate  # noqa: F401
+from katra.provider import (
     ExecutedLlm,
     GenerationResult,
     ProviderCallFailed,
 )
-from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
-from analysis_service.retry import (
+from katra.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
+from katra.retry import (
     _RATE_LIMIT_CLEARS_WITH_TIME,
     _RETRY_AFTER_CEILING_SECONDS,
     RefusedCompletionError,
@@ -47,7 +47,7 @@ from analysis_service.retry import (
     _retry_after_seconds,
     classify,
 )
-from analysis_service.vendors import VENDOR_NAMES, vendor_for
+from katra.vendors import VENDOR_NAMES, vendor_for
 
 #: The loop projects whatever request it is handed and passes the projection
 #: to the executor, which here ignores it. One empty request stands in for
@@ -97,7 +97,7 @@ def response(text: str, finish_reason: str | None = None) -> LlmResponse:
     A bare string would hide the ``finish_reason`` the truncation check reads:
     what a provider says about *how* a completion ended is part of the answer
     rather than metadata around it. The real type is what the seam
-    reduces to a :class:`~analysis_service.provider.GenerationResult`, so using
+    reduces to a :class:`~katra.provider.GenerationResult`, so using
     it here means every field the projection reads is a field that exists.
     """
     return LlmResponse(
@@ -129,8 +129,8 @@ class FakeExecutor:
     counts calls, which is the number every claim in this module is about.
 
     It raises the provider's exception rather than a
-    :class:`~analysis_service.provider.ProviderCallFailed`, because that
-    translation is :class:`~analysis_service.provider.InProcessExecutor`'s job
+    :class:`~katra.provider.ProviderCallFailed`, because that
+    translation is :class:`~katra.provider.InProcessExecutor`'s job
     and it is the thing under test here as much as the loop is.
     """
 
@@ -170,7 +170,7 @@ def policy(attempts: int = 3, capacity: float = 10, ratio: float = 0.1) -> Retry
 def drive(base: FakeExecutor, pol: RetryPolicy, stream: bool = False) -> list:
     """Run one call through the shipped adapter, over a scripted executor.
 
-    The adapter is :class:`~analysis_service.provider.ExecutedLlm` — the one
+    The adapter is :class:`~katra.provider.ExecutedLlm` — the one
     ``binding`` builds — so the loop under test is the one that runs in
     production, with only what sits on the far side of the seam replaced.
     """
@@ -883,7 +883,7 @@ def test_adk_still_labels_a_request_with_its_node():
     """``provider._node_of`` reads this label, so a rename in ADK is a failure here."""
     from google.adk.flows.llm_flows import base_llm_flow
 
-    from analysis_service.provider import _NODE_LABEL
+    from katra.provider import _NODE_LABEL
 
     assert base_llm_flow._ADK_AGENT_NAME_LABEL_KEY == _NODE_LABEL
 

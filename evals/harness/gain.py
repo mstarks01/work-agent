@@ -46,8 +46,6 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Literal
 
-from analysis_service.claims import FrameworkName
-from analysis_service.parsing import table_entry
 from evals.harness import audit
 from evals.harness.artifact import figures_corpus
 from evals.harness.comparison import flagged_cases, held_out_cases
@@ -60,6 +58,8 @@ from evals.harness.promotion import (
 )
 from evals.harness.rates import complete_mean, mean, shown_figure
 from evals.harness.scorer import review_coverage
+from katra.claims import FrameworkName
+from katra.parsing import table_entry
 
 #: One figure, read from one artifact over the cases a selector keeps, or
 #: ``None`` where the artifact carries no such figure.

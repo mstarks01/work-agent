@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from analysis_service.frameworks.stride import CASES, NOTES, STRIDE
-from analysis_service.knowledge import (
+from katra.frameworks.stride import CASES, NOTES, STRIDE
+from katra.knowledge import (
     MAX_CASES,
     MAX_NOTES,
     compose_cases,
@@ -25,7 +25,7 @@ from analysis_service.knowledge import (
     select_documents,
     select_per_lane,
 )
-from analysis_service.markdown_loader import MarkdownLoader
+from katra.markdown_loader import MarkdownLoader
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 # The package's own text root: a document's home follows its retrieval key,
@@ -190,10 +190,10 @@ class TestTheCorpusCannotBecomeEvidence:
         import ``knowledge`` and reads them by path, so it keeps failing loud
         even if the allowlist lint is ever weakened or deleted.
         """
-        package = PROJECT_ROOT / "src" / "analysis_service"
+        package = PROJECT_ROOT / "src" / "katra"
         for module in ("evidence.py", "critic.py"):
             source = (package / module).read_text()
-            assert "from analysis_service.knowledge import" not in source
+            assert "from katra.knowledge import" not in source
 
     def test_a_document_id_is_never_an_evidence_reference(self):
         """The two ID spaces cannot collide.

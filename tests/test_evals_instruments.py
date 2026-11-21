@@ -28,8 +28,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
 from evals.harness.instruments import (
     INSTRUMENTS,
     ModeRun,
@@ -39,6 +37,8 @@ from evals.harness.instruments import (
 )
 from evals.harness.ledger import Ledger
 from evals.harness.reference import load_case
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
 from tests.factories import sample_report
 from tests.test_asvs import _block as asvs_block
 
@@ -270,13 +270,13 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
         writing one of those keys fails here, and so does a re-score key nobody
         declared.
         """
-        from analysis_service.certification import CertifyResult
         from evals.harness.artifact import (
             DECLARED_KEYS,
             RESCORED_KEYS,
             RepoCommit,
             build,
         )
+        from katra.certification import CertifyResult
 
         run = empty_run(tuple(PACKAGES))
         artifact = build(
@@ -302,8 +302,8 @@ class TestTheDeclaredKeysAreTheWrittenKeys:
         """
         from dataclasses import replace
 
-        from analysis_service.certification import CertifyResult
         from evals.harness.artifact import RepoCommit, build
+        from katra.certification import CertifyResult
 
         run = replace(empty_run(tuple(PACKAGES)), charges={"extract": 0.003})
         artifact = build(

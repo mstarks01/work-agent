@@ -22,28 +22,28 @@ from botocore.exceptions import ClientError, EndpointConnectionError
 from pydantic import ValidationError
 from sqlalchemy.pool import NullPool
 
-from analysis_service import jobs, sql_store, store_backends
-from analysis_service.answer_sets import (
+from katra import jobs, sql_store, store_backends
+from katra.answer_sets import (
     NO_ANSWERS,
     NO_SENT_ANSWERS,
     AnswerSet,
     SentAnswers,
 )
-from analysis_service.budgets import BudgetPolicy
-from analysis_service.controls import (
+from katra.budgets import BudgetPolicy
+from katra.controls import (
     Control,
     ControlDocument,
     ControlLimits,
     EvidenceRefusal,
 )
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.job_controls import (
+from katra.fact_answers import FactAnswer
+from katra.job_controls import (
     ControlFact,
     ControlFacts,
     CopiedControl,
     LeftOutScope,
 )
-from analysis_service.jobs import (
+from katra.jobs import (
     NON_LOCKING_STATUSES,
     RECORD_FIELDS,
     RESTART_FAILURE_MESSAGE,
@@ -61,20 +61,20 @@ from analysis_service.jobs import (
     readable,
     same_schema,
 )
-from analysis_service.objects import (
+from katra.objects import (
     ObjectStore,
     build_object_store,
     evidence_key,
     file_key,
     object_key,
 )
-from analysis_service.owner_files import OwnerFile
-from analysis_service.principals import Identity, Principal
-from analysis_service.report import SCHEMA_VERSION, NodeRun, TokenUsage
-from analysis_service.sources import Source, text_digest
-from analysis_service.sql_store import DATABASES
-from analysis_service.store_backends import JOB_STORES, build_store
-from analysis_service.store_settings import StoreConfigError
+from katra.owner_files import OwnerFile
+from katra.principals import Identity, Principal
+from katra.report import SCHEMA_VERSION, NodeRun, TokenUsage
+from katra.sources import Source, text_digest
+from katra.sql_store import DATABASES
+from katra.store_backends import JOB_STORES, build_store
+from katra.store_settings import StoreConfigError
 from tests import test_resume
 from tests.factories import (
     SEEDING_BUDGET,
@@ -182,7 +182,7 @@ def held(request, tmp_path_factory, monkeypatch):
     deletes a test can make fail."""
     env = _settings(request, tmp_path_factory, monkeypatch)()
     objects = FailingDeletes(build_object_store(env))
-    return JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects), objects
+    return JOB_STORES[env["KATRA_JOB_STORE"]].build(env, objects), objects
 
 
 class DeletingReads:
@@ -212,7 +212,7 @@ def racing(request, tmp_path_factory, monkeypatch):
     can delete a job during a read."""
     env = _settings(request, tmp_path_factory, monkeypatch)()
     objects = DeletingReads(build_object_store(env))
-    objects.store = JOB_STORES[env["ANALYSIS_JOB_STORE"]].build(env, objects)
+    objects.store = JOB_STORES[env["KATRA_JOB_STORE"]].build(env, objects)
     return objects.store, objects
 
 
@@ -1423,7 +1423,7 @@ class TestTheRetentionSweep:
         self, store, caplog
     ):
         job = last_updated(store, "completed", days_ago=2)
-        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+        with caplog.at_level(logging.INFO, logger="katra.store_backends"):
             asyncio.run(store_backends.expire_jobs(store, 1))
         [line] = caplog.messages
         assert re.fullmatch(
@@ -1575,7 +1575,7 @@ class TestAFailedObjectDelete:
         job = completed(store)
         sources = object_key("alice", job, "sources.json")
         objects.failing = {sources}
-        with caplog.at_level(logging.WARNING, logger="analysis_service.sql_store"):
+        with caplog.at_level(logging.WARNING, logger="katra.sql_store"):
             asyncio.run(store.delete(job, "alice"))
         [line] = caplog.messages
         assert sources in line
@@ -1586,7 +1586,7 @@ class TestAFailedObjectDelete:
         store, objects = held
         job = completed(store)
         objects.failing = {object_key("alice", job, "sources.json")}
-        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+        with caplog.at_level(logging.INFO, logger="katra.store_backends"):
             assert (
                 asyncio.run(store_backends.audited_delete(store, job, "alice", "owner"))
                 == 1
@@ -1594,7 +1594,7 @@ class TestAFailedObjectDelete:
         assert [
             record.getMessage()
             for record in caplog.records
-            if record.name == "analysis_service.store_backends"
+            if record.name == "katra.store_backends"
         ] == [f"deleted job {job} of owner alice: cause owner, 1 object(s) removed"]
 
     def test_a_cancellation_is_never_caught(self, held):
@@ -1817,7 +1817,7 @@ class TestTheOrphanSweep:
         monkeypatch.setattr(store_backends, "ORPHAN_GRACE", timedelta(minutes=-1))
         key = object_key("alice", new_record().id, "sources.json")
         asyncio.run(objects.put(key, b"[]"))
-        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+        with caplog.at_level(logging.INFO, logger="katra.store_backends"):
             asyncio.run(store_backends.remove_orphans(store))
         assert caplog.messages == ["the orphan sweep removed 1 object(s)"]
 
@@ -1853,22 +1853,22 @@ class TestTheSweepLoop:
     retention period, and a failed pass does not stop the loop."""
 
     def test_the_orphan_sweep_runs_without_a_retention_period(self, monkeypatch):
-        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        monkeypatch.delenv("KATRA_RETENTION_DAYS", raising=False)
         store = SweepSpy()
         asyncio.run(passes_in_lifespan(store, 1))
         assert store.passes == 1
 
     def test_a_failed_pass_is_logged_and_the_next_pass_runs(self, monkeypatch, caplog):
-        monkeypatch.delenv("ANALYSIS_RETENTION_DAYS", raising=False)
+        monkeypatch.delenv("KATRA_RETENTION_DAYS", raising=False)
         monkeypatch.setattr(store_backends, "SWEEP_SECONDS", 0)
         store = SweepSpy(failures=1)
-        with caplog.at_level(logging.INFO, logger="analysis_service.store_backends"):
+        with caplog.at_level(logging.INFO, logger="katra.store_backends"):
             asyncio.run(passes_in_lifespan(store, 2))
         assert store.passes >= 2
         assert "the orphan sweep failed" in caplog.messages
 
     def test_a_failed_retention_pass_does_not_stop_the_orphan_sweep(self, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_RETENTION_DAYS", "30")
+        monkeypatch.setenv("KATRA_RETENTION_DAYS", "30")
         store = SweepSpy()
 
         async def refused(before: datetime) -> list[tuple[str, str]]:
@@ -1889,7 +1889,7 @@ class TestTheRetentionSetting:
         "value", ["1", "30", str(store_backends.MAX_RETENTION_DAYS)]
     )
     def test_a_whole_number_of_days(self, value):
-        assert store_backends.retention_days({"ANALYSIS_RETENTION_DAYS": value}) == int(
+        assert store_backends.retention_days({"KATRA_RETENTION_DAYS": value}) == int(
             value
         )
 
@@ -1910,8 +1910,8 @@ class TestTheRetentionSetting:
         ],
     )
     def test_any_other_value_stops_the_startup(self, value):
-        with pytest.raises(StoreConfigError, match="ANALYSIS_RETENTION_DAYS"):
-            store_backends.retention_days({"ANALYSIS_RETENTION_DAYS": value})
+        with pytest.raises(StoreConfigError, match="KATRA_RETENTION_DAYS"):
+            store_backends.retention_days({"KATRA_RETENTION_DAYS": value})
 
 
 class TestTheRestartScan:
@@ -1991,7 +1991,7 @@ class TestTheRestartScan:
 
 class TestTheSchemaVersion:
     """Each record keeps the ``SCHEMA_VERSION`` that created it, and
-    :func:`~analysis_service.jobs.same_schema` reads it (#1532)."""
+    :func:`~katra.jobs.same_schema` reads it (#1532)."""
 
     def test_a_new_record_holds_the_current_version(self, store):
         record = new_record()

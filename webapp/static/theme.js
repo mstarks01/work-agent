@@ -3,7 +3,7 @@
 // Only this file reads or writes the stored choice. The sidebar's theme switch calls
 // workAgentTheme.choose.
 window.workAgentTheme = (() => {
-  const key = "work-agent-theme";
+  const key = "katra-theme";
   const themes = ["light", "dark"];
   const apply = (theme) => { document.documentElement.dataset.theme = theme; };
   try {

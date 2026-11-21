@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks.asvs.catalog import AsvsLevel
 from evals.harness import early_rounds
 from evals.harness.early_rounds import ANSWERERS, replay
+from katra.frameworks.asvs.catalog import AsvsLevel
 from tests.factories import FrameworkSelection, sample_report, valid_model
 from tests.test_asvs import _block
 

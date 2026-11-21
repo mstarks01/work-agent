@@ -14,10 +14,10 @@ import asyncio
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from analysis_service.claims import UnknownRef
-from analysis_service.errors import MAX_RENDERED_ERRORS, refusal_text
-from analysis_service.jobs import JobRecord
-from analysis_service.question_kinds import QUESTION_KINDS
+from katra.claims import UnknownRef
+from katra.errors import MAX_RENDERED_ERRORS, refusal_text
+from katra.jobs import JobRecord
+from katra.question_kinds import QUESTION_KINDS
 from tests import test_webapp
 from tests.factories import asking_threat, sample_report, sample_selection, valid_model
 from tests.test_api import admit, auth, make_client

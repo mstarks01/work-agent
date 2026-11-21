@@ -37,16 +37,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, get_args
 
-from analysis_service.answer_state import recommended
-from analysis_service.capabilities import Applicability, Presence, parse_capability_key
-from analysis_service.claims import FrameworkName, UnknownKey, UnknownRef
-from analysis_service.early_questions import capability_questions
-from analysis_service.fact_answers import FactAnswer, key_ref
-from analysis_service.fact_writes import answered_model
-from analysis_service.frameworks import PACKAGES
-from analysis_service.parsing import signer
-from analysis_service.system_model import CapabilityStatement, SystemModel
 from evals.harness.rates import ratio
+from katra.answer_state import recommended
+from katra.capabilities import Applicability, Presence, parse_capability_key
+from katra.claims import FrameworkName, UnknownKey, UnknownRef
+from katra.early_questions import capability_questions
+from katra.fact_answers import FactAnswer, key_ref
+from katra.fact_writes import answered_model
+from katra.frameworks import PACKAGES
+from katra.parsing import signer
+from katra.system_model import CapabilityStatement, SystemModel
 
 __all__ = [
     "FIXTURES_DIR",
@@ -313,7 +313,7 @@ class QuestionRun:
 def simulate_questions(fixture: Fixture) -> QuestionRun:
     """Answer the paused job's capability questions from the fixture's truth.
 
-    Save after save, as :func:`~analysis_service.answer_state.recommended`
+    Save after save, as :func:`~katra.answer_state.recommended`
     serves the list: each list is read off the model with every earlier
     answer in, so an answer drops a question it settled from every later
     list. A part whose parent the list asks waits until the parent is "yes",

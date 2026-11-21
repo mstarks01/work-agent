@@ -25,10 +25,10 @@ from typing import get_args
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.frameworks import PACKAGES
 from evals.harness import audit
 from evals.harness.run import COMMANDS
+from katra import graph
+from katra.frameworks import PACKAGES
 
 
 def _namespace(**fields) -> argparse.Namespace:

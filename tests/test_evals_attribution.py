@@ -12,8 +12,6 @@ from typing import get_args, get_type_hints
 
 import pytest
 
-from analysis_service.claims import ScopeEntry, UnreconciledRuling
-from analysis_service.sources import CARRIED_EVIDENCE_KINDS
 from evals.harness.applicability import (
     EVIDENCE_FOR_DISPOSITION,
     Observation,
@@ -29,6 +27,8 @@ from evals.harness.attribution import (
     pooled,
 )
 from evals.harness.critic_yield import UNSTATED
+from katra.claims import ScopeEntry, UnreconciledRuling
+from katra.sources import CARRIED_EVIDENCE_KINDS
 from tests.eval_factories import corpus_case
 from tests.test_evals_applicability import Block, Scoped, deferred, ruling
 

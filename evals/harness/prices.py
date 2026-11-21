@@ -51,8 +51,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from analysis_service.report import TokenUsage
-from analysis_service.vendors import vendor_for_route
+from katra.report import TokenUsage
+from katra.vendors import vendor_for_route
 
 
 @dataclass(frozen=True)

@@ -4,24 +4,24 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.assertions import Assertion, AssertionCatalog, Subject
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.compact import FULL_FORMAT
-from analysis_service.evidence import prepared_view
-from analysis_service.field_capabilities import (
+from katra import graph
+from katra.assertions import Assertion, AssertionCatalog, Subject
+from katra.capabilities import CAPABILITIES
+from katra.compact import FULL_FORMAT
+from katra.evidence import prepared_view
+from katra.field_capabilities import (
     FIELD_CAPABILITIES,
     with_field_capabilities,
 )
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import (
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import (
     UNKNOWN,
     Assumption,
     CapabilityStatement,
     DataFlow,
     ExternalEntity,
 )
-from analysis_service.validation import validate
+from katra.validation import validate
 from tests.factories import valid_model
 from tests.test_graph import KEYS, FakeContext
 
@@ -267,8 +267,8 @@ def test_a_second_pass_writes_nothing_more():
 
 
 def test_the_sensitive_rows_read_the_disclosure_tags_but_the_most_over_tagged():
-    from analysis_service.analysis import SENSITIVE_ASSET_TAGS
-    from analysis_service.field_capabilities import SECRET_TAGS, SENSITIVE_TAGS
+    from katra.analysis import SENSITIVE_ASSET_TAGS
+    from katra.field_capabilities import SECRET_TAGS, SENSITIVE_TAGS
 
     assert SENSITIVE_ASSET_TAGS - SENSITIVE_TAGS == {"business-critical-data"}
     assert SECRET_TAGS <= SENSITIVE_TAGS

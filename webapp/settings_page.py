@@ -9,15 +9,15 @@ out (``excluded``) with a reason.
 
 The loaders stay the only source of each type, closed set and bound, so no
 entry holds one. Each family of entries walks the loader's own export: the
-tiers and the vendors of :mod:`~analysis_service.model_tiers`, the credential
+tiers and the vendors of :mod:`~katra.model_tiers`, the credential
 variables of each ``VENDORS`` row, the offered params of
-:mod:`~analysis_service.sampling`, the overrides of
-:mod:`~analysis_service.resilience`, the optional passes and the config paths
-of :mod:`~analysis_service.deployment`, the carried frameworks of
-:mod:`~analysis_service.framework_config`, and the store settings of
-:mod:`~analysis_service.store_backends`. The test of this module holds the
+:mod:`~katra.sampling`, the overrides of
+:mod:`~katra.resilience`, the optional passes and the config paths
+of :mod:`~katra.deployment`, the carried frameworks of
+:mod:`~katra.framework_config`, and the store settings of
+:mod:`~katra.store_backends`. The test of this module holds the
 variables of :data:`SETTINGS` against
-:func:`~analysis_service.settings_variables.deployment_variables`.
+:func:`~katra.settings_variables.deployment_variables`.
 """
 
 from __future__ import annotations
@@ -25,22 +25,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from analysis_service import (
+from katra import (
     deployment,
     framework_config,
     resilience,
     sampling,
     store_backends,
 )
-from analysis_service.config_files import refused_var
-from analysis_service.model_tiers import (
+from katra.config_files import refused_var
+from katra.model_tiers import (
     TIER_NAMES,
     charges_env_var_for,
     credentials_env_var_for,
     env_vars_for,
     upstreams_env_var_for,
 )
-from analysis_service.vendors import VENDOR_NAMES, VENDORS, VendorName
+from katra.vendors import VENDOR_NAMES, VENDORS, VendorName
 
 #: What the page does with a setting.
 Mark = Literal["changes", "shows", "excluded"]
@@ -59,7 +59,7 @@ class Setting:
     #: Why the page does not change it. Empty where the mark is ``changes``.
     reason: str
     #: Where the shipped TOML file holds its base value: the field of
-    #: :data:`~analysis_service.deployment.CONFIG_PATHS` that names the file,
+    #: :data:`~katra.deployment.CONFIG_PATHS` that names the file,
     #: and the path of keys in it. ``None`` where no file holds one.
     file_key: tuple[deployment.ConfigPathName, tuple[str, ...]] | None = None
     #: The effect of a change, for a setting that the page changes. Empty for
@@ -189,12 +189,12 @@ def _model_settings() -> list[tuple[str, Setting]]:
 
 def _credential_settings() -> list[tuple[str, Setting]]:
     """Each credential variable of each ``VENDORS`` row, once, under the stem
-    that its vendor's prefix leaves: ``ANALYSIS_BEDROCK_REGION`` is
+    that its vendor's prefix leaves: ``KATRA_BEDROCK_REGION`` is
     ``credentials.bedrock.region``."""
     entries = []
     for vendor, row in VENDORS.items():
         for var in row.all_env_vars():
-            stem = refused_var(var).removeprefix(f"ANALYSIS_{vendor.upper()}_")
+            stem = refused_var(var).removeprefix(f"KATRA_{vendor.upper()}_")
             entries.append(
                 _changes(
                     f"credentials.{vendor}.{stem.lower()}",
@@ -259,10 +259,10 @@ def _deployment_settings() -> list[tuple[str, Setting]]:
     ]
     entries += [
         _changes(
-            f"passes.{var.removeprefix('ANALYSIS_').lower()}",
+            f"passes.{var.removeprefix('KATRA_').lower()}",
             var,
             "Optional passes",
-            _words(var.removeprefix("ANALYSIS_")),
+            _words(var.removeprefix("KATRA_")),
         )
         for var in deployment.PASS_FLAGS
     ]
@@ -300,10 +300,10 @@ def _deployment_settings() -> list[tuple[str, Setting]]:
     ]
     entries += [
         _changes(
-            f"store.{var.removeprefix('ANALYSIS_').lower()}",
+            f"store.{var.removeprefix('KATRA_').lower()}",
             var,
             "Job storage",
-            _words(var.removeprefix("ANALYSIS_").removesuffix("_FILE")),
+            _words(var.removeprefix("KATRA_").removesuffix("_FILE")),
         )
         for var in store_backends.env_variables()
     ]

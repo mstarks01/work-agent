@@ -11,7 +11,7 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     EXTRACTED,
     MAX_ASSERTIONS,
@@ -31,12 +31,12 @@ from analysis_service.assertions import (
     missing_value,
     states_missing,
 )
-from analysis_service.claims import UnknownRef
-from analysis_service.fact_answers import FactAnswer, part_answers
-from analysis_service.links import ANSWERS_LABEL, apply_answers, with_link_answers
-from analysis_service.prompts import render_predicates
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.sources import Source
+from katra.claims import UnknownRef
+from katra.fact_answers import FactAnswer, part_answers
+from katra.links import ANSWERS_LABEL, apply_answers, with_link_answers
+from katra.prompts import render_predicates
+from katra.question_kinds import QUESTION_KINDS
+from katra.sources import Source
 from tests.factories import valid_model
 from tests.test_links import inferred
 

@@ -1,0 +1,1150 @@
+"""Every fact a lane agent may cite, enumerated from the validated model.
+
+A finding's justification is a :class:`~katra.claims.Ground`, and the
+three non-quote branches of one are pure functions of the System Model: an
+attribute the input never settled, a control attribute the input says is not
+there, and a Data Flow whose endpoints sit in different trust zones. None of
+them requires judgement to construct, and none is anything an agent knows that
+the service does not. The service therefore constructs them once, and hands the
+agent a list of IDs.
+
+The LLM decides which evidence supports a finding, and this module decides how
+that evidence is represented. An agent answers with ``evidence_refs``, which are
+IDs copied out of the catalog, and :func:`resolve_proposals` turns each back
+into the ground it came from. An agent that picks the right fact cannot
+file it under the wrong branch, omit the field that branch requires, or invent
+an element ID, because it supplies none of those things. It supplies a choice
+from a closed set.
+
+A catalog entry says that this fact is in the validated system representation,
+and nothing more. ``authentication`` being unknown on a flow is not a spoofing
+threat, and a crossing is not a vulnerability. Whether either takes part in a
+credible attack stays the agent's judgement and the critic's to rule on. The
+catalog is deliberately incapable of expressing a conclusion: the two rules
+above derive every entry, so there is no seam through which "the authentication
+is weak" could enter it.
+
+Quotes are not catalogued, and could not be. A quote is a span of the
+submitter's own words chosen for what it states, which is the judgement no
+enumeration can make. An agent proposes one as a
+:class:`~katra.claims.QuoteCandidate`, which is the span and the
+source it came from, and :func:`resolve_proposals` assembles the ground. It does
+not check the quote. Presence in the named source stays
+:func:`~katra.fan_in.join_drafts`'s question, answered by the pinned
+ladder in :mod:`katra.grounding` against the job's actual bytes,
+which this module does not hold.
+
+The IDs are stable and mean something: ``unknown:<element-id>:<attribute>``,
+``absent:<element-id>:<attribute>`` and ``crossing:<flow-id>``. All three are
+built from IDs the model already carries, so the same System Model yields the
+same catalog on every run, and a ref in a log or a diff is readable without a
+lookup. Opaque IDs would lose that and gain nothing, because there is no secret
+here. There are only facts the agent is being shown anyway.
+
+A fourth family arrives with the job's **Assertion** catalog, where the job ran
+one. ``assertion:<predicate>~<subject>~<scope>~<value>`` is the row's own
+computed identity, used verbatim, and it is offered for a settled row the
+graph does not already carry — a second factor stated absent, a credential
+stated shared, a mechanism on a component with no ``authentication`` field, a
+control stated only for administrators — because those facts reach no
+attribute a rule could read. A row whose projection the graph holds stays
+cited through that attribute: one fact, one reader (ADR 0036). Which rows those
+are is :func:`~katra.assertions.offered`'s one rule, and which rows
+settle is :func:`~katra.assertions.settled`'s, so a conflict or an
+unsupported row is never in the table as an ``assertion``, and a claim can
+never rest on one as a fact. A settled row the graph attribute contradicts
+(:func:`~katra.assertions.contradicted`) is not offered as an
+``assertion`` either.
+
+An **open** row is in the table and is a different thing. It is offered under
+the same identity and a ``unknown-assertion`` ground. A row is open where the
+sources were asked about the fact and left it open, or where another row
+disputes it. Such a row is in the table where it reaches no graph field, or
+where its projection qualifies the field and the field states a value
+(:func:`~katra.assertions.hidden_qualifications`): the validity gate refused
+the projected model, so the field keeps what extraction wrote. Otherwise the
+field it reaches shows what
+:data:`~katra.assertions.PROJECTION_EFFECT` writes for the rows
+under it. A row the graph attribute contradicts is open too, and it is in the
+table whatever field it reaches. The attribute it contradicts, or a field
+that hides the qualification its projection writes, is not offered as an
+``absent-attribute``
+(:func:`~katra.assertions.held_open_attributes`): its value is no
+fact, and the open rows behind it, where there are any, carry the question.
+An agent may raise a
+*conditional* claim on an open row exactly as it may on an element attribute
+nobody stated.
+Which of the two an entry is, is the entry's own ``Ground.kind``, so a claim
+that grounds a settled row on an open question — or the reverse — is refused
+by comparing its kind against the table rather than by a second reading of
+``settled``.
+
+Model output is untrusted input (OWASP LLM05). A ref is used as a dictionary key
+and never parsed, interpolated, or matched by a pattern compiled from it, so the
+only thing an agent can do with the field is name an entry or fail to. There is
+no fuzzy match and no repair. A ref that is not in the catalog is reported as
+itself, because the alternative — inferring which fact an agent meant — is the
+class of guess this module exists to remove.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from types import MappingProxyType
+from typing import Any, NamedTuple
+
+from katra.analysis import (
+    CONTROL_ATTRIBUTES,
+    ModelText,
+    control_state,
+    model_text,
+    names_term,
+)
+from katra.assertions import (
+    ABSENT,
+    GRAPH_BOUND,
+    Assertion,
+    AssertionCatalog,
+    Projection,
+    Subject,
+    apply_projection,
+    assertion_id,
+    contradicted,
+    disputed,
+    held_open_attributes,
+    hidden_qualifications,
+    offered,
+    projected_attribute,
+    states_missing,
+)
+from katra.claims import (
+    ASSERTION_GROUNDS,
+    ATTRIBUTE_GROUNDS,
+    GROUND_TERM_MAX_CHARS,
+    REFERENCE_MAX_CHARS,
+    AnalysisMarks,
+    Claim,
+    DroppedClaim,
+    Ground,
+    GroundKind,
+    InvalidProposal,
+    Proposal,
+    UnknownClaimIdentity,
+    UnresolvedEvidence,
+)
+from katra.field_capabilities import with_field_capabilities
+from katra.frameworks import FrameworkPackage, schemas_for
+from katra.system_model import (
+    UNKNOWN,
+    DataFlow,
+    Element,
+    SystemModel,
+    TrustBoundary,
+    attribute_names,
+)
+
+#: An evidence catalog: each reference, in a stable order, against the ground
+#: it resolves to. A plain mapping on purpose — ``list(catalog)`` is what the
+#: agent is shown, ``ref in catalog`` is the whole of the validity question,
+#: and ``catalog[ref]`` is the whole of resolution, so a wrapper type would add
+#: a vocabulary without adding an operation.
+EvidenceCatalog = dict[str, Ground]
+
+UNKNOWN_PREFIX = "unknown"
+ABSENT_PREFIX = "absent"
+CROSSING_PREFIX = "crossing"
+#: Not a catalog prefix: no entry is ever keyed by it, because a catalog
+#: enumerates what a model holds and an absence is not in it. It exists so an
+#: absence a model contradicts is reported in the same spelling as every other
+#: reference that named nothing.
+ABSENT_ELEMENT_PREFIX = "absent-element"
+
+
+def unknown_evidence_ref(element_id: str, attribute: str) -> str:
+    """The catalog ID for one element's unstated attribute."""
+    return f"{UNKNOWN_PREFIX}:{element_id}:{attribute}"
+
+
+def absent_evidence_ref(element_id: str, attribute: str) -> str:
+    """The catalog ID for one control the input states is not there."""
+    return f"{ABSENT_PREFIX}:{element_id}:{attribute}"
+
+
+def crossing_evidence_ref(flow_id: str) -> str:
+    """The catalog ID for one flow's derived boundary crossing."""
+    return f"{CROSSING_PREFIX}:{flow_id}"
+
+
+def absent_element_ref(term: str) -> str:
+    """How an unresolved absence is named in a mark. Never a catalog key."""
+    return f"{ABSENT_ELEMENT_PREFIX}:{term}"
+
+
+#: Not a catalog prefix either. A ground about none of its claim's elements is
+#: dropped and marked under its own reference with this in front, so the mark
+#: says why the reference left rather than that it named nothing.
+OUT_OF_SCOPE_PREFIX = "out-of-scope"
+
+
+def out_of_scope_ref(ref: str) -> str:
+    """How a ground about none of its claim's elements is named in a mark."""
+    return f"{OUT_OF_SCOPE_PREFIX}:{ref}"
+
+
+def evidence_ref(ground: Ground) -> str:
+    """The catalog key :func:`evidence_catalog` files this ground under.
+
+    The inverse of the catalog, for a mark that names a ground the service
+    built rather than a reference an agent wrote. ``""`` for a quote or an
+    absence, which the catalog never holds.
+    """
+    if ground.kind == "unknown-attribute":
+        return unknown_evidence_ref(ground.element_id, ground.attribute)
+    if ground.kind == "absent-attribute":
+        return absent_evidence_ref(ground.element_id, ground.attribute)
+    if ground.kind == "derived-fact":
+        return crossing_evidence_ref(ground.flow_id)
+    if ground.kind in ASSERTION_GROUNDS:
+        return ground.assertion
+    return ""
+
+
+def ground_places(
+    ground: Ground, assertions: AssertionCatalog | None
+) -> frozenset[str]:
+    """The graph elements one ground is about, or none.
+
+    **The one reader of "which part of the model is this fact about".** An
+    attribute or a crossing names its element or flow
+    (:attr:`~katra.claims.Ground.place`). An assertion names a row,
+    and the row answers: its subject where the subject is a graph element, and
+    its value where the value names one, as a zone does. A row about a
+    principal or a credential, a quote and an absence name no element, so they
+    return none and no scope rule can read them.
+    """
+    if ground.kind not in ASSERTION_GROUNDS:
+        return frozenset({ground.place}) if ground.place else frozenset()
+    if assertions is None:
+        return frozenset()
+    rows = {assertion_id(row): row for row in assertions.entries}
+    row = rows.get(ground.assertion)
+    if row is None:
+        return frozenset()
+    bound = {
+        subject.id for subject in assertions.subjects if subject.type in GRAPH_BOUND
+    }
+    return frozenset(ref for ref in (row.subject, row.value) if ref in bound)
+
+
+def evidence_catalog(
+    model: SystemModel, assertions: AssertionCatalog | None = None
+) -> EvidenceCatalog:
+    """Every mechanically derivable fact in one validated System Model.
+
+    Two enumerations, in this order: each element's attributes the input left
+    unsettled or stated absent, walked in the model's own element order and each
+    element's own field-declaration order; then the **decided** boundary
+    crossings, in the order
+    :meth:`~katra.system_model.SystemModel.boundary_crossings`
+    yields them. Both orders are properties of the model rather than of this
+    call, so an identical model produces an identical catalog — which is what
+    lets a ref be compared across runs, samples and reports.
+
+    **An undecidable crossing is not catalogued.** A catalogued fact is one a
+    lane agent may cite and a critic may let stand, and
+    [ADR 0039](../../docs/adr/0039-a-crossing-a-model-cannot-decide-is-still-a-lead.md)
+    rule 4 says a crossing the model could not decide establishes nothing — not
+    that a crossing occurred, not that a control is missing. It confers
+    eligibility for analysis, which the crossing block and the candidate rules
+    already carry. Each unplaced endpoint publishes an ``unknown`` entry for
+    its ``trust_zone`` above, and the fact a reader needs is offered there, in
+    the words that say it is a question.
+
+    The assertion rows follow where the job carried an assertion pass. The
+    settled rows are a third enumeration: every row
+    :func:`~katra.assertions.offered` returns — settled, not
+    contradicted by the graph, and not already carried by the attribute its
+    projection wrote — in the catalog's own order. The open rows come after
+    them as ``unknown-assertion`` entries: an unknown or disputed row that
+    reaches no graph field, or whose projection qualifies a field that still
+    states a value, and every contradicted row. An attribute in
+    :func:`~katra.assertions.held_open_attributes` is never an
+    ``absent-attribute`` entry. ``None`` is a job that
+    ran no such pass, and its catalog holds only the first two enumerations;
+    an empty catalog is a pass that settled nothing, which offers the same rows
+    and says so on the report.
+
+    Only the *type-specific* attributes are eligible
+    (:func:`~katra.system_model.attribute_names`). ``notes`` holding
+    the word "unknown" is a sentence, not an unstated control, and a catalog
+    that could not tell those apart would invite a finding grounded on prose.
+
+    Refs cannot collide. An element ID is unique across a validated model and an
+    attribute appears once on an element, so each attribute half is injective
+    and the two cannot overlap because one attribute has one state; a flow ID is
+    an element ID, so the ``crossing`` half is injective; and the three halves
+    are separated by their prefixes.
+
+    Requires a valid model, and fails closed on an invalid one exactly as
+    ``boundary_crossings`` does — a catalog derived from a model with a
+    dangling flow endpoint would offer agents evidence about a system nobody
+    described.
+    """
+    # A field the rows hold open is no stated absence: the rows behind it state
+    # the opposite, or its qualification is hidden.
+    held_open = _held_open_attributes(model, assertions)
+    catalog: EvidenceCatalog = dict(
+        entry
+        for element in model.elements()
+        for attribute in attribute_names(element)
+        if (entry := _attribute_entry(element, attribute)) is not None
+        and not (
+            entry[1].kind == "absent-attribute" and (element.id, attribute) in held_open
+        )
+    )
+    catalog.update(
+        {
+            crossing_evidence_ref(crossing.flow_id): Ground(
+                kind="derived-fact", flow_id=crossing.flow_id
+            )
+            for crossing in model.boundary_crossings()
+            if crossing.decided
+        }
+    )
+    if assertions is not None:
+        catalog.update(
+            {
+                assertion_id(row): Ground(kind="assertion", assertion=assertion_id(row))
+                for row in offered(assertions, model)
+            }
+        )
+        # The open questions, after the settled rows and never merged with
+        # them. An unknown row, or a row in a conflict, reaches here when it
+        # reaches no graph field, or when its projection qualifies the field
+        # and the field still states a value. An applied projection shows a disputed
+        # attribute as a qualified unknown, which the attribute enumeration
+        # above offers, but a principal's second factor has no attribute to
+        # qualify. Where the validity gate refuses the projected model, the
+        # field keeps what extraction wrote, so only this offer carries the
+        # question.
+        hidden_question_rows = {
+            row
+            for projection in hidden_qualifications(assertions, model)
+            for row in projection.rows
+        }
+        unprojected = [
+            row
+            for row in (
+                *(row for row in assertions.entries if row.value == UNKNOWN),
+                *disputed(assertions),
+            )
+            if not projected_attribute(row.predicate, row.subject)
+            or assertion_id(row) in hidden_question_rows
+        ]
+        # A row the graph attribute contradicts reaches a graph field, and that
+        # field states the opposite rather than an unknown, so only this offer
+        # carries the question.
+        catalog.update(
+            {
+                assertion_id(row): Ground(
+                    kind="unknown-assertion", assertion=assertion_id(row)
+                )
+                for row in (*unprojected, *contradicted(assertions, model))
+            }
+        )
+    return catalog
+
+
+def prepared_view(
+    model: SystemModel, assertions: AssertionCatalog
+) -> tuple[SystemModel, tuple[Projection, ...], EvidenceCatalog]:
+    """The model a job's lanes read, what moved it, and the evidence it offers.
+
+    **The one reader of "what does analysis preparation make of this catalog".**
+    ``prepare`` calls it, the question readers take their model from it
+    through :func:`~katra.open_facts.prepared_model`, and so does
+    every instrument that asks what a catalog does to a job — ``run.py
+    falsify``'s production path, the reassessment after a review, the
+    replay's offered count and the population table — so a guarantee tested
+    through one is the guarantee the other runs. The projection is applied first because a zone
+    predicate moves ``trust_zone``, and the evidence is derived from the model
+    it produced. A projection can move a closed field a field capability reads,
+    such as ``exposure``, so the field capabilities are written again on the
+    model it produced.
+    """
+    projected, applied = apply_projection(model, assertions)
+    if applied:
+        projected = with_field_capabilities(projected)
+    return projected, applied, evidence_catalog(projected, assertions)
+
+
+def lead_topics(
+    evidence: EvidenceCatalog, assertions: AssertionCatalog | None
+) -> frozenset[str]:
+    """What this evidence offers a lane as an open question or an absence.
+
+    **The one reader of "is this still a lead".** A lead is named by what it
+    is about — ``element.attribute`` for an attribute, ``subject.predicate``
+    for an assertion row — never by its reference, so a stated absence that
+    becomes an open question on the same attribute is still a lead a lane can
+    raise, and a lead with nothing left on its topic is one it cannot. The
+    falsification instrument and the post-review reassessment both ask it.
+    """
+    rows = (
+        {}
+        if assertions is None
+        else {assertion_id(entry): entry for entry in assertions.entries}
+    )
+    found = set()
+    for ref, ground in evidence.items():
+        if ground.kind in ATTRIBUTE_GROUNDS:
+            found.add(f"{ground.element_id}.{ground.attribute}")
+        elif ref in rows and (
+            ground.kind == "unknown-assertion"
+            or (ground.kind == "assertion" and states_missing(rows[ref]))
+        ):
+            row = rows[ref]
+            found.add(f"{row.subject}.{row.predicate}")
+    return frozenset(found)
+
+
+def _attribute_entry(element: Element, attribute: str) -> tuple[str, Ground] | None:
+    """One attribute's catalog entry, or ``None`` where it states a control.
+
+    The classifier is :func:`~katra.analysis.control_state`, the same
+    one the candidate rules read, which is the whole of this function's point.
+    A catalog that tested exact equality with the ``unknown`` sentinel while
+    the analysis layer read the leading token would take a control the input
+    *hedged* (``"unknown; possibly a shared group account"``) and a control the
+    input said is *not there* (``"none; accepted by network position"``) both
+    facts a rule could fire on and no agent could cite (#171).
+
+    **The two halves cover different attribute sets, and the asymmetry is the
+    honest reading rather than an oversight.** ``unknown`` is the extraction
+    sentinel: it means "the input never settled this" on every type-specific
+    field, decorated with a hedge or not, so the unverified half runs over all
+    of them. ``none`` is not a sentinel — it carries a determinate meaning only
+    where the attribute names a control, and "the submitter said this is not
+    there" is not a fact about a ``protocol`` or a ``data_description``. So the
+    absent half is confined to :data:`~katra.analysis.CONTROL_ATTRIBUTES`,
+    and a ``technology`` reading ``none`` stays what the input wrote rather than
+    becoming a fact an agent may rest a finding on.
+
+    Both entries carry the element and the attribute and nothing else. Which
+    *state* the attribute is in is the branch, never a field — a ground whose
+    kind and payload could disagree is the shape this whole module exists to
+    make unreachable.
+    """
+    state = control_state(getattr(element, attribute))
+    if state == "unverified":
+        return unknown_evidence_ref(element.id, attribute), Ground(
+            kind="unknown-attribute", element_id=element.id, attribute=attribute
+        )
+    if state == "absent" and attribute in CONTROL_ATTRIBUTES:
+        return absent_evidence_ref(element.id, attribute), Ground(
+            kind="absent-attribute", element_id=element.id, attribute=attribute
+        )
+    return None
+
+
+def ground_issues(
+    claims: Iterable[Claim],
+    model: SystemModel,
+    assertions: AssertionCatalog | None,
+) -> list[str]:
+    """Every catalogued ground these claims carry that ``model`` does not derive.
+
+    **The one reader of "is this ground one the service could have written
+    from this model", asked at both seams that hold grounds.** The fan-in
+    asks it of the drafts it joined, where every ground came out of the
+    catalog and a failure is this module's own defect. A **Report** asks it of
+    the claims it loads, where nothing built the grounds: a report handed to a
+    reviewer or a scorer is a file, and a file can carry an unknown on an
+    attribute the embedded model states, or a crossing the model never
+    derives. Membership in the catalog derived from the model in front of the
+    reader is the whole of the question, so it is asked as membership rather
+    than as a list of per-branch conditions that would have to agree with
+    :func:`evidence_catalog` by hand.
+
+    A quote is not here: its check is against the source text, which
+    :mod:`katra.grounding` holds. An ``absent-element`` is the
+    branch whose referent is the whole model, and it is checked the way
+    :func:`_grounds_of` checked it when it was written — the model names the
+    term nowhere.
+
+    The message says which of the conditions failed, because the fan-in
+    raises it as the job's death and a re-ask cannot read a bare "not in the
+    catalog". The element and the attribute are checked before the state so a
+    ground naming a field the element's type does not carry is told so, and
+    one naming a real field is told what the model says about it instead.
+    """
+    catalog = evidence_catalog(model, assertions)
+    by_id = {element.id: element for element in model.elements()}
+    text = model_text(model)
+    held_open = _held_open_attributes(model, assertions)
+    issues = []
+    for claim in claims:
+        for ground in claim.grounds:
+            issue = _one_ground_issue(claim.id, ground, catalog, by_id, text, held_open)
+            if issue:
+                issues.append(issue)
+    return issues
+
+
+def _held_open_attributes(
+    model: SystemModel, assertions: AssertionCatalog | None
+) -> frozenset[tuple[str, str]]:
+    """The attributes whose absence is no fact, or none without a pass."""
+    if assertions is None:
+        return frozenset()
+    return held_open_attributes(assertions, model)
+
+
+def _one_ground_issue(
+    claim_id: str,
+    ground: Ground,
+    catalog: EvidenceCatalog,
+    by_id: Mapping[str, Element],
+    text: ModelText,
+    held_open: frozenset[tuple[str, str]],
+) -> str:
+    """Why one catalogued ground is not in this model's catalog, or ``""``.
+
+    ``held_open`` holds the attributes the assertion rows contradict, or whose
+    qualification the field hides
+    (:func:`~katra.assertions.held_open_attributes`).
+    """
+    if ground.kind == "quote":
+        return ""
+    if ground.kind == "absent-element":
+        if names_term(text, ground.term):
+            return (
+                f"claim {claim_id!r} grounds an absence on {ground.term!r},"
+                " which the system model names"
+            )
+        return ""
+    if ground.kind == "derived-fact":
+        if crossing_evidence_ref(ground.flow_id) not in catalog:
+            return (
+                f"claim {claim_id!r} grounds a derived fact in flow"
+                f" {ground.flow_id!r}, which is not a decided boundary crossing"
+            )
+        return ""
+    if ground.kind in ASSERTION_GROUNDS:
+        held = catalog.get(ground.assertion)
+        if held is None:
+            return (
+                f"claim {claim_id!r} grounds an assertion {ground.assertion!r},"
+                " which the job's catalog does not offer"
+            )
+        # The kind is checked against the table's own entry, not re-derived.
+        # Both kinds are keyed by the row's identity, so membership alone would
+        # let a claim rest on an open question by calling it settled — the one
+        # substitution `settled` exists to prevent.
+        if held.kind != ground.kind:
+            # Both halves are read off the catalog's entry, which this branch
+            # did not pin. Naming the claimed kind as well would print one of
+            # two fixed words and say the same thing twice.
+            stated = (
+                "settles that row, so it is a fact in hand"
+                if held.kind == "assertion"
+                else "leaves that row open, so it is a question"
+            )
+            return (
+                f"claim {claim_id!r} grounds {ground.assertion!r} the other way"
+                f" round: the job's catalog {stated}"
+            )
+        return ""
+    named = (
+        "an unknown attribute"
+        if ground.kind == "unknown-attribute"
+        else "an absent attribute"
+    )
+    element = by_id.get(ground.element_id)
+    if element is None:
+        return (
+            f"claim {claim_id!r} grounds {named} on element"
+            f" {ground.element_id!r}, which is not in the system model"
+        )
+    if ground.attribute not in attribute_names(element):
+        return (
+            f"claim {claim_id!r} grounds {named} {ground.attribute!r}, which"
+            f" element {ground.element_id!r} does not have"
+        )
+    ref = (
+        unknown_evidence_ref(ground.element_id, ground.attribute)
+        if ground.kind == "unknown-attribute"
+        else absent_evidence_ref(ground.element_id, ground.attribute)
+    )
+    if ref in catalog:
+        return ""
+    state = control_state(getattr(element, ground.attribute))
+    held_open_absence = (
+        ground.kind == "absent-attribute"
+        and state == "absent"
+        and (ground.element_id, ground.attribute) in held_open
+    )
+    if held_open_absence:
+        return (
+            f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
+            f" {ground.element_id!r}, which the assertion rows contradict or whose"
+            " qualification the field hides, so the job's catalog offers no such"
+            " fact"
+        )
+    return (
+        f"claim {claim_id!r} grounds {named} {ground.attribute!r} on element"
+        f" {ground.element_id!r}, which the system model reads as {state}"
+    )
+
+
+def _cell(value: str) -> str:
+    """``value`` as one table cell: its lines joined by a space, and ``|`` escaped.
+
+    **The one writer of a cell in the two tables below**, the evidence catalog
+    and the element roster. A gloss carries
+    words a model or a submitter wrote, and a line break or a ``|`` there ended
+    the row and let the rest read as a heading or a fence of its own. Every
+    terminator ``str.splitlines`` splits on is joined, U+2028 included. A cell
+    holds one line, so a fence or a heading inside it opens nothing.
+    """
+    return " ".join(value.splitlines()).replace("|", "\\|")
+
+
+def render_catalog(
+    catalog: Mapping[str, Ground], assertions: AssertionCatalog | None
+) -> str:
+    """The catalog as a table an agent selects from rather than a list it reads.
+
+    **Shape is the point, and it is a fix rather than a decoration.** Rendered
+    as a JSON array of ID strings, the catalog reads as a *specimen of the
+    format* as much as a closed list, and agents composed well-formed
+    references to facts it did not contain — correct grammar, plausible element
+    IDs, real attribute names, absent from the set (#138). Every such reference
+    fails its job, so this is not a cosmetic concern.
+
+    A table resists that in a way a list cannot. Each row carries prose derived
+    from *this* model, so there is no pattern to complete: an agent that wants
+    to cite a flow's authentication either finds the row or finds that the row
+    is not there. The gloss is what makes the second case legible — the reason
+    an attribute is absent is that the input *stated* it, which the ID alone
+    never says.
+
+    Order is the catalog's own, which is the model's, so the same System Model
+    renders the same table on every run.
+
+    ``assertions`` is the catalog the assertion rows came out of, read for
+    their gloss: an identity names a subject, a predicate and a digest, and
+    the agent needs the words. Required whenever the catalog holds one, and
+    a row with no catalog behind it fails here rather than rendering a bare
+    identity nobody could select on.
+    """
+    rows_by_id = (
+        {}
+        if assertions is None
+        else {assertion_id(row): row for row in assertions.entries}
+    )
+    subjects = (
+        {}
+        if assertions is None
+        else {subject.id: subject for subject in assertions.subjects}
+    )
+    rows = "\n".join(
+        f"| `{_cell(ref)}` | {_cell(_gloss(ground, rows_by_id, subjects))} |"
+        for ref, ground in catalog.items()
+    )
+    return (
+        f"{len(catalog)} facts, and this table is all of them.\n\n"
+        "| cite this exactly | what it says |\n| --- | --- |\n"
+        f"{rows}\n"
+    )
+
+
+def catalog_refs(table: str) -> frozenset[str]:
+    """The refs a table :func:`render_catalog` wrote, read back from its key column.
+
+    The eval harness reads an archived lane's table with this, to say which
+    facts the lane was sent. A gloss can quote a ref, so a search of the whole
+    text is not this reading.
+    """
+    return frozenset(
+        line[3 : line.index("` |")].replace("\\|", "|")
+        for line in table.split("\n")
+        if line.startswith("| `") and "` |" in line
+    )
+
+
+def ground_gloss(ground: Ground, assertions: AssertionCatalog | None) -> str:
+    """What one ground asserts, in the words the evidence table already uses.
+
+    **The one reader of "what does this ground say".** The lane agent selects
+    a fact out of :func:`render_catalog`'s table, and the critic then rules on
+    whether the argument follows from it — so the two have to read one
+    sentence. An assertion ground is what makes that a live question rather
+    than a tidiness one: it carries a digest of the row's value and scope and
+    nothing else, so a critic handed the ground alone could not see the fact
+    (#1082).
+
+    Raises for an assertion ground with no catalog behind it, exactly as
+    :func:`render_catalog` does: a bare identity says nothing, and answering
+    with one would be the failure this exists to prevent.
+    """
+    rows = (
+        {}
+        if assertions is None
+        else {assertion_id(row): row for row in assertions.entries}
+    )
+    subjects = (
+        {}
+        if assertions is None
+        else {subject.id: subject for subject in assertions.subjects}
+    )
+    return _gloss(ground, rows, subjects)
+
+
+def render_element_roster(model: SystemModel) -> str:
+    """Every element ID a claim may name, as a table to select from.
+
+    **Rendered as a table, for the reason :func:`render_catalog` gives:**
+    rendered as a specimen of the format, a reference set invites an agent to
+    *compose* a well-formed member instead of copying one (#138, ADR 0012). A
+    lane agent given only the model as fenced JSON can compose a flow ID with
+    its own label concatenated twice: well-formed, plausible, absent from the
+    set. ``analysis`` mode does not show it, because its seeded blessed model
+    has clean IDs to copy (#306).
+
+    **The gloss is type and place, never the attributes.** Those are in the
+    System Model already and this table is paid for on every lane agent of every
+    framework; repeating them would gain nothing and enlarge the most expensive
+    block in the job-varying half. What a row has to carry is enough for an
+    agent to recognise the element it means without reconstructing the ID —
+    which is what the left column is for.
+
+    Order is the model's own, so one System Model renders one table every run.
+    """
+    elements = list(model.elements())
+    rows = "\n".join(
+        f"| `{_cell(element.id)}` | {_cell(_element_gloss(element))} |"
+        for element in elements
+    )
+    return (
+        f"{len(elements)} elements, and this table is all of them."
+        " Name one exactly as it appears here.\n\n"
+        "| cite this exactly | what it is |\n| --- | --- |\n"
+        f"{rows}\n"
+    )
+
+
+def _element_gloss(element: Element) -> str:
+    """One element's type and where it sits, in the fewest words that identify it.
+
+    A flow reads as its endpoints rather than its zone: a flow has no
+    ``trust_zone`` of its own, and its endpoints are the thing an agent is
+    choosing between when two flows share a source.
+    """
+    if isinstance(element, DataFlow):
+        return f"flow, `{element.source}` to `{element.destination}`"
+    if isinstance(element, TrustBoundary):
+        return "trust boundary"
+    return f"{element.id_prefix} in `{element.trust_zone}`"
+
+
+def _gloss(
+    ground: Ground,
+    rows: Mapping[str, Assertion],
+    subjects: Mapping[str, Subject],
+) -> str:
+    """What one catalogued fact asserts.
+
+    Deliberately short, and it does not repeat the element ID: that is the left
+    column already, and this text is paid for on every lane agent's instruction
+    through the two exemplar catalogs. What it has to carry is the *kind* of
+    fact — an unstated attribute reads very differently from a derived crossing,
+    and an agent that conflates them cites the wrong one. *Never stated* against
+    *stated absent* is the sharpest of those distinctions and the cheapest to
+    render: it is the difference between a question and an answer, and the
+    prompt gives a whole procedure step to it.
+
+    An assertion row is the one entry whose left column is a digest, so its
+    gloss carries what the others leave to the ID: the subject, spelled as
+    the element ID for a graph-bound subject and as the label for one of the
+    layer's own; the predicate; the value; the basis, so an inference reads
+    as one; and the scope, so a fact stated for some principals is never read
+    as stated for all.
+
+    ``derived-fact`` reads one sentence because the catalog holds one kind of
+    crossing. :func:`evidence_catalog` admits the decided ones only, so this
+    line never tells an agent that a flow whose endpoint nobody placed crosses
+    anything.
+    """
+    if ground.kind == "derived-fact":
+        return "crosses a trust boundary"
+    if ground.kind == "absent-attribute":
+        return f"`{ground.attribute}` stated absent"
+    if ground.kind in ASSERTION_GROUNDS:
+        return ASSERTION_GLOSSES[ground.kind](rows[ground.assertion], subjects)
+    return f"`{ground.attribute}` never stated"
+
+
+def _open_question_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """One open row, in the words that say it is a question.
+
+    It names the ``reason`` rather than the value, because the value is the
+    unknown sentinel and carries nothing: what an agent needs is whether the
+    sources were silent, hedged, cut off, or never measured it. That is the
+    same distinction the attribute half of this table draws between *never
+    stated* and *stated absent*, at the seam where the fact has no attribute.
+
+    A row with a value is open because another row disputes it
+    (:func:`~katra.assertions.disputed`) or the graph attribute
+    contradicts it (:func:`~katra.assertions.contradicted`). The
+    gloss says the sources disagree and names this side's value. For a
+    contradicted row the other side is the graph attribute, which extraction
+    read from the same sources or inferred.
+    """
+    about = _about(row, subjects)
+    if row.value != UNKNOWN:
+        value = "absent" if row.value == ABSENT else f"`{row.value}`"
+        return (
+            f"`{row.predicate}` {about}: the sources disagree; this row states"
+            f" {value}{_reviewed(row)}"
+        )
+    return f"`{row.predicate}` {about}: not stated" + (
+        f" ({row.reason})" if row.reason else ""
+    )
+
+
+def _about(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """Which subject a row is about, spelled for the reader.
+
+    One spelling for both glosses: an ID for a subject the graph holds, and a
+    label and type for one of this layer's own, which has no ID a reader would
+    recognise.
+    """
+    subject = subjects.get(row.subject)
+    if subject is None or subject.type in GRAPH_BOUND:
+        return f"on `{row.subject}`"
+    return f"for {subject.label} ({subject.type})"
+
+
+def _assertion_gloss(row: Assertion, subjects: Mapping[str, Subject]) -> str:
+    """One settled assertion in the fewest words that say what it states."""
+    about = _about(row, subjects)
+    referent = subjects.get(row.value)
+    if row.value == ABSENT:
+        value = "absent"
+    elif referent is not None and referent.type not in GRAPH_BOUND:
+        value = f"`{referent.label}`"
+    else:
+        value = f"`{row.value}`"
+    scope = "".join(
+        f", where {qualifier.kind} is {qualifier.value}" for qualifier in row.scope
+    )
+    return f"`{row.predicate}` {row.basis} {value} {about}{scope}{_reviewed(row)}"
+
+
+def _reviewed(row: Assertion) -> str:
+    """Whether anybody checked this row, in the words a lane reads.
+
+    **An unchecked row informs a conditional finding and settles nothing
+    alone** (#926, the owner's decision of 2026-09-23), so the table says which
+    rows those are rather than leaving a lane to assume every cited fact was
+    verified. A settled row is either unchecked or supported; the other two
+    assessments keep a row from settling, so they never reach this gloss.
+    """
+    if row.assessment == "supported":
+        return f" — checked by {row.assessor}"
+    return " — unchecked"
+
+
+#: How each assertion ground reads, keyed by its kind.
+#:
+#: **A table rather than a branch**, and keyed by
+#: :data:`~katra.claims.ASSERTION_GROUNDS`: a kind added to that set
+#: raises here, where a branch would let it fall through to the attribute
+#: sentence below and gloss a resolved row as an unstated attribute.
+#: ``tests/test_evidence.py`` compares the keys against the set.
+ASSERTION_GLOSSES: Mapping[
+    GroundKind, Callable[[Assertion, Mapping[str, Subject]], str]
+] = MappingProxyType(
+    {
+        "assertion": _assertion_gloss,
+        "unknown-assertion": _open_question_gloss,
+    }
+)
+
+
+class Resolution(NamedTuple):
+    """One lane's drafts, and every reference of theirs that named nothing.
+
+    Two values because the second is not fatal on its own: a dropped
+    reference is recorded and the analysis continues, so the caller needs both
+    halves. Shaped like :class:`~katra.fan_in.JoinedDrafts` — marks
+    beside drafts — and carrying the same
+    :class:`~katra.claims.AnalysisMarks`, so the fan-in merges what
+    every lane and the join produced without knowing which mark came from where.
+    Only ``unresolved_evidence`` is ever populated here; the other four lists
+    have no producer this early.
+
+    The drafts are the package's own record type; they are typed as the neutral
+    :class:`~katra.claims.Claim` here because this module builds them
+    from a contract rather than from a framework it knows.
+    """
+
+    drafts: list[Claim]
+    marks: AnalysisMarks
+
+
+def _grounds_of(
+    proposal: Proposal, catalog: Mapping[str, Ground], text: ModelText
+) -> tuple[list[Ground], list[str]]:
+    """One proposal's grounds, and every reference of its that named nothing.
+
+    Quotes first, then evidence, then absences, and the order is fixed rather
+    than incidental: :class:`~katra.claims.UnverifiedGround` marks a
+    quote by its *index* into the finished list, so a reader following a mark
+    back to the quote it is about depends on the order this sets. The fan-in's
+    scope check later removes the grounds about none of a claim's elements,
+    keeping the order of the rest, and it runs before the quote check takes
+    any mark. Quotes lead because they are the submitter's
+    own words, which is what a reader looks for first.
+
+    A ref is stripped of surrounding whitespace before lookup — which spelling
+    of a name arrived is mechanical — and matched exactly thereafter.
+
+    A reference that resolves to nothing is **dropped rather than raised on**.
+    Nothing can be built from it — the catalog is the only source of a ground's
+    branch and fields — so it leaves as a mark the caller records, and whether
+    the threat survives is decided by what is left, not by this function.
+
+    An ``absent_elements`` term is checked the other way round, and it is the
+    only entry here whose referent is the whole model: it resolves when nothing
+    in the model names it, and is dropped as unresolved when something does.
+    An agent claiming a system has no directory service, in a model whose store
+    is called "LDAP directory", has asserted an absence the model contradicts,
+    and this is where the service drops its entry. A term longer than
+    :data:`~katra.claims.GROUND_TERM_MAX_CHARS` leaves the same way:
+    the field holds one term, an agent that wrote a sentence named no term, and
+    the service drops the entry — never the run. A blank one leaves with no
+    mark at all, because an empty string names nothing for a mark to be about.
+    """
+    grounds = [
+        Ground(kind="quote", text=quote.text, source_label=quote.source_label)
+        for quote in proposal.quotes
+    ]
+    unresolved = []
+    for ref in proposal.evidence_refs:
+        ground = catalog.get(ref.strip())
+        if ground is None:
+            unresolved.append(ref)
+        else:
+            grounds.append(ground)
+    for raw in proposal.absent_elements:
+        term = raw.strip().lower()
+        # A blank entry earns no mark, on the rule the caller applies to a blank
+        # evidence reference: a mark names what the model contradicts, and an
+        # empty string names nothing. It cannot be filtered there, because the
+        # prefix below has already made the string non-blank.
+        if not term:
+            continue
+        if len(term) > GROUND_TERM_MAX_CHARS or names_term(text, term):
+            unresolved.append(absent_element_ref(raw)[:REFERENCE_MAX_CHARS])
+        else:
+            grounds.append(Ground(kind="absent-element", term=term))
+    return grounds, unresolved
+
+
+#: What every proposal carries for this module rather than for the claim: the
+#: three evidence lists, which resolve into ``grounds`` and do not survive as
+#: fields. Everything else an agent wrote is carried across untouched.
+_RESOLVED_AWAY = frozenset({"evidence_refs", "quotes", "absent_elements"})
+
+#: What a proposal carries for the *fan-in* rather than for the claim. A field
+#: here has already done its work by the time a draft is built, so carrying it
+#: on would put a routing signal in the report.
+#:
+#: ``needs_evidence`` is one: the fan-in reads it to decide whether the
+#: proposal becomes a draft at all, and a proposal that survives that split is
+#: one this job can settle. What remains of the distinction — *the description
+#: is thin* against *no description would do* — is already carried by whether
+#: the requirement is a **Claim** or a **Scope Entry**, so repeating it as a
+#: field would be a second spelling of the same fact. ``direction`` (ADR 0028)
+#: is *not* here: the fan-in reads it to refuse a gap that rests on absence
+#: alone, and then the draft carries it on, because the critic rules an
+#: ``excluded`` draft by it.
+_ROUTED_AWAY = frozenset({"needs_evidence"})
+
+
+def resolve_proposals(
+    proposals: Iterable[Proposal],
+    catalog: Mapping[str, Ground],
+    package: FrameworkPackage,
+    lane: str,
+    model: SystemModel,
+) -> Resolution:
+    """Turn one lane's proposals into drafts: resolve the evidence, stamp the lane.
+
+    **One resolver for every framework**, which is what keeps *the agent selects
+    and the service constructs* a construction rather than a convention each
+    package could break. Three things are the service's here and none of them is
+    a judgement: the grounds, the claim ID, and the lane.
+
+    A resolved ground is its catalog entry itself, so it carries the branch and
+    the fields that branch requires, and the claim this returns cannot be
+    mis-shaped whatever an agent emitted.
+
+    ``lane`` is the lane being resolved, and it arrives as an argument because
+    that is where the fact lives — the graph builds one node per
+    ``(framework, lane)`` and knows which is which before any model runs. The ID
+    is composed by the package's own :class:`~katra.frameworks.IdRule`
+    from that lane and the agent's key, and the lane is stamped into whatever
+    field that rule names, so a draft's lane, its ID's prefix and the node that
+    produced it agree by construction rather than by an agent keeping three
+    spellings in line.
+
+    Everything else the agent wrote passes through untouched — the title, the
+    description, the element refs, and whatever this framework judges. The key
+    itself does not: it is what the ID was composed *from*, and the gate has
+    already refused a record that declares it.
+
+    **A reference that names nothing loses its entry and does not fail the
+    job.** Agents compose well-formed references to facts the catalog does not
+    hold — correct grammar, plausible element IDs — and failing the whole
+    analysis over one discards every lane's work to punish a citation error
+    (#138). So an unresolvable reference is dropped and marked, and the claim
+    stands on whatever else it cited.
+
+    A claim whose every ground evaporates has nothing supporting it, and a
+    finding with empty ``grounds`` is the one thing this schema refuses to
+    represent — so the claim is dropped and recorded as a
+    :class:`~katra.claims.DroppedClaim`, with the references it
+    cited in the reason. It is the same rule
+    :func:`~katra.fan_in.join_drafts` applies to unverified quotes:
+    marked per entry, dropped per claim. Nothing here raises on what an agent
+    cited.
+
+    Every proposal handed in names an identifier its framework has: the
+    fan-in runs :func:`known_proposals` first, on the whole batch, so an
+    invented key is marked there rather than here.
+    """
+    key_field = schemas_for(package.name).key_field
+    carried = _RESOLVED_AWAY | _ROUTED_AWAY | {key_field}
+    drafts: list[Claim] = []
+    unresolved_evidence: list[UnresolvedEvidence] = []
+    groundless: list[DroppedClaim] = []
+    text = model_text(model)
+    for proposal in proposals:
+        key = getattr(proposal, key_field)
+        claim_id = package.compose_id(lane, key)
+        grounds, unresolved = _grounds_of(proposal, catalog, text)
+        # A per-reference mark names a claim the block carries, so a claim that
+        # is dropped gets none: its groundless mark names the references instead.
+        if not grounds:
+            cited = ", ".join(repr(ref) for ref in unresolved)
+            groundless.append(
+                DroppedClaim.of(
+                    claim_id=claim_id,
+                    title=proposal.title,
+                    reason=(
+                        "cites only evidence this job's catalog does not"
+                        f" contain ({cited})"
+                    ),
+                )
+            )
+            continue
+        # A blank reference is skipped rather than marked: a mark names what
+        # the catalog does not hold, and an empty string names nothing. The
+        # groundless reason above still lists it, so a claim that cited only
+        # blanks is still reported.
+        unresolved_evidence += [
+            UnresolvedEvidence(claim_id=claim_id, reference=ref[:REFERENCE_MAX_CHARS])
+            for ref in unresolved
+            if ref.strip()
+        ]
+        # The agent's own fields plus the lane the graph stamped, as one mapping:
+        # what a package's record declares beyond :class:`Claim` is the package's
+        # business, so this is deliberately untyped here and validated by the
+        # record's own model.
+        agent_fields: dict[str, Any] = {
+            **package.lane_fields(lane),
+            **proposal.model_dump(exclude=set(carried)),
+        }
+        drafts.append(
+            package.record(
+                id=claim_id,
+                framework=package.name,
+                framework_version=package.version,
+                grounds=grounds,
+                **agent_fields,
+            )
+        )
+    return Resolution(
+        drafts,
+        AnalysisMarks(
+            unresolved_evidence=unresolved_evidence,
+            dropped_claims=groundless,
+        ),
+    )
+
+
+def known_proposals(
+    proposals: Iterable[Proposal], package: FrameworkPackage, lane: str
+) -> tuple[list[Proposal], AnalysisMarks]:
+    """The proposals naming an identifier their framework has, and a mark per other.
+
+    **Runs before the fan-in splits a lane's proposals**, so it reaches every
+    one of them: a proposal naming ``99.99`` is dropped and marked whether the
+    agent ruled on it or set it aside for evidence the job does not carry.
+    When this check sat inside :func:`resolve_proposals` it saw only the kept
+    half, and a deferred proposal with an invented key vanished — the scope
+    builder walks the catalog and never met the key (#659).
+
+    Dropped and marked on the #138 rule: an agent composing a well-formed
+    reference to something absent loses its entry, never the run. A package
+    that mints its own IDs answers ``True`` for every key, so its list of
+    marks stays empty by construction.
+    """
+    key_field = schemas_for(package.name).key_field
+    known: list[Proposal] = []
+    unknown: list[UnknownClaimIdentity] = []
+    for proposal in proposals:
+        key = getattr(proposal, key_field)
+        if package.id_rule.knows(lane, key):
+            known.append(proposal)
+            continue
+        unknown.append(
+            UnknownClaimIdentity(
+                claim_id=package.compose_id(lane, key), title=proposal.title
+            )
+        )
+    return known, AnalysisMarks(unknown_claim_identities=unknown)
+
+
+def invalid_proposal_marks(
+    invalid: Sequence[InvalidProposal], package: FrameworkPackage, lane: str
+) -> AnalysisMarks:
+    """The marks for the proposals a lane's batch could not validate.
+
+    A schema fault is a fault in one entry, so only that entry goes: the batch
+    already dropped it (:class:`~katra.claims.ProposalBatch`), and
+    this records it as a :class:`~katra.claims.DroppedClaim` with
+    the first error pydantic reported. The ID is composed from the package's
+    rule where the key is readable, so the mark names the claim the agent
+    meant; where it is not, the mark is keyed by the lane and the position,
+    which is the only identity left.
+    """
+    key_field = schemas_for(package.name).key_field
+    dropped: list[DroppedClaim] = []
+    for entry in invalid:
+        key = entry.scalars.get(key_field)
+        try:
+            claim_id = package.compose_id(lane, key) if key is not None else ""
+        except (TypeError, ValueError, KeyError):
+            claim_id = ""
+        dropped.append(
+            DroppedClaim.of(
+                claim_id=claim_id or f"{package.name}:{lane}:proposal-{entry.index}",
+                title=str(entry.scalars.get("title") or ""),
+                reason=f"fails the proposal schema at {entry.error}",
+            )
+        )
+    return AnalysisMarks(dropped_claims=dropped)

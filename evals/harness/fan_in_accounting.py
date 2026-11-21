@@ -3,8 +3,8 @@
 The fan-in merges a framework's lane batches into the drafts its critic reads.
 It is deterministic, so it can run again on an archived case: the batches are
 ``<case>.proposals.json``, and :func:`replay_fan_in` hands them to the shipped
-:func:`~analysis_service.fan_in.fan_in` with the case's own model, its sources
-as :func:`~analysis_service.execution.source_texts` maps them, and the
+:func:`~katra.fan_in.fan_in` with the case's own model, its sources
+as :func:`~katra.execution.source_texts` maps them, and the
 assertion catalog its report holds. ``descendants`` replays through the same
 function.
 
@@ -19,7 +19,7 @@ carries, or names one ID more often than proposals carry it, is extra.
 **Quotes.** The drafts' quote grounds, counted four ways: verified as
 written, repaired to the source's own span, refused, and unchecked. A quote is
 unchecked where the fan-in ran no quote check
-(:attr:`~analysis_service.fan_in.FanIn.quotes_checked`), so only a check that
+(:attr:`~katra.fan_in.FanIn.quotes_checked`), so only a check that
 ran can count a quote as verified. Only the drafts that survive carry their
 grounds, so a draft dropped because no ground verifies counts among the drops,
 not among the refused quotes.
@@ -48,14 +48,6 @@ from typing import Any, NamedTuple
 
 from pydantic import ValidationError
 
-from analysis_service.claims import FrameworkName, ProposalBatch
-from analysis_service.evidence import invalid_proposal_marks
-from analysis_service.execution import source_texts
-from analysis_service.fan_in import DraftJoinError, FanIn, fan_in
-from analysis_service.frameworks import PACKAGES, FrameworkPackage, schemas_for
-from analysis_service.frameworks.asvs.record import RequirementProposals
-from analysis_service.frameworks.stride.record import ArchivedThreatProposals
-from analysis_service.report import Report
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
@@ -67,6 +59,14 @@ from evals.harness.bundle import UnreadableReport, finished_file, read_report
 from evals.harness.grounds import unchecked_quote_count
 from evals.harness.modes import REPORTING_MODES, EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from katra.claims import FrameworkName, ProposalBatch
+from katra.evidence import invalid_proposal_marks
+from katra.execution import source_texts
+from katra.fan_in import DraftJoinError, FanIn, fan_in
+from katra.frameworks import PACKAGES, FrameworkPackage, schemas_for
+from katra.frameworks.asvs.record import RequirementProposals
+from katra.frameworks.stride.record import ArchivedThreatProposals
+from katra.report import Report
 
 #: Each package's batch type for a stored lane batch: the agent's own schema,
 #: or an archived reading of it that tolerates a field the run did not store.
@@ -84,7 +84,7 @@ def replay_fan_in(
     """The shipped fan-in over one framework's stored lane batches.
 
     ``lanes`` is each lane against its stored batch. Raises
-    :class:`~analysis_service.fan_in.DraftJoinError` where the fan-in does.
+    :class:`~katra.fan_in.DraftJoinError` where the fan-in does.
     """
     batch_type = ARCHIVED_BATCHES[framework]
     batches = {lane: batch_type.model_validate(raw) for lane, raw in lanes.items()}

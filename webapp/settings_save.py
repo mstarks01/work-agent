@@ -5,7 +5,7 @@ A save is a JSON object of at most :data:`MAX_SAVE_BYTES`::
 
     {"revision": "<SHA-256 of settings.env>",
      "changes": {"tiers.strong.model": "<value>", "store.retention_days": null},
-     "remove": ["ANALYSIS_OLD_NAME"]}
+     "remove": ["KATRA_OLD_NAME"]}
 
 ``changes`` names each value by its **Deployment Setting** key. A ``null``
 value is a reset: the save removes the line, and the shipped value applies.
@@ -33,7 +33,7 @@ from pathlib import Path
 from secrets import token_hex
 from typing import Protocol, TypeVar
 
-from analysis_service.config_files import (
+from katra.config_files import (
     SettingsFileError,
     SettingsLine,
     create_private,
@@ -43,18 +43,18 @@ from analysis_service.config_files import (
     value_refusal,
     write_settings_env,
 )
-from analysis_service.errors import ConfigError
-from analysis_service.model_gate import NoThinkingLevel
-from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.settings_variables import (
+from katra.errors import ConfigError
+from katra.model_gate import NoThinkingLevel
+from katra.model_tiers import ModelTierConfig
+from katra.settings_variables import (
     deployment_variables,
     merged_env,
     secret_vars,
 )
-from analysis_service.store_backends import env_variables as store_variables
-from analysis_service.store_backends import retention_days
-from analysis_service.store_settings import StoreConfigError
-from analysis_service.vendors import VENDORS
+from katra.store_backends import env_variables as store_variables
+from katra.store_backends import retention_days
+from katra.store_settings import StoreConfigError
+from katra.vendors import VENDORS
 from webapp.settings_page import CHANGED_SAMPLING, SETTINGS, sampling_key
 from webapp.settings_view import build_app_store
 
@@ -168,8 +168,8 @@ def _refusals(
     A change must name an entry of
     :data:`~webapp.settings_page.SETTINGS` marked ``changes``, whose variable
     is not set in the process environment, and its value must pass
-    :func:`~analysis_service.config_files.value_refusal`, or
-    :func:`~analysis_service.config_files.secret_refusal` for a key. A
+    :func:`~katra.config_files.value_refusal`, or
+    :func:`~katra.config_files.secret_refusal` for a key. A
     removal must name a line of ``lines`` that this version does not read.
     A refusal names a key the caller made up by its position, never by the
     key.
@@ -228,12 +228,12 @@ def _saved_keys(save: Save) -> dict[str, str]:
 
 
 def _key_stem(var: str) -> str:
-    return refused_var(var).removeprefix("ANALYSIS_").lower()
+    return refused_var(var).removeprefix("KATRA_").lower()
 
 
 def _new_key_file(directory: Path, var: str) -> Path:
     """A new absolute path for a key file of the key variable ``var`` in
-    ``directory``: its name without ``ANALYSIS_`` and ``_FILE``, in lower
+    ``directory``: its name without ``KATRA_`` and ``_FILE``, in lower
     case, a dot and a random token, such as ``anthropic_api_key.3f9c0a1b2d4e5f60``.
     The name holds no part of the key."""
     return directory.absolute() / f"{_key_stem(var)}.{token_hex(8)}"
@@ -241,7 +241,7 @@ def _new_key_file(directory: Path, var: str) -> Path:
 
 def _write_keys(directory: Path, keys: Mapping[str, str]) -> dict[str, Path]:
     """Write each key text of ``keys`` to a new :func:`_new_key_file` by
-    :func:`~analysis_service.config_files.create_private`, and give each path
+    :func:`~katra.config_files.create_private`, and give each path
     by its variable. Where a write fails, it deletes each file it wrote and
     raises."""
     written: dict[str, Path] = {}
@@ -360,7 +360,7 @@ def _check(
             Refusal(
                 None,
                 f"the store cannot load a library ({exc}): install"
-                " analysis-service again with the extra that the store needs",
+                " katra again with the extra that the store needs",
             )
         )
     return built, found
@@ -398,7 +398,7 @@ async def apply_save(
     takes the value that the check built, and the save then deletes each key
     file that no variable names. A failure of that deletion only logs.
 
-    A :class:`~analysis_service.config_files.SettingsFileError` refuses the
+    A :class:`~katra.config_files.SettingsFileError` refuses the
     whole save.
     """
     async with lock:

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from analysis_service.actions import ACTION_VERBS
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.frameworks.stride.record import LANES_OF_VERB, DraftThreat
+from katra.actions import ACTION_VERBS
+from katra.frameworks.stride import STRIDE
+from katra.frameworks.stride.record import LANES_OF_VERB, DraftThreat
 from tests.factories import sample_draft
 
 CORPUS = Path(__file__).resolve().parents[1] / "evals" / "corpus"

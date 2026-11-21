@@ -57,7 +57,7 @@
 
 ## Context
 
-The compact extraction transport ships behind `ANALYSIS_COMPACT_EXTRACTION`,
+The compact extraction transport ships behind `KATRA_COMPACT_EXTRACTION`,
 off. It replaces each element ID with a short response-local `ref` and expands
 the result into the same **System Model** in code. What it is worth is a
 measurement nobody has made.
@@ -120,7 +120,7 @@ One case cannot answer this. The first run's spread is the reason: a per-case
 reading of a 10% effect needs an n the corpus gives for free.
 
 **The baseline arm runs first**, from the same tree, on the same tiers file and
-the same node map. Nothing but `ANALYSIS_COMPACT_EXTRACTION` differs between
+the same node map. Nothing but `KATRA_COMPACT_EXTRACTION` differs between
 the arms.
 
 ### What decides it

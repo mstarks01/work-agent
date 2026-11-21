@@ -8,9 +8,9 @@ from typing import Any, get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.analysis import CONTROL_ATTRIBUTES
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.controls import (
+from katra.analysis import CONTROL_ATTRIBUTES
+from katra.capabilities import CAPABILITIES
+from katra.controls import (
     ALIASES_FULL,
     ATTRIBUTE_STATEMENTS,
     MAX_CONTROL_ALIASES,
@@ -26,17 +26,17 @@ from analysis_service.controls import (
     control_refusal,
     credential_hit,
 )
-from analysis_service.fact_answers import STORED
-from analysis_service.frameworks import PACKAGES
-from analysis_service.job_controls import CopiedControl
-from analysis_service.owner_files import (
+from katra.fact_answers import STORED
+from katra.frameworks import PACKAGES
+from katra.job_controls import CopiedControl
+from katra.owner_files import (
     NO_TEXT,
     NOT_PLAIN_TEXT,
     NOT_UTF_8,
     text_refusal,
 )
-from analysis_service.sources import text_digest
-from analysis_service.system_model import (
+from katra.sources import text_digest
+from katra.system_model import (
     CONTROL_VALUE_MAX_CHARS,
     ElementPrefix,
     ZonedElement,
@@ -595,7 +595,7 @@ def test_a_long_or_unclosed_credential_is_refused(line, shape):
     )
 
 
-#: The line ends that :func:`~analysis_service.owner_files.text_refusal`
+#: The line ends that :func:`~katra.owner_files.text_refusal`
 #: lets through.
 LINE_ENDS = ["\n", "\r\n", "\r", "\u2028", "\u2029"]
 
@@ -650,8 +650,8 @@ def test_a_hostile_line_is_read_in_linear_time(line):
 
 
 def test_a_pause_save_ticks_at_most_one_model_of_elements():
-    from analysis_service.job_controls import ControlScopeEntry
-    from analysis_service.validation import MAX_ELEMENTS
+    from katra.job_controls import ControlScopeEntry
+    from katra.validation import MAX_ELEMENTS
 
     ticked = [f"store:part-{n}" for n in range(MAX_ELEMENTS + 1)]
     assert ControlScopeEntry(control=CONTROL_ID, ticked=ticked[:-1])

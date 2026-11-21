@@ -11,7 +11,7 @@ job calls: ``projected`` is a settled row the graph carries,
 ``offered`` is a settled row the Evidence Catalog cites as itself, ``open`` is
 an unknown, ``set-aside`` is a row a conflict or an assessment kept from
 settling, or a settled row the graph contradicts
-(:func:`~analysis_service.assertions.contradicted`), and ``refused`` is a row
+(:func:`~katra.assertions.contradicted`), and ``refused`` is a row
 the gate refused, named by the code that refused it. The first two are the
 rows that reach a consumer, which is the population the owner's decision of
 2026-09-23 fixes; the rest are recorded beside them so a reviewer sees what the
@@ -20,7 +20,7 @@ job did not use as well.
 Nothing here assesses anything, and it runs no model.
 
 **After the review**, ``run.py reassess`` applies a reviewer's verdicts to one
-report through :func:`~analysis_service.reassess.reassess` and writes what the
+report through :func:`~katra.reassess.reassess` and writes what the
 review changed — rows rejected, findings withdrawn, leads reopened — beside the
 report. The verdicts name the catalog digest they were written against, and a
 verdict file for another catalog is refused rather than applied to rows its
@@ -38,19 +38,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from analysis_service.assertions import (
-    UNKNOWN,
-    AssertionRecord,
-    CatalogProposal,
-    assertion_id,
-    offered,
-    uncontradicted,
-)
-from analysis_service.evidence import prepared_view
-from analysis_service.execution import source_texts
-from analysis_service.reassess import ReviewerAssessment, reassess
-from analysis_service.sources import text_digest
-from analysis_service.system_model import SystemModel
 from evals.harness.archive import case_suffix
 from evals.harness.artifact import corpus_digest, load_artifact
 from evals.harness.bundle import (
@@ -61,6 +48,19 @@ from evals.harness.bundle import (
 from evals.harness.modes import EvalRunError
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
 from evals.harness.run_record import run_record, sweep_inputs
+from katra.assertions import (
+    UNKNOWN,
+    AssertionRecord,
+    CatalogProposal,
+    assertion_id,
+    offered,
+    uncontradicted,
+)
+from katra.evidence import prepared_view
+from katra.execution import source_texts
+from katra.reassess import ReviewerAssessment, reassess
+from katra.sources import text_digest
+from katra.system_model import SystemModel
 
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
 
@@ -117,7 +117,7 @@ def population(
     """Every row of one job, routed by the job's own readers.
 
     ``model`` is the model the job read. It is prepared again here by
-    :func:`~analysis_service.evidence.prepared_view`, which is idempotent on a
+    :func:`~katra.evidence.prepared_view`, which is idempotent on a
     model the job already projected, so a report's embedded model and an
     unprojected one route the same.
     """
@@ -316,7 +316,7 @@ def parsed_verdicts(held: object) -> dict[str, ReviewerAssessment]:
 
     Each entry is an object holding a string ``assessment`` and a string
     ``assessor``. Whether the assessment is one a review may write is
-    :func:`~analysis_service.reassess.reviewed`'s question, not this one.
+    :func:`~katra.reassess.reviewed`'s question, not this one.
     """
     if not isinstance(held, dict):
         raise PopulationError("`verdicts` is not an object keyed by assertion identity")

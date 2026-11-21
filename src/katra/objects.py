@@ -1,0 +1,536 @@
+"""The object store: where the ``sql`` job store keeps sources, reports,
+Owner Files and the evidence of Controls (ADRs 0065, 0118 and 0127).
+
+A job's sources and its report are each one object, under the key that
+:func:`object_key` gives. An Owner File's text is one object, under the key
+that :func:`file_key` gives, and so is one evidence file of a Control, under
+the key that :func:`evidence_key` gives. The job store writes each object once, writes the
+object before the row that names it, and keeps the SHA-256 of each object in
+that row. So this module stores bytes and checks nothing about them, and the
+job store checks the digest on each read.
+
+A deployment selects a backend with ``KATRA_OBJECT_STORE``. Each value is a
+row of :data:`OBJECT_STORES`, and :func:`build_object_store` builds it. An
+unset or unknown value stops the startup.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import os
+import re
+import stat
+from collections.abc import AsyncIterator, Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Literal, Protocol, cast, get_args
+
+from katra.controls import CONTROL_ID_PATTERN, EVIDENCE_ID_PATTERN
+from katra.jobs import JOB_ID_PATTERN
+from katra.owner_files import OWNER_FILE_ID_PATTERN
+from katra.store_settings import (
+    StoreConfigError,
+    closed_setting,
+    refuse_unread,
+)
+from katra.vendors import CredentialMode
+
+#: The objects of a job: its sources, its report and its copy of the
+#: Controls it applies (ADR 0127). The service writes each one once, so no
+#: name carries a revision.
+ObjectName = Literal["sources.json", "report.json", "controls.json"]
+
+#: An owner ID is a UUIDv4 that the service generates (ADR 0064). This shape
+#: admits only lowercase letters, digits and hyphens, so no part of a key can
+#: hold a separator or a dot segment.
+_OWNER_ID = re.compile(r"[0-9a-z][0-9a-z-]{0,63}")
+
+
+def _owner_part(owner_id: str) -> str:
+    if not _OWNER_ID.fullmatch(owner_id):
+        raise ValueError("an owner ID is not a key part")
+    return owner_id
+
+
+def object_key(owner_id: str, job_id: str, name: ObjectName) -> str:
+    """The key of one object of a job: ``<owner-id>/<job-id>/<name>``.
+
+    **The one rule for a job key.** A key holds only the IDs that the service
+    generates, never a name, an email or a ``sub``. A part outside its shape
+    raises, so a key never reaches outside the owner's and the job's prefix.
+    """
+    if not JOB_ID_PATTERN.fullmatch(job_id):
+        raise ValueError("a job ID is not a key part")
+    if name not in get_args(ObjectName):
+        raise ValueError(f"{name!r} is not an object name")
+    return f"{_owner_part(owner_id)}/{job_id}/{name}"
+
+
+def file_key(owner_id: str, file_id: str) -> str:
+    """The key of an Owner File's text: ``<owner-id>/<file-id>``.
+
+    **The one rule for a file key** (ADR 0118). A job key has three parts and
+    a file key two, so no key has both shapes.
+    """
+    if not OWNER_FILE_ID_PATTERN.fullmatch(file_id):
+        raise ValueError("a file ID is not a key part")
+    return f"{_owner_part(owner_id)}/{file_id}"
+
+
+def evidence_key(owner_id: str, control_id: str, evidence_id: str) -> str:
+    """The key of one evidence file of a Control:
+    ``<owner-id>/<control-id>/<evidence-id>``.
+
+    **The one rule for an evidence key** (ADR 0127). It has three parts, as a
+    job key has, and the second part's prefix tells the two apart.
+    """
+    if not CONTROL_ID_PATTERN.fullmatch(control_id):
+        raise ValueError("a Control ID is not a key part")
+    if not EVIDENCE_ID_PATTERN.fullmatch(evidence_id):
+        raise ValueError("an evidence ID is not a key part")
+    return f"{_owner_part(owner_id)}/{control_id}/{evidence_id}"
+
+
+@dataclass(frozen=True)
+class JobKey:
+    """The parts of a key that :func:`object_key` gives."""
+
+    owner_id: str
+    job_id: str
+    name: ObjectName
+
+
+@dataclass(frozen=True)
+class FileKey:
+    """The parts of a key that :func:`file_key` gives."""
+
+    owner_id: str
+    file_id: str
+
+
+@dataclass(frozen=True)
+class ControlKey:
+    """The parts of a key that :func:`evidence_key` gives."""
+
+    owner_id: str
+    control_id: str
+    evidence_id: str
+
+
+def key_parts(key: str) -> JobKey | FileKey | ControlKey | None:
+    """The parts of ``key``, typed by its shape, or ``None`` where no builder
+    of :func:`object_key`, :func:`file_key` and :func:`evidence_key` can give
+    ``key``.
+
+    The builders check each part, so this function holds no rule of its own.
+    """
+    parts = key.split("/")
+    try:
+        if len(parts) == 3 and CONTROL_ID_PATTERN.fullmatch(parts[1]):
+            owner_id, control_id, evidence_id = parts
+            evidence_key(owner_id, control_id, evidence_id)
+            return ControlKey(owner_id, control_id, evidence_id)
+        if len(parts) == 3:
+            owner_id, job_id, name = parts
+            object_key(owner_id, job_id, cast(ObjectName, name))
+            return JobKey(owner_id, job_id, cast(ObjectName, name))
+        if len(parts) == 2:
+            owner_id, file_id = parts
+            file_key(owner_id, file_id)
+            return FileKey(owner_id, file_id)
+    except ValueError:
+        return None
+    return None
+
+
+def check_private(path: Path, label: str, *, directory: bool) -> None:
+    """Refuse ``path`` where it is missing, not a directory (or not a regular
+    file), owned by another user, or open to a group or to others.
+
+    **The one rule of a private path.** The object root and a SQLite database
+    file both hold content, and both pass it. ``label`` names the path and its
+    setting in the error, which never repeats the path. A symbolic link is
+    neither a directory nor a regular file, so it is refused.
+    """
+    kind, is_kind, mode = (
+        ("a directory", stat.S_ISDIR, "0700")
+        if directory
+        else ("a regular file", stat.S_ISREG, "0600")
+    )
+    try:
+        held = os.lstat(path)
+    except FileNotFoundError:
+        raise StoreConfigError(f"{label} does not exist") from None
+    if not is_kind(held.st_mode):
+        raise StoreConfigError(f"{label} is not {kind}")
+    if held.st_uid != os.geteuid():
+        raise StoreConfigError(f"another user owns {label}")
+    if held.st_mode & 0o077:
+        raise StoreConfigError(
+            f"a group or others can open {label}; set its mode to {mode}"
+        )
+
+
+class ObjectStore(Protocol):
+    """Bytes under keys that :func:`object_key` gives."""
+
+    async def check(self) -> None:
+        """Raise :class:`StoreConfigError` where the store cannot serve.
+
+        The startup runs it after the schema check and before the restart scan.
+        """
+
+    async def put(self, key: str, data: bytes) -> None:
+        """Keep ``data`` under ``key``. Raise where ``key`` already holds an object."""
+
+    async def get(self, key: str) -> bytes | None:
+        """The bytes under ``key``, or ``None`` where it holds none."""
+
+    async def delete(self, key: str) -> bool:
+        """Remove the object under ``key``. False where it holds none."""
+
+    def list(self) -> AsyncIterator[tuple[str, datetime]]:
+        """Each key in the store, with the time of its last write in UTC.
+
+        The orphan sweep,
+        :meth:`~katra.sql_store.SqlJobStore.sweep_orphans`, is the
+        only reader. A key can have any shape, so the
+        sweep checks each one with :func:`key_parts`.
+        """
+        ...
+
+
+class FilesystemObjectStore:
+    """Objects as files under one directory that only the service user can open.
+
+    ``KATRA_OBJECT_ROOT`` names the directory. Each directory this store
+    makes is ``0700`` and each file ``0600``. A put creates its file
+    exclusively. No put, read or delete passes through a symbolic link in any
+    part of a key (:func:`_folder`), so each one stays under the root. The
+    listing enters no symbolic link.
+    Only the service user can make an entry under the root, which
+    :meth:`check` holds.
+    """
+
+    def __init__(self, root: Path) -> None:
+        self._root = root
+
+    @classmethod
+    def from_env(cls, env: Mapping[str, str]) -> FilesystemObjectStore:
+        refuse_unread(
+            env,
+            ("KATRA_OBJECT_",),
+            OBJECT_STORES["filesystem"].reads,
+            "the filesystem object store",
+        )
+        value = env.get(OBJECT_ROOT_VAR, "")
+        if not value:
+            raise StoreConfigError(f"set {OBJECT_ROOT_VAR} for the filesystem store")
+        root = Path(value)
+        if not root.is_absolute():
+            raise StoreConfigError(f"{OBJECT_ROOT_VAR} must be an absolute path")
+        return cls(root)
+
+    async def check(self) -> None:
+        """Refuse a root that is missing, not a directory, owned by another user,
+        or open to a group or to others."""
+        check_private(
+            self._root,
+            f"the object root that {OBJECT_ROOT_VAR} names",
+            directory=True,
+        )
+
+    async def put(self, key: str, data: bytes) -> None:
+        await asyncio.to_thread(_write, self._root, key.split("/"), data)
+
+    async def get(self, key: str) -> bytes | None:
+        try:
+            return await asyncio.to_thread(_read, self._root, key.split("/"))
+        except FileNotFoundError:
+            return None
+
+    async def delete(self, key: str) -> bool:
+        return await asyncio.to_thread(_delete, self._root, key.split("/"))
+
+    async def list(self) -> AsyncIterator[tuple[str, datetime]]:
+        for listed in await asyncio.to_thread(_walk, self._root):
+            yield listed
+
+
+def _walk(root: Path) -> list[tuple[str, datetime]]:
+    """Each regular file under ``root``, as its key and the time of its last
+    write in UTC.
+
+    The walk enters no symbolic link and returns none, so each key names a
+    file under ``root``. A file that a delete removes during the walk is not
+    returned.
+    """
+    found = []
+    for folder, _, names in os.walk(root):
+        for name in names:
+            path = Path(folder, name)
+            try:
+                held = os.lstat(path)
+            except FileNotFoundError:
+                continue
+            if stat.S_ISREG(held.st_mode):
+                modified = datetime.fromtimestamp(held.st_mtime, UTC)
+                found.append((path.relative_to(root).as_posix(), modified))
+    return found
+
+
+_DIRECTORY = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+@contextlib.contextmanager
+def _folder(root: Path, folders: Sequence[str], *, create: bool) -> Iterator[int]:
+    """A descriptor of the directory ``root/folders``.
+
+    **The one walk of a key.** Each step opens one name under the descriptor
+    of the step before, with ``O_NOFOLLOW``, so a symbolic link at the root or
+    at any folder raises :class:`OSError` and its target stays untouched. No
+    step checks a path and then opens it, so no link can take the place of a
+    folder between the two. With ``create``, a missing folder is made
+    ``0700``; else it raises :class:`FileNotFoundError`.
+    """
+    descriptor = os.open(root, _DIRECTORY)
+    try:
+        for folder in folders:
+            if create:
+                with contextlib.suppress(FileExistsError):
+                    os.mkdir(folder, 0o700, dir_fd=descriptor)
+            parent = descriptor
+            descriptor = os.open(folder, _DIRECTORY, dir_fd=parent)
+            os.close(parent)
+        yield descriptor
+    finally:
+        os.close(descriptor)
+
+
+def _write(root: Path, parts: list[str], data: bytes) -> None:
+    *folders, name = parts
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+    with _folder(root, folders, create=True) as folder:
+        file = os.open(name, flags, 0o600, dir_fd=folder)
+    with os.fdopen(file, "wb") as opened:
+        opened.write(data)
+
+
+def _read(root: Path, parts: list[str]) -> bytes:
+    *folders, name = parts
+    with _folder(root, folders, create=False) as folder:
+        file = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=folder)
+    with os.fdopen(file, "rb") as opened:
+        return opened.read()
+
+
+def _delete(root: Path, parts: list[str]) -> bool:
+    *folders, name = parts
+    try:
+        with _folder(root, folders, create=False) as folder:
+            os.unlink(name, dir_fd=folder)
+    except FileNotFoundError:
+        return False
+    # A job's or a Control's directory goes with its last object. An owner's
+    # directory stays: every job, Owner File and Control of the owner writes
+    # under it, so a removal could race another write.
+    if len(folders) < 2:
+        return True
+    with (
+        contextlib.suppress(OSError),
+        _folder(root, folders[:-1], create=False) as parent,
+    ):
+        os.rmdir(folders[-1], dir_fd=parent)
+    return True
+
+
+def _s3_store(env: Mapping[str, str]) -> ObjectStore:
+    """The ``s3`` store, from the ``aws`` extra (ADR 0023)."""
+    try:
+        from katra.s3_objects import S3ObjectStore
+    except ModuleNotFoundError as missing:
+        raise StoreConfigError(
+            f"the s3 object store needs the aws extra ({missing.name} is not"
+            " installed): install katra[aws]"
+        ) from None
+    return S3ObjectStore.from_env(env)
+
+
+def _gcs_store(env: Mapping[str, str]) -> ObjectStore:
+    """The ``gcs`` store, from the ``gcs`` extra (ADR 0103)."""
+    try:
+        from katra.gcs_objects import GcsObjectStore
+    except ModuleNotFoundError as missing:
+        raise StoreConfigError(
+            f"the gcs object store needs the gcs extra ({missing.name} is not"
+            " installed): install katra[gcs]"
+        ) from None
+    return GcsObjectStore.from_env(env)
+
+
+#: The files that hold the static key pair of the ``api_key`` mode of the
+#: ``s3`` store, by the ``boto3`` argument that each one fills. They live here,
+#: and not in :mod:`~katra.s3_objects`, so that a reader without the
+#: ``aws`` extra can name them.
+S3_KEY_FILES: dict[str, str] = {
+    "aws_access_key_id": "KATRA_OBJECT_ACCESS_KEY_ID_FILE",
+    "aws_secret_access_key": "KATRA_OBJECT_SECRET_ACCESS_KEY_FILE",
+}
+
+#: The file that holds the service account key of the ``api_key`` mode of the
+#: ``gcs`` store (ADR 0108). It lives here for the reason that
+#: :data:`S3_KEY_FILES` does.
+GCS_KEY_FILE_VAR = "KATRA_OBJECT_SERVICE_ACCOUNT_KEY_FILE"
+
+#: How a request of the ``s3`` store names the bucket: in the host name, or in
+#: the path. The values are the ``addressing_style`` values of ``botocore``.
+#: The type lives here for the reason that :data:`S3_KEY_FILES` does.
+Addressing = Literal["virtual", "path"]
+
+
+@dataclass(frozen=True)
+class ObjectStoreBackend:
+    """One ``KATRA_OBJECT_STORE`` value: a row of :data:`OBJECT_STORES`.
+
+    No field has a default, so a new row states every fact.
+    """
+
+    #: Builds the store from the environment.
+    build: Callable[[Mapping[str, str]], ObjectStore]
+    #: Every ``KATRA_OBJECT_*`` setting that this store reads. The store
+    #: refuses each other one.
+    reads: tuple[str, ...]
+    #: The settings of :attr:`reads` that only one credential mode reads, by
+    #: that mode. The Settings page shows them only for that mode.
+    mode_reads: Mapping[CredentialMode, tuple[str, ...]]
+
+    def reads_in(self, mode: CredentialMode | None) -> tuple[str, ...]:
+        """The settings of :attr:`reads` that ``mode`` reads: each one but the
+        :attr:`mode_reads` of every other mode. ``None`` names no mode, so no
+        setting of :attr:`mode_reads` is in the list.
+
+        **The one reader of which settings a credential mode reads.** A store
+        refuses each other setting through
+        :func:`~katra.store_settings.refuse_unread`, and the
+        Settings page shows only these.
+        """
+        unread = {
+            var
+            for other, mode_vars in self.mode_reads.items()
+            if other != mode
+            for var in mode_vars
+        }
+        return tuple(var for var in self.reads if var not in unread)
+
+
+ObjectStoreName = Literal["filesystem", "s3", "gcs"]
+
+#: The setting that selects a row of :data:`OBJECT_STORES`.
+OBJECT_STORE_VAR = "KATRA_OBJECT_STORE"
+#: The s3 setting that the Settings page offers as a closed choice.
+OBJECT_ADDRESSING_VAR = "KATRA_OBJECT_ADDRESSING"
+#: The setting of the s3 and gcs rows that the Settings page offers as a
+#: closed choice.
+OBJECT_CREDENTIALS_VAR = "KATRA_OBJECT_CREDENTIALS"
+#: The setting of the s3 and gcs rows that each reads as free text.
+OBJECT_BUCKET_VAR = "KATRA_OBJECT_BUCKET"
+#: The s3 settings that the s3 store reads as free text.
+OBJECT_REGION_VAR = "KATRA_OBJECT_REGION"
+OBJECT_ENDPOINT_VAR = "KATRA_OBJECT_ENDPOINT"
+#: The directory of the filesystem store.
+OBJECT_ROOT_VAR = "KATRA_OBJECT_ROOT"
+
+#: Each ``KATRA_OBJECT_STORE`` value, and how to build its store from the
+#: environment. The table answers for every name of :data:`ObjectStoreName`.
+OBJECT_STORES: dict[ObjectStoreName, ObjectStoreBackend] = {
+    "filesystem": ObjectStoreBackend(
+        build=FilesystemObjectStore.from_env,
+        reads=(OBJECT_STORE_VAR, OBJECT_ROOT_VAR),
+        mode_reads={},
+    ),
+    "s3": ObjectStoreBackend(
+        build=_s3_store,
+        reads=(
+            OBJECT_STORE_VAR,
+            OBJECT_BUCKET_VAR,
+            OBJECT_REGION_VAR,
+            OBJECT_ENDPOINT_VAR,
+            OBJECT_ADDRESSING_VAR,
+            OBJECT_CREDENTIALS_VAR,
+            *S3_KEY_FILES.values(),
+        ),
+        mode_reads={CredentialMode.API_KEY: tuple(S3_KEY_FILES.values())},
+    ),
+    "gcs": ObjectStoreBackend(
+        build=_gcs_store,
+        reads=(
+            OBJECT_STORE_VAR,
+            OBJECT_BUCKET_VAR,
+            OBJECT_CREDENTIALS_VAR,
+            GCS_KEY_FILE_VAR,
+        ),
+        mode_reads={CredentialMode.API_KEY: (GCS_KEY_FILE_VAR,)},
+    ),
+}
+
+
+def object_store_name(env: Mapping[str, str]) -> ObjectStoreName:
+    """The row of :data:`OBJECT_STORES` that ``env`` selects; fail closed.
+
+    **The one reader of which object store an env selects.**
+    """
+    return closed_setting(
+        env.get(OBJECT_STORE_VAR, ""), OBJECT_STORE_VAR, OBJECT_STORES
+    )
+
+
+#: Each ``KATRA_OBJECT_CREDENTIALS`` value, by its mode.
+_MODES = {mode: mode.value for mode in CredentialMode}
+
+
+def object_reads(env: Mapping[str, str]) -> tuple[str, ...]:
+    """The object settings that the settings in ``env`` select: the reads of
+    the row of :data:`OBJECT_STORES`, without the reads of each credential mode
+    that ``env`` does not select.
+
+    The Settings page shows only these. Where the credential mode names no
+    mode, no setting of :attr:`ObjectStoreBackend.mode_reads` is in the list.
+    """
+    mode: CredentialMode | None
+    try:
+        mode = _named_mode(env)
+    except StoreConfigError:
+        mode = None
+    return OBJECT_STORES[object_store_name(env)].reads_in(mode)
+
+
+def _named_mode(env: Mapping[str, str]) -> CredentialMode:
+    """The credential mode that ``KATRA_OBJECT_CREDENTIALS`` names; fail
+    closed. **The one reader of the object credential mode.**"""
+    return closed_setting(
+        env.get(OBJECT_CREDENTIALS_VAR, ""), OBJECT_CREDENTIALS_VAR, _MODES
+    )
+
+
+def credential_mode(env: Mapping[str, str], store: ObjectStoreName) -> CredentialMode:
+    """The credential mode of the ``store`` row, after the refusal of each
+    object setting that the mode does not read.
+
+    The s3 and gcs stores call it before they read any file. The refusal
+    names the mode, the store and each stray setting, and never a value.
+    """
+    mode = _named_mode(env)
+    refuse_unread(
+        env,
+        ("KATRA_OBJECT_",),
+        OBJECT_STORES[store].reads_in(mode),
+        f"the {mode} mode of the {store} object store",
+    )
+    return mode
+
+
+def build_object_store(env: Mapping[str, str]) -> ObjectStore:
+    """Build the object store that ``KATRA_OBJECT_STORE`` names; fail closed."""
+    return OBJECT_STORES[object_store_name(env)].build(env)

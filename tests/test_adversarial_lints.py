@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.report import Report
 from evals.adversarial import verify
 from evals.adversarial.model import (
     ATTACK_CLASSES,
@@ -27,6 +26,7 @@ from evals.adversarial.model import (
     load_corpus,
 )
 from evals.adversarial.score import citation_failures, score_case
+from katra.report import Report
 from tests.factories import sample_report
 
 pytestmark = pytest.mark.lint

@@ -47,13 +47,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from analysis_service.claims import FrameworkName
 from evals.harness import audit, baseline, standings
 from evals.harness.artifact import REPO_ROOT
 from evals.harness.baseline import BaselineError, artifact_filename
 from evals.harness.instruments import INSTRUMENTS, Cases, Column
 from evals.harness.rates import UNAVAILABLE, mean
 from evals.harness.scorer import vote_coverage
+from katra.claims import FrameworkName
 
 #: Where the generated table lives, beside the Baselines it reads. Relative,
 #: because every reader here takes a ``root`` — the repo's own tree in CI, a

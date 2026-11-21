@@ -6,8 +6,8 @@ from typing import get_args, get_origin
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.compact import CompactDataStore
-from analysis_service.system_model import (
+from katra.compact import CompactDataStore
+from katra.system_model import (
     ELEMENT_GROUPS,
     ELEMENT_ID,
     FLOW_DELIMITER,
@@ -35,7 +35,7 @@ from analysis_service.system_model import (
     normalize_name,
     parse_flow_id,
 )
-from analysis_service.validation import validate
+from katra.validation import validate
 from tests.factories import valid_model
 
 

@@ -21,26 +21,26 @@ import pytest
 from google.adk.models.base_llm import BaseLlm
 from pydantic import Field
 
-import analysis_service.fan_in as fan_in_module
-import analysis_service.graph as graph_module
-from analysis_service.critic import CriticOutputError
-from analysis_service.deployment import Deployment
-from analysis_service.fan_in import DraftJoinError
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.graph import (
-    ENTRY_PREPARE,
-    STATE_INPUT_TEXT,
-    Lane,
-    tier_node_by_graph_node,
-)
-from analysis_service.retry import RefusedCompletionError
-from analysis_service.sampling import load_sampling
+import katra.fan_in as fan_in_module
+import katra.graph as graph_module
 from evals.harness import modes
 from evals.harness.archive import kind_of
 from evals.harness.bundle import reports_dir, write_failures
 from evals.harness.coverage import aggregate_coverage, coverage_totals
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from katra.critic import CriticOutputError
+from katra.deployment import Deployment
+from katra.fan_in import DraftJoinError
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.graph import (
+    ENTRY_PREPARE,
+    STATE_INPUT_TEXT,
+    Lane,
+    tier_node_by_graph_node,
+)
+from katra.retry import RefusedCompletionError
+from katra.sampling import load_sampling
 from tests.factories import DEFAULT_FRAMEWORKS, EVAL_MODEL, TEST_TIER_ENV, ScriptedLlm
 from tests.test_evals_modes import lane_of, reaching_refs, scripted_ruling
 

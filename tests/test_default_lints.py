@@ -96,27 +96,27 @@ _ADK_OVERRIDE = (
 #: ``Class.method`` for a method, with the enclosing function first for a
 #: class built inside one.
 KEPT_DEFAULTS: dict[tuple[str, str, str], str] = {
-    ("analysis_service.engine", "Engine.analyze_sync", "system_name"): (
+    ("katra.engine", "Engine.analyze_sync", "system_name"): (
         "the in-process API that an integrator's code calls, where a report"
         " with no system name is a supported call"
     ),
     (
-        "analysis_service.charges",
+        "katra.charges",
         "charge_reporting_llm_class.ChargeReportingLlm.generate_content_async",
         "stream",
     ): _ADK_OVERRIDE,
     (
-        "analysis_service.prompt_cache",
+        "katra.prompt_cache",
         "cache_write_reporting_llm_class.CacheWriteReportingLlm.generate_content_async",
         "stream",
     ): _ADK_OVERRIDE,
     (
-        "analysis_service.refusal_categories",
+        "katra.refusal_categories",
         "refusal_reporting_llm_class.RefusalReportingLlm.generate_content_async",
         "stream",
     ): _ADK_OVERRIDE,
     (
-        "analysis_service.provider",
+        "katra.provider",
         "ExecutedLlm.generate_content_async",
         "stream",
     ): _ADK_OVERRIDE,

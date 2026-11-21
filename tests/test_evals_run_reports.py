@@ -1,6 +1,6 @@
 """A finished sweep keeps its reports, not only the numbers it thought to take.
 
-A harness that built a full :class:`~analysis_service.report.Report` per
+A harness that built a full :class:`~katra.report.Report` per
 case, read four things off it and dropped it would leave a plain question — show
 me one of the reports — unanswerable on a sweep the provider billed, and
 nothing about a sweep is deterministic enough for a re-run to answer it
@@ -19,23 +19,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.assertions import (
-    ABSENT,
-    MAX_SUBJECTS,
-    AssertionCatalog,
-    AssertionProposal,
-    AssertionRecord,
-    CatalogIssue,
-    CatalogProposal,
-    Quarantined,
-    QuoteProposal,
-)
-from analysis_service.deployment import Deployment
-from analysis_service.graph import ENTRY_EXTRACT
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
-from analysis_service.validation import ValidationIssue, parse_and_validate
 from evals.harness import modes
 from evals.harness.bundle import (
     heads_from_reports,
@@ -52,6 +35,23 @@ from evals.harness.modes import (
 )
 from evals.harness.reference import load_case
 from evals.harness.run import _run_mode
+from katra import graph
+from katra.assertions import (
+    ABSENT,
+    MAX_SUBJECTS,
+    AssertionCatalog,
+    AssertionProposal,
+    AssertionRecord,
+    CatalogIssue,
+    CatalogProposal,
+    Quarantined,
+    QuoteProposal,
+)
+from katra.deployment import Deployment
+from katra.graph import ENTRY_EXTRACT
+from katra.report import Report
+from katra.system_model import SystemModel
+from katra.validation import ValidationIssue, parse_and_validate
 from tests.eval_factories import write_emission_sweep
 from tests.factories import emitted
 from tests.test_evals_run_grounds import CASE_DIR, DEAD, TEST_TIER_ENV, sweep

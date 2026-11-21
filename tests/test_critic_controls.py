@@ -9,7 +9,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.claims import (
+from katra.claims import (
     AnalysisMarks,
     ControlRowRef,
     CriticStep,
@@ -18,19 +18,19 @@ from analysis_service.claims import (
     Ruling,
     Verdict,
 )
-from analysis_service.controls import Control, ControlDocument
-from analysis_service.critic import review_issues
-from analysis_service.critic_round import Accepted, CriticRound, Reask
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.fan_in import fan_in, returned_to_deferred
-from analysis_service.frameworks import PACKAGES
-from analysis_service.frameworks.asvs.record import (
+from katra.controls import Control, ControlDocument
+from katra.critic import review_issues
+from katra.critic_round import Accepted, CriticRound, Reask
+from katra.fact_answers import FactAnswer
+from katra.fan_in import fan_in, returned_to_deferred
+from katra.frameworks import PACKAGES
+from katra.frameworks.asvs.record import (
     AsvsAnalysis,
     DraftRequirementRuling,
     RequirementProposal,
     RequirementProposals,
 )
-from analysis_service.job_controls import (
+from katra.job_controls import (
     MIN_PART_WORDS,
     PART_WORDS_TEXT,
     AppliedControl,
@@ -46,8 +46,8 @@ from analysis_service.job_controls import (
     row_rulings,
     unreached_rows,
 )
-from analysis_service.sources import text_digest
-from analysis_service.system_model import SystemModel
+from katra.sources import text_digest
+from katra.system_model import SystemModel
 from tests.factories import (
     asvs_draft,
     sample_analysis,

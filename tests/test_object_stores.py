@@ -23,8 +23,8 @@ import pytest
 from botocore.exceptions import ClientError
 from moto.core import set_initial_no_auth_action_count
 
-from analysis_service.aws_identity import PLATFORM_METHODS, platform_session
-from analysis_service.objects import (
+from katra.aws_identity import PLATFORM_METHODS, platform_session
+from katra.objects import (
     OBJECT_STORES,
     S3_KEY_FILES,
     ControlKey,
@@ -39,9 +39,9 @@ from analysis_service.objects import (
     key_parts,
     object_key,
 )
-from analysis_service.store_backends import build_store
-from analysis_service.store_settings import StoreConfigError
-from analysis_service.vendors import CredentialMode
+from katra.store_backends import build_store
+from katra.store_settings import StoreConfigError
+from katra.vendors import CredentialMode
 from tests.sql_stores import (
     TEST_KEYS,
     TEST_REGION,
@@ -137,13 +137,13 @@ def test_the_filesystem_listing_enters_and_holds_no_symbolic_link(tmp_path):
 
 
 def test_a_refused_object_root_names_its_setting_and_not_its_path(tmp_path):
-    env = filesystem_env(tmp_path) | {"ANALYSIS_OBJECT_ROOT": str(tmp_path / "qzxv")}
+    env = filesystem_env(tmp_path) | {"KATRA_OBJECT_ROOT": str(tmp_path / "qzxv")}
     objects = build_object_store(env)
 
     with pytest.raises(StoreConfigError) as refused:
         asyncio.run(objects.check())
 
-    assert "ANALYSIS_OBJECT_ROOT" in str(refused.value)
+    assert "KATRA_OBJECT_ROOT" in str(refused.value)
     assert "qzxv" not in str(refused.value)
 
 
@@ -200,7 +200,7 @@ def test_the_s3_listing_reads_every_page(env):
     client = boto3.Session(**TEST_KEYS).client("s3", region_name=TEST_REGION)
     keys = {f"{i:04}" for i in range(1001)}
     for key in keys:
-        client.put_object(Bucket=env["ANALYSIS_OBJECT_BUCKET"], Key=key, Body=b"")
+        client.put_object(Bucket=env["KATRA_OBJECT_BUCKET"], Key=key, Body=b"")
     assert set(asyncio.run(listing(objects))) == keys
 
 
@@ -225,66 +225,66 @@ class TestTheSettings:
     @pytest.mark.parametrize(
         ("change", "message"),
         [
-            ({"ANALYSIS_OBJECT_BUCKET": None}, "set ANALYSIS_OBJECT_BUCKET"),
-            ({"ANALYSIS_OBJECT_REGION": " "}, "set ANALYSIS_OBJECT_REGION"),
-            ({"ANALYSIS_OBJECT_BUCKET": "Jobs"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "jobs_1"}, "ANALYSIS_OBJECT_BUCKET must match"),
-            ({"ANALYSIS_OBJECT_BUCKET": "j" * 64}, "ANALYSIS_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": None}, "set KATRA_OBJECT_BUCKET"),
+            ({"KATRA_OBJECT_REGION": " "}, "set KATRA_OBJECT_REGION"),
+            ({"KATRA_OBJECT_BUCKET": "Jobs"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "jobs_1"}, "KATRA_OBJECT_BUCKET must match"),
+            ({"KATRA_OBJECT_BUCKET": "j" * 64}, "KATRA_OBJECT_BUCKET must match"),
             (
-                {"ANALYSIS_OBJECT_REGION": "EU-WEST-1"},
-                "ANALYSIS_OBJECT_REGION must match",
+                {"KATRA_OBJECT_REGION": "EU-WEST-1"},
+                "KATRA_OBJECT_REGION must match",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "http://objects.example"},
+                {"KATRA_OBJECT_ENDPOINT": "http://objects.example"},
                 "must be an https URL",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "objects.example"},
+                {"KATRA_OBJECT_ENDPOINT": "objects.example"},
                 "must be an https URL",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "https://user:hunter2@objects.example"},
+                {"KATRA_OBJECT_ENDPOINT": "https://user:hunter2@objects.example"},
                 "and nothing more",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "https://objects.example/bucket"},
+                {"KATRA_OBJECT_ENDPOINT": "https://objects.example/bucket"},
                 "and nothing more",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "https://objects.example?k=hunter2"},
+                {"KATRA_OBJECT_ENDPOINT": "https://objects.example?k=hunter2"},
                 "and nothing more",
             ),
-            ({"ANALYSIS_OBJECT_ENDPOINT": "https://"}, "and nothing more"),
+            ({"KATRA_OBJECT_ENDPOINT": "https://"}, "and nothing more"),
             (
-                {"ANALYSIS_OBJECT_ENDPOINT": "https://objects.example:port"},
+                {"KATRA_OBJECT_ENDPOINT": "https://objects.example:port"},
                 "is not a URL",
             ),
-            ({"ANALYSIS_OBJECT_ADDRESSING": "dns"}, "unknown value for"),
-            ({"ANALYSIS_OBJECT_CREDENTIALS": None}, "set ANALYSIS_OBJECT_CREDENTIALS"),
-            ({"ANALYSIS_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
+            ({"KATRA_OBJECT_ADDRESSING": "dns"}, "unknown value for"),
+            ({"KATRA_OBJECT_CREDENTIALS": None}, "set KATRA_OBJECT_CREDENTIALS"),
+            ({"KATRA_OBJECT_CREDENTIALS": "token"}, "unknown value for"),
             (
-                {"ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE": None},
-                "needs ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
+                {"KATRA_OBJECT_ACCESS_KEY_ID_FILE": None},
+                "needs KATRA_OBJECT_ACCESS_KEY_ID_FILE",
             ),
             (
-                {"ANALYSIS_OBJECT_SECRET_ACCESS_KEY_FILE": "/nonexistent/hunter2"},
+                {"KATRA_OBJECT_SECRET_ACCESS_KEY_FILE": "/nonexistent/hunter2"},
                 "cannot read \\(FileNotFoundError\\)",
             ),
             (
-                {"ANALYSIS_OBJECT_SECRET_ACCESS_KEY": "hunter2"},
-                "unset ANALYSIS_OBJECT_SECRET_ACCESS_KEY,",
+                {"KATRA_OBJECT_SECRET_ACCESS_KEY": "hunter2"},
+                "unset KATRA_OBJECT_SECRET_ACCESS_KEY,",
             ),
             (
-                {"ANALYSIS_OBJECT_CREDENTIALS": "iam"},
-                "the iam mode of the s3 object store takes no ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE",
+                {"KATRA_OBJECT_CREDENTIALS": "iam"},
+                "the iam mode of the s3 object store takes no KATRA_OBJECT_ACCESS_KEY_ID_FILE",
             ),
             (
-                {"ANALYSIS_OBJECT_ROOT": "/srv/objects"},
-                "s3 object store takes no ANALYSIS_OBJECT_ROOT",
+                {"KATRA_OBJECT_ROOT": "/srv/objects"},
+                "s3 object store takes no KATRA_OBJECT_ROOT",
             ),
             (
-                {"ANALYSIS_OBJECT_ENDPIONT": "http://objects.example"},
-                "s3 object store takes no ANALYSIS_OBJECT_ENDPIONT",
+                {"KATRA_OBJECT_ENDPIONT": "http://objects.example"},
+                "s3 object store takes no KATRA_OBJECT_ENDPIONT",
             ),
         ],
     )
@@ -294,15 +294,15 @@ class TestTheSettings:
         assert "hunter2" not in str(refused.value)
 
     def test_an_empty_key_file(self, env):
-        Path(env["ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE"]).write_text("\n")
+        Path(env["KATRA_OBJECT_ACCESS_KEY_ID_FILE"]).write_text("\n")
         with pytest.raises(
-            StoreConfigError, match="ANALYSIS_OBJECT_ACCESS_KEY_ID_FILE names is empty"
+            StoreConfigError, match="KATRA_OBJECT_ACCESS_KEY_ID_FILE names is empty"
         ):
             build_store(env)
 
     @pytest.mark.parametrize("addressing", ["virtual", "path", "PATH", ""])
     def test_a_usable_store_starts(self, env, addressing):
-        start(changed(env, {"ANALYSIS_OBJECT_ADDRESSING": addressing}))
+        start(changed(env, {"KATRA_OBJECT_ADDRESSING": addressing}))
 
     def test_an_endpoint_from_the_environment_is_ignored(self, env, monkeypatch):
         """``boto3`` would send each request to it, and pass by the https check."""
@@ -313,19 +313,19 @@ class TestTheSettings:
     @pytest.mark.parametrize(
         ("endpoint", "message"),
         [
-            ("https://storage.googleapis.com", "ANALYSIS_OBJECT_STORE=gcs"),
+            ("https://storage.googleapis.com", "KATRA_OBJECT_STORE=gcs"),
             (
                 "https://storage.europe-west1.rep.googleapis.com",
-                "ANALYSIS_OBJECT_STORE=gcs",
+                "KATRA_OBJECT_STORE=gcs",
             ),
-            ("https://Storage.GoogleAPIs.com:443", "ANALYSIS_OBJECT_STORE=gcs"),
-            ("https://storage.googleapis.com.", "ANALYSIS_OBJECT_STORE=gcs"),
+            ("https://Storage.GoogleAPIs.com:443", "KATRA_OBJECT_STORE=gcs"),
+            ("https://storage.googleapis.com.", "KATRA_OBJECT_STORE=gcs"),
             ("https://s3.us-west-004.backblazeb2.com", "a Backblaze B2 host"),
         ],
     )
     def test_a_host_without_a_create_only_write(self, env, endpoint, message):
         """A put through it replaces an object with no error (ADR 0103)."""
-        env["ANALYSIS_OBJECT_ENDPOINT"] = endpoint
+        env["KATRA_OBJECT_ENDPOINT"] = endpoint
         with pytest.raises(StoreConfigError, match=message) as refused:
             build_store(env)
         assert endpoint.lower() not in str(refused.value).lower()
@@ -340,7 +340,7 @@ class TestTheSettings:
         ],
     )
     def test_a_host_with_a_create_only_write(self, env, endpoint):
-        env["ANALYSIS_OBJECT_ENDPOINT"] = endpoint
+        env["KATRA_OBJECT_ENDPOINT"] = endpoint
         build_store(env)
 
 
@@ -348,7 +348,7 @@ def iam(env: dict[str, str]) -> dict[str, str]:
     """``env`` in the ``iam`` mode, with no key file."""
     return changed(
         env,
-        {"ANALYSIS_OBJECT_CREDENTIALS": "iam", **dict.fromkeys(S3_KEY_FILES.values())},
+        {"KATRA_OBJECT_CREDENTIALS": "iam", **dict.fromkeys(S3_KEY_FILES.values())},
     )
 
 
@@ -419,7 +419,7 @@ class TestTheStartupCheck:
     refusal stops it."""
 
     def test_a_missing_bucket(self, env):
-        env["ANALYSIS_OBJECT_BUCKET"] = "jobs-missing"
+        env["KATRA_OBJECT_BUCKET"] = "jobs-missing"
         with pytest.raises(StoreConfigError, match="'jobs-missing' does not exist"):
             start(env)
 
@@ -431,7 +431,7 @@ class TestTheStartupCheck:
     def test_an_endpoint_the_service_cannot_reach(self, env, monkeypatch):
         # One attempt and no retries, so the test does not wait for a back-off.
         monkeypatch.setenv("AWS_MAX_ATTEMPTS", "1")
-        env["ANALYSIS_OBJECT_ENDPOINT"] = "https://127.0.0.1:9"
+        env["KATRA_OBJECT_ENDPOINT"] = "https://127.0.0.1:9"
         with pytest.raises(StoreConfigError, match="EndpointConnectionError"):
             start(env)
 
@@ -440,7 +440,7 @@ class TestTheStartupCheck:
         """A delete there keeps each object as an older version (#1816)."""
         client = boto3.Session(**TEST_KEYS).client("s3", region_name=TEST_REGION)
         client.put_bucket_versioning(
-            Bucket=env["ANALYSIS_OBJECT_BUCKET"],
+            Bucket=env["KATRA_OBJECT_BUCKET"],
             VersioningConfiguration={"Status": status},
         )
         with pytest.raises(StoreConfigError, match=f"has versioning {status},"):
@@ -513,9 +513,9 @@ async def every_call(objects: ObjectStore) -> int:
 def test_without_boto3_the_startup_names_the_aws_extra(tmp_path, monkeypatch):
     """The image without the ``aws`` extra: ``boto3`` cannot be imported."""
     monkeypatch.setitem(sys.modules, "boto3", None)
-    monkeypatch.delitem(sys.modules, "analysis_service.s3_objects", raising=False)
-    env = {"ANALYSIS_OBJECT_STORE": "s3"}
-    with pytest.raises(StoreConfigError, match=r"install analysis-service\[aws\]"):
+    monkeypatch.delitem(sys.modules, "katra.s3_objects", raising=False)
+    env = {"KATRA_OBJECT_STORE": "s3"}
+    with pytest.raises(StoreConfigError, match=r"install katra\[aws\]"):
         build_object_store(env)
 
 

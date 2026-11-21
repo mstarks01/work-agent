@@ -6,7 +6,7 @@ the drafts are ``<case>.drafts.json``, and every ruling the critic made is
 still in the report, because each ruled claim carries its own verdict and the
 fields its package's ruling declares. :func:`rulings_from_report` rebuilds
 them, and :func:`replay_case` asks the
-:class:`~analysis_service.critic_round.CriticRound` for its outcome over the
+:class:`~katra.critic_round.CriticRound` for its outcome over the
 pair, as the ``assemble`` node does.
 
 **What it answers.** Two questions, both about the code between the critic
@@ -74,19 +74,6 @@ from typing import Any, Literal, NamedTuple, get_args
 
 from pydantic import ValidationError
 
-from analysis_service.claims import (
-    AnalysisMarks,
-    Claim,
-    FrameworkAnalysis,
-    FrameworkName,
-    Ruling,
-    quote_check_ran,
-)
-from analysis_service.critic_round import CriticRound, Failed
-from analysis_service.errors import error_place
-from analysis_service.fan_in import drop_duplicate_ids, returned_to_deferred
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import (
     EvalArtifact,
     ProvenanceError,
@@ -99,6 +86,19 @@ from evals.harness.history import current_commit
 from evals.harness.modes import REPORTING_MODES, EvalRunError
 from evals.harness.provenance import REPO_ROOT
 from evals.harness.reference import GoldenCase, development_cases, load_corpus
+from katra.claims import (
+    AnalysisMarks,
+    Claim,
+    FrameworkAnalysis,
+    FrameworkName,
+    Ruling,
+    quote_check_ran,
+)
+from katra.critic_round import CriticRound, Failed
+from katra.errors import error_place
+from katra.fan_in import drop_duplicate_ids, returned_to_deferred
+from katra.frameworks import PACKAGES, schemas_for
+from katra.system_model import SystemModel
 
 
 def ruling_type(framework: FrameworkName) -> type[Ruling]:
@@ -112,7 +112,7 @@ class ArchivedRulingError(ValueError):
 
     A report reads the shapes its archive holds, and a ruling record holds
     only what a critic may write today: a claim rejected as ``duplicate``
-    (ADR 0059) rebuilds a ruling that :class:`~analysis_service.claims.ProposedVerdict`
+    (ADR 0059) rebuilds a ruling that :class:`~katra.claims.ProposedVerdict`
     refuses.
     """
 
@@ -393,7 +393,7 @@ class AssemblySweep(NamedTuple):
 
     rows: list[AssemblyReplay]
     #: One line for each finished case whose report today's
-    #: :class:`~analysis_service.report.Report` refuses. That case has no
+    #: :class:`~katra.report.Report` refuses. That case has no
     #: block to replay, and the other cases replay.
     unreadable: list[str]
     #: One line for each case whose report or drafts file the archive lacks,

@@ -15,23 +15,23 @@ from types import MappingProxyType
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
     Subject,
     SupportSpan,
 )
-from analysis_service.candidates import generate_candidates
-from analysis_service.frameworks import (
+from katra.candidates import generate_candidates
+from katra.frameworks import (
     PACKAGES,
     FrameworkPackageError,
     NoRule,
     unprojected_predicates,
     validate_package,
 )
-from analysis_service.sources import text_digest
-from analysis_service.system_model import UNKNOWN
+from katra.sources import text_digest
+from katra.system_model import UNKNOWN
 from tests.factories import PROJECT_ROOT, valid_model
 
 STRIDE = PACKAGES["stride"]

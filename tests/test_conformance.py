@@ -14,7 +14,7 @@ answer, and running them together is what produced the imbalance
 
 Everything below is **credential-free**. The capability probes read the pinned
 ``litellm``'s local model-cost map, and the binding assertions hand
-:func:`~analysis_service.binding.build_tier_adapters` a synthetic environment —
+:func:`~katra.binding.build_tier_adapters` a synthetic environment —
 the registry checks that a credential was *declared*, never that it
 authenticates, so a placeholder builds a real adapter without a key and without
 egress. That is what lets one suite cover every vendor equally
@@ -39,9 +39,9 @@ from typing import Any, ClassVar
 import pytest
 from google.adk.models.base_llm import BaseLlm
 
-from analysis_service.binding import NodeBinding, build_tier_adapters
-from analysis_service.compact import FULL_FORMAT
-from analysis_service.conformance import (
+from katra.binding import NodeBinding, build_tier_adapters
+from katra.compact import FULL_FORMAT
+from katra.conformance import (
     PROBED_PARAMS,
     REFERENCE_MODELS,
     ProviderCapability,
@@ -50,14 +50,14 @@ from analysis_service.conformance import (
     reference_matrix,
     render_markdown,
 )
-from analysis_service.frameworks.stride.record import ThreatProposals, ThreatRulings
-from analysis_service.graph import ENTRY_EXTRACT, Pipeline, build_pipeline
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.model_gate import ModelGateError
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import load_sampling
-from analysis_service.system_model import SystemModel
-from analysis_service.vendors import (
+from katra.frameworks.stride.record import ThreatProposals, ThreatRulings
+from katra.graph import ENTRY_EXTRACT, Pipeline, build_pipeline
+from katra.markdown_loader import MarkdownLoader
+from katra.model_gate import ModelGateError
+from katra.resilience import load_resilience
+from katra.sampling import load_sampling
+from katra.system_model import SystemModel
+from katra.vendors import (
     VENDOR_NAMES,
     CredentialMode,
     ProviderAuthError,
@@ -331,9 +331,9 @@ class TestTheMatrixItself:
         so the test sees a refusal even on a pin where every reference pair
         binds.
         """
-        from analysis_service.ladder import rungs_for
-        from analysis_service.model_gate import ModelGateError
-        from analysis_service.sampling import TierSampling
+        from katra.ladder import rungs_for
+        from katra.model_gate import ModelGateError
+        from katra.sampling import TierSampling
 
         constrained = TierSampling(constrain_output=True, structured_output="native")
 
@@ -442,8 +442,7 @@ class TestModelsCanBeBound:
         expected = entry.reports_charge or not entry.routes_to_one_provider
         for tier, adapter in adapters.items():
             captures = (
-                type(translator_of(adapter).llm_client).__module__
-                == "analysis_service.charges"
+                type(translator_of(adapter).llm_client).__module__ == "katra.charges"
             )
             assert captures is expected, (
                 f"{vendor} {tier} binds a client that"
@@ -456,7 +455,7 @@ class TestModelsCanBeBound:
         """One adapter class for all three, which is the no-privileged-path claim.
 
         ADK ships a native Gemini integration and warns on every run that this
-        service declines it (:mod:`analysis_service.binding` says so in its own
+        service declines it (:mod:`katra.binding` says so in its own
         header). Declining it is what makes "no vendor is privileged" true, and
         prose cannot hold that: a native path reintroduced for one vendor would
         leave every other assertion here passing, because the model strings,
@@ -466,11 +465,11 @@ class TestModelsCanBeBound:
         no vendor has a route the others lack — and the shared class is where
         the pinned ``num_retries=0`` and the credential gate live, so a vendor
         that escaped it would escape those too. The retry budget is one level
-        out, on the :class:`~analysis_service.provider.ExecutedLlm` every tier
+        out, on the :class:`~katra.provider.ExecutedLlm` every tier
         is bound to, and ``tests/test_deployment.py`` is what holds that.
 
         The comparison is on the *ancestry* rather than the class object:
-        :func:`~analysis_service.charges.charge_reporting_llm_class` mints one
+        :func:`~katra.charges.charge_reporting_llm_class` mints one
         subclass per call, so two identically-wired translators are never the
         same class. What must match is everything behind that subclass.
         """
@@ -499,7 +498,7 @@ class TestModelsCanBeBound:
                 tier: tuple(
                     ancestor
                     for ancestor in type(translator_of(adapter)).__mro__
-                    if not ancestor.__module__.startswith("analysis_service.")
+                    if not ancestor.__module__.startswith("katra.")
                 )
                 for tier, adapter in adapters.items()
             }
@@ -552,7 +551,7 @@ class TestUnsupportedParamsAreHandledClearly:
         accepts is what is allowed to differ.
         """
         sampling = load_sampling(
-            CONFIG / "sampling.toml", env={"ANALYSIS_SAMPLING_BASE_SEED": "7"}
+            CONFIG / "sampling.toml", env={"KATRA_SAMPLING_BASE_SEED": "7"}
         )
         with pytest.raises(ModelGateError) as raised:
             build_tier_adapters(
@@ -571,7 +570,7 @@ class TestUnsupportedParamsAreHandledClearly:
         restriction rather than reporting one.
         """
         sampling = load_sampling(
-            CONFIG / "sampling.toml", env={"ANALYSIS_SAMPLING_BASE_SEED": "7"}
+            CONFIG / "sampling.toml", env={"KATRA_SAMPLING_BASE_SEED": "7"}
         )
         adapters = build_tier_adapters(
             tiers_for("vertex"),
@@ -826,7 +825,7 @@ class TestTheLiveLanesSweepWhatWasProfiled:
     @pytest.mark.parametrize(
         ("line", "value"),
         [
-            ("      ANALYSIS_MODEL_BASE_MODEL: gemini-2.5-flash", "gemini-2.5-flash"),
+            ("      KATRA_MODEL_BASE_MODEL: gemini-2.5-flash", "gemini-2.5-flash"),
             ("          - vendor: anthropic", "anthropic"),
             ('            base_model: "gpt-4o"', "gpt-4o"),
             ("            base_model: 'gpt-4o'", "gpt-4o"),
@@ -952,15 +951,15 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
     # One row of the First-Run table: the vendor's display name, the two
     # backticked models, and the credentials cell. The vendor is read from the
     # credentials cell rather than the display name, because "Vertex AI" is
-    # prose and ``ANALYSIS_VERTEX_...`` is the registry's own spelling.
+    # prose and ``KATRA_VERTEX_...`` is the registry's own spelling.
     _ROW = re.compile(
         r"^\|[^|]+\|\s*`(?P<base>[^`]+)`\s*\|\s*`(?P<strong>[^`]+)`\s*\|"
-        r"\s*`ANALYSIS_(?P<vendor>[A-Z]+)_[^`]+`"
+        r"\s*`KATRA_(?P<vendor>[A-Z]+)_[^`]+`"
     )
 
     def test_the_first_run_table_is_the_registry(self):
         """The table says outright that it holds "the reference pairs declared
-        in ``analysis_service.conformance.REFERENCE_MODELS``". This is what
+        in ``katra.conformance.REFERENCE_MODELS``". This is what
         makes that sentence true rather than aspirational."""
         documented = {
             match["vendor"].lower(): (match["base"], match["strong"])
@@ -980,7 +979,7 @@ class TestTheDocumentedPairsAreTheProfiledPairs:
         """
         cells = {
             match["vendor"].lower(): tuple(
-                re.findall(r"`(ANALYSIS_[A-Z_]+)`", line.rsplit("|", 2)[1])
+                re.findall(r"`(KATRA_[A-Z_]+)`", line.rsplit("|", 2)[1])
             )
             for line in self.FIRST_RUN.read_text(encoding="utf-8").splitlines()
             if (match := self._ROW.match(line))
@@ -1192,8 +1191,8 @@ def test_the_probe_raises_that_type_and_no_other_across_the_map():
     """
     from litellm import model_cost
 
-    from analysis_service.model_gate import ModelGateError, check_supported
-    from analysis_service.vendors import REASONING_KWARG, VENDORS
+    from katra.model_gate import ModelGateError, check_supported
+    from katra.vendors import REASONING_KWARG, VENDORS
 
     prefixes = {v.litellm_provider: v for v in VENDORS.values()}
     probes = (("temperature", 0.5), ("seed", 7), (REASONING_KWARG, "low"))
@@ -1231,7 +1230,7 @@ def test_every_bedrock_reference_model_names_an_inference_profile():
     pair would have died on a ValidationException at the first live request —
     which is the answer
     [#626](https://github.com/mstarks01/work-agent/issues/626) asked for and
-    could not get, because nobody has provisioned ``ANALYSIS_BEDROCK_API_KEY``.
+    could not get, because nobody has provisioned ``KATRA_BEDROCK_API_KEY``.
 
     Named for one vendor because the fact is one vendor's, and the property is
     general: **a vendor may serve a model under an identifier its price table

@@ -27,24 +27,24 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service import graph
-from analysis_service.assertions import assertion_id
-from analysis_service.capabilities import resolve
-from analysis_service.claim_identity import (
+from katra import graph
+from katra.assertions import assertion_id
+from katra.capabilities import resolve
+from katra.claim_identity import (
     distinct_mechanisms,
     finding_key,
     mechanism_of,
 )
-from analysis_service.claims import AnalysisMarks, ProposedVerdict, Severity
-from analysis_service.compact import COMPACT_FORMAT
-from analysis_service.critic_round import CriticRound, Reask, rulings_of
-from analysis_service.evidence import evidence_catalog, ground_gloss
-from analysis_service.fan_in import join_drafts
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.asvs.record import RequirementProposal
-from analysis_service.graph import parse_extraction
-from analysis_service.system_model import ModelIndex, normalize_name
-from analysis_service.validation import IssueCode, parse_and_validate, validate
+from katra.claims import AnalysisMarks, ProposedVerdict, Severity
+from katra.compact import COMPACT_FORMAT
+from katra.critic_round import CriticRound, Reask, rulings_of
+from katra.evidence import evidence_catalog, ground_gloss
+from katra.fan_in import join_drafts
+from katra.frameworks import PACKAGES, schemas_for
+from katra.frameworks.asvs.record import RequirementProposal
+from katra.graph import parse_extraction
+from katra.system_model import ModelIndex, normalize_name
+from katra.validation import IssueCode, parse_and_validate, validate
 from tests import test_critic_controls as controls
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.source_tree import REPO_ROOT

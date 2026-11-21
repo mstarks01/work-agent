@@ -25,11 +25,11 @@ from pathlib import Path
 
 from pydantic import Field
 
-from analysis_service import graph
-from analysis_service.jobs import JobRecord
-from analysis_service.pipeline import AdkPipelineRunner
-from analysis_service.system_model import SystemModel
 from evals.harness.artifact import repo_commit
+from katra import graph
+from katra.jobs import JobRecord
+from katra.pipeline import AdkPipelineRunner
+from katra.system_model import SystemModel
 from tests.factories import ScriptedLlm, emitted, sample_selection, scripted_pipeline
 
 sys.path.insert(0, str(Path(__file__).parent))

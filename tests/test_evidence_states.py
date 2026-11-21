@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     UNKNOWN,
     Qualifier,
@@ -23,18 +23,18 @@ from analysis_service.assertions import (
     project,
     support_span,
 )
-from analysis_service.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
-from analysis_service.critic import assemble_claims
-from analysis_service.evidence import (
+from katra.claims import Ground, ProposedVerdict, Ruling, UnknownRef, Verdict
+from katra.critic import assemble_claims
+from katra.evidence import (
     absent_evidence_ref,
     evidence_catalog,
     ground_issues,
 )
-from analysis_service.fan_in import DraftJoinError, JoinedDrafts, join_drafts
-from analysis_service.frameworks import schemas_for
-from analysis_service.frameworks.stride import STRIDE
-from analysis_service.sources import ANSWERS_LABEL
-from analysis_service.system_model import DataStore, SystemModel
+from katra.fan_in import DraftJoinError, JoinedDrafts, join_drafts
+from katra.frameworks import schemas_for
+from katra.frameworks.stride import STRIDE
+from katra.sources import ANSWERS_LABEL
+from katra.system_model import DataStore, SystemModel
 from tests import test_assertions
 from tests.factories import sample_draft, sample_ruling, valid_model
 from tests.test_assertions import FLOW, stated

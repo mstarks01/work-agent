@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from analysis_service.claims import FrameworkName
-from analysis_service.frameworks import PACKAGES
-from analysis_service.report import FrameworkSelection
-from analysis_service.selection import SelectionError, resolve_names, resolve_selection
+from katra.claims import FrameworkName
+from katra.frameworks import PACKAGES
+from katra.report import FrameworkSelection
+from katra.selection import SelectionError, resolve_names, resolve_selection
 from tests.factories import sample_selection
 
 CARRIED = tuple(PACKAGES)

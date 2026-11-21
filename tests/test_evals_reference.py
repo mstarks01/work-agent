@@ -14,12 +14,6 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.claims import derive_severity_level
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES
-from analysis_service.report import InputRef
-from analysis_service.resilience import MAX_SOURCE_BYTES_VAR
-from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel, normalize_element_ids
 from evals import verify_corpus
 from evals.harness.identity import endpoint_form, endpoint_subset
 from evals.harness.reference import (
@@ -32,6 +26,12 @@ from evals.harness.reference import (
     load_corpus,
 )
 from evals.harness.sitting import moved
+from katra.claims import derive_severity_level
+from katra.frameworks.stride.record import STRIDE_CATEGORIES
+from katra.report import InputRef
+from katra.resilience import MAX_SOURCE_BYTES_VAR
+from katra.sources import Source
+from katra.system_model import SystemModel, normalize_element_ids
 
 CORPUS_DIR = Path(__file__).resolve().parents[1] / "evals" / "corpus"
 

@@ -7,7 +7,7 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.assertions import (
+from katra.assertions import (
     ABSENT,
     PROJECTION_VERSION,
     Assertion,
@@ -17,7 +17,7 @@ from analysis_service.assertions import (
     assertion_id,
     contradiction_issues,
 )
-from analysis_service.claims import (
+from katra.claims import (
     CLAIM_BOUND_MARKS,
     CLAIM_ID_MAX_CHARS,
     DROPPED_REASON_MAX_CHARS,
@@ -40,15 +40,15 @@ from analysis_service.claims import (
     Verdict,
     derive_severity_level,
 )
-from analysis_service.frameworks import PACKAGES, schemas_for
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks import PACKAGES, schemas_for
+from katra.frameworks.stride.record import (
     ThreatProposals,
     ThreatRulings,
     build_stride_summary,
 )
-from analysis_service.report import Report
-from analysis_service.sampling import TierSampling
-from analysis_service.system_model import all_attribute_names, attribute_names
+from katra.report import Report
+from katra.sampling import TierSampling
+from katra.system_model import all_attribute_names, attribute_names
 from tests.eval_factories import unreconciled
 from tests.factories import (
     sample_draft,
@@ -889,7 +889,7 @@ class TestAnalysisMarks:
     def test_every_mark_reaches_the_report(self):
         """A mark the report has no field for is dropped, and says nothing.
 
-        :func:`~analysis_service.graph._framework_block` spreads this value
+        :func:`~katra.graph._framework_block` spreads this value
         onto a block by walking the block's own fields, and keeps only what the
         block declares. That filter is right — a package that grades no harm
         carries no :class:`MissingMitigation` list — and it cannot tell a mark
@@ -901,9 +901,9 @@ class TestAnalysisMarks:
         from the registry rather than listed, so a package that arrives with a
         mark of its own is covered by this test existing.
         """
-        from analysis_service.claims import FrameworkAnalysis
-        from analysis_service.frameworks import SCHEMAS
-        from analysis_service.report import Report
+        from katra.claims import FrameworkAnalysis
+        from katra.frameworks import SCHEMAS
+        from katra.report import Report
 
         blocks = {FrameworkAnalysis, *(schemas.block for schemas in SCHEMAS.values())}
         lands = set(Report.model_fields)
@@ -1138,7 +1138,7 @@ class TestARulingRulesOnItsUnit:
     """#657: only an evidence rejection says the unit does not apply."""
 
     def _ruled(self, status, cause=None):
-        from analysis_service.claims import (
+        from katra.claims import (
             Ground,
             RuledClaim,
             Verdict,

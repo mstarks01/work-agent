@@ -37,7 +37,7 @@ its own record carries. A package that grades nothing declares no severity and
 digests less; a package nobody has written yet digests what it declares. This is
 the table-not-branch rule applied to a record instead of a registry, and
 ``tests/test_evals_content.py`` checks both tables against the shared types
-:mod:`analysis_service.claims` defines.
+:mod:`katra.claims` defines.
 
 Whitespace is the one thing normalised in the prose digest, because the page is
 HTML and HTML collapses it: two strings that render as one string must digest as
@@ -62,9 +62,9 @@ import unicodedata
 from collections.abc import Callable, Iterable
 from typing import Any
 
-from analysis_service.claims import Claim, Ground, Mitigation, Severity, Verdict
-from analysis_service.parsing import ascii_int
-from analysis_service.sources import text_digest
+from katra.claims import Claim, Ground, Mitigation, Severity, Verdict
+from katra.parsing import ascii_int
+from katra.sources import text_digest
 
 #: The version of the structural digest this build computes.
 STRUCTURAL_VERSION = 1
@@ -107,7 +107,7 @@ def _severity_parts(severity: Severity) -> tuple[str, ...]:
 #: nothing contributes nothing.
 #:
 #: ``tests/test_evals_content.py`` checks this against the judgement types
-#: :mod:`analysis_service.claims` defines, in both directions — a table nobody
+#: :mod:`katra.claims` defines, in both directions — a table nobody
 #: compares to its registry fails as quietly as a branch.
 STRUCTURAL_FIELDS: dict[str, Callable[[Any], tuple[str, ...]]] = {
     "verdict": _verdict_parts,
@@ -148,7 +148,7 @@ def _ground_parts(ground: Ground) -> tuple[str, ...]:
     longer span of the same sentence is making the same argument, and the
     grounding ladder already proves the span is present.
 
-    The referent comes from :attr:`~analysis_service.claims.Ground.referent`,
+    The referent comes from :attr:`~katra.claims.Ground.referent`,
     which is that question's one reader: the element a ground points at, or
     the term or the assertion it names where it points at none. A second
     ``or`` chain here read the same fields, so a branch carrying a new naming

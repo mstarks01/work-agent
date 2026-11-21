@@ -12,12 +12,12 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from analysis_service.frameworks.stride.record import DraftThreat
-from analysis_service.system_model import ModelIndex
 from evals.harness.identity import SubsetVerbIdentity
 from evals.harness.ledger import Ledger
 from evals.harness.reference import development_cases, load_corpus
 from evals.harness.scorer import score_case
+from katra.frameworks.stride.record import DraftThreat
+from katra.system_model import ModelIndex
 
 RUNS = (
     "evals/baselines/6bff717-gpt-5.6-terra-24dda4db/mstarks01-e32ad9c5.reports",

@@ -6,11 +6,11 @@ from urllib.parse import urlparse
 
 import pytest
 
-from analysis_service import graph
-from analysis_service.compact import FULL_FORMAT
-from analysis_service.protocol_defaults import PROTOCOL_DEFAULTS, with_protocol_defaults
-from analysis_service.system_model import UNKNOWN, Assumption
-from analysis_service.validation import validate
+from katra import graph
+from katra.compact import FULL_FORMAT
+from katra.protocol_defaults import PROTOCOL_DEFAULTS, with_protocol_defaults
+from katra.system_model import UNKNOWN, Assumption
+from katra.validation import validate
 from tests.factories import valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_graph import KEYS, FakeContext

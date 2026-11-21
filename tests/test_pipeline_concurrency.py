@@ -23,13 +23,13 @@ from google.adk.models.base_llm import BaseLlm
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 
-from analysis_service import graph
-from analysis_service.binding import NodeBinding
-from analysis_service.compact import FULL_FORMAT
-from analysis_service.jobs import JobRecord, PipelineCompleted
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.sampling import load_sampling
-from analysis_service.sources import Source
+from katra import graph
+from katra.binding import NodeBinding
+from katra.compact import FULL_FORMAT
+from katra.jobs import JobRecord, PipelineCompleted
+from katra.markdown_loader import MarkdownLoader
+from katra.sampling import load_sampling
+from katra.sources import Source
 from tests.factories import (
     BASE_MODEL,
     DEFAULT_FRAMEWORKS,

@@ -8,7 +8,7 @@ element and flow IDs are the IDs the prose defines, and the evidence catalog
 that code derives from it is the table the prose shows.
 
 The fan-in test then sends each lane's exemplar drafts through
-:func:`~analysis_service.fan_in.fan_in`, with the inputs the prepare step
+:func:`~katra.fan_in.fan_in`, with the inputs the prepare step
 computes for that model. Each check that the fan-in runs on lane output covers
 the exemplars too, with no lint for each rule.
 """
@@ -18,15 +18,15 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.claims import AnalysisMarks
-from analysis_service.evidence import evidence_catalog, render_catalog
-from analysis_service.fan_in import DraftJoinError, fan_in
-from analysis_service.frameworks import PACKAGES, run_precondition, schemas_for
-from analysis_service.graph import FrameworkNodes, framework_lane_inputs
-from analysis_service.prompts import lane_exemplars_doc
-from analysis_service.system_model import SystemModel
-from analysis_service.validation import validate
 from evals.harness.exemplar_verbs import proposal_type
+from katra.claims import AnalysisMarks
+from katra.evidence import evidence_catalog, render_catalog
+from katra.fan_in import DraftJoinError, fan_in
+from katra.frameworks import PACKAGES, run_precondition, schemas_for
+from katra.graph import FrameworkNodes, framework_lane_inputs
+from katra.prompts import lane_exemplars_doc
+from katra.system_model import SystemModel
+from katra.validation import validate
 from tests.test_capability_reader import WIDEST_OPTIONS
 from tests.test_prompt_lints import (
     EXEMPLAR_LANES,

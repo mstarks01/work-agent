@@ -36,7 +36,7 @@ RECORD_WITH_A_GUIDE = (
 FIX_WITH_A_ROW = (
     "evals/experiments/QA-2026-10-14-03.jsonl",
     "evals/experiments/QA-2026-10-14-03.md",
-    "src/analysis_service/capabilities.py",
+    "src/katra/capabilities.py",
     "tests/test_capabilities.py",
 )
 
@@ -58,9 +58,7 @@ def test_a_record_pull_request_passes(paths: tuple[str, ...]) -> None:
 
 
 def test_a_fix_that_carries_a_ledger_row_fails() -> None:
-    assert code_beside_ledger(FIX_WITH_A_ROW) == (
-        "src/analysis_service/capabilities.py",
-    )
+    assert code_beside_ledger(FIX_WITH_A_ROW) == ("src/katra/capabilities.py",)
     assert run(FIX_WITH_A_ROW) == 1
 
 

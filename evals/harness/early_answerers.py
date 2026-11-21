@@ -32,7 +32,7 @@ how the list moves.
 
 **The order without the effects is the shipped code with one reader stubbed.**
 ``answer_state.capability_effects`` answers with no effect, so
-:func:`~analysis_service.answer_state.recommended` breaks a tie by the
+:func:`~katra.answer_state.recommended` breaks a tie by the
 question's place in the early list. Everything else, the limits, the floors, the turns and the
 parts that wait on a parent, is the shipped code.
 """
@@ -51,24 +51,24 @@ from pathlib import Path
 from typing import Any, cast
 from unittest import mock
 
-from analysis_service import answer_state
-from analysis_service.answer_forms import YesNo
-from analysis_service.answer_sets import SentAnswers
-from analysis_service.answer_state import Answers, AnswerState, SavedAnswers
-from analysis_service.capabilities import Presence, lineage
-from analysis_service.claims import FrameworkName, UnknownKey
-from analysis_service.early_questions import EarlyQuestion
-from analysis_service.fact_answers import FactAnswer, SkipKey, key_ref
-from analysis_service.fact_writes import answered_model
-from analysis_service.frameworks import PACKAGES
-from analysis_service.open_facts import prepared_model
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
 from evals.harness.bundle import read_report
 from evals.harness.early_policies import Needs, Selection, needs_of, paired
 from evals.harness.early_rounds import dont_know, paused_state
 from evals.harness.rule_applicability import TRUTH_ANSWERS, load_fixtures
 from evals.harness.run_record import run_record
+from katra import answer_state
+from katra.answer_forms import YesNo
+from katra.answer_sets import SentAnswers
+from katra.answer_state import Answers, AnswerState, SavedAnswers
+from katra.capabilities import Presence, lineage
+from katra.claims import FrameworkName, UnknownKey
+from katra.early_questions import EarlyQuestion
+from katra.fact_answers import FactAnswer, SkipKey, key_ref
+from katra.fact_writes import answered_model
+from katra.frameworks import PACKAGES
+from katra.open_facts import prepared_model
+from katra.report import Report
+from katra.system_model import SystemModel
 
 #: The submitter effort, in choices, at which each walk is read.
 BUDGETS = (5, 10, 20)

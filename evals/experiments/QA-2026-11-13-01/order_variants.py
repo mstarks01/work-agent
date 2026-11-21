@@ -27,10 +27,7 @@ from itertools import groupby
 from pathlib import Path
 from unittest import mock
 
-import analysis_service.early_questions as early_module
-from analysis_service import answer_state
-from analysis_service.frameworks import PACKAGES
-from analysis_service.question_kinds import parse_question_kind
+import katra.early_questions as early_module
 from evals.harness.early_policies import (
     BUDGETS,
     _each,
@@ -40,6 +37,9 @@ from evals.harness.early_policies import (
     sweep,
 )
 from evals.harness.run_record import run_record
+from katra import answer_state
+from katra.frameworks import PACKAGES
+from katra.question_kinds import parse_question_kind
 
 SHIPPED_READS = early_module.reads
 ASVS_LANES = frozenset(PACKAGES["asvs"].lanes)

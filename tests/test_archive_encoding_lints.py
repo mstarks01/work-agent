@@ -40,13 +40,13 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.report import Report
 from evals.harness.archive import (
     ARCHIVE_SPELLINGS,
     UnknownArchiveKind,
     archive_bytes,
     kind_of,
 )
+from katra.report import Report
 
 pytestmark = pytest.mark.lint
 

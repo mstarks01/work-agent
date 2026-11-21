@@ -1,7 +1,7 @@
 """What a sweep's execution identities were, serialized so promotion can reuse them.
 
 A blessed fingerprint is the sha256 of a versioned **Execution Identity**; see
-:mod:`analysis_service.identity`. Its parts are observations. The served build
+:mod:`katra.identity`. Its parts are observations. The served build
 is read back off each response. The sampling is what the deployment resolved
 after env overrides. The instruction digest is what the built graph carried. The
 build map is what was installed. None of them is recoverable from the configured
@@ -24,13 +24,13 @@ record: one entry per node execution, carrying the tier it ran on, what was
 requested, what answered, and the hash that pair produced. Everything else here
 is derived from it — the per-tier summary a reader greps for, and the
 node-to-fingerprint observation map
-:func:`~analysis_service.certification.certify` rules on. The summary is written
+:func:`~katra.certification.certify` rules on. The summary is written
 into the artifact for legibility, and re-derived rather than read back on load.
 A stored summary that disagrees with the per-node record is a corrupted artifact
 rather than a second opinion (OWASP A08).
 
 The resolved sampling is stored once per tier rather than per execution, which
-mirrors the clear block a :class:`~analysis_service.report.Report` already
+mirrors the clear block a :class:`~katra.report.Report` already
 carries. A fingerprint recomputes from a node's two routes, plus its tier's
 block and the two per-sweep fields. Repeating any of them on every execution
 would be the same fact twelve times over, free to drift.
@@ -57,13 +57,13 @@ from pydantic import (
     model_validator,
 )
 
-from analysis_service.certification import CertificationError, TierResolver
-from analysis_service.charges import UPSTREAM_MAX_CHARS
-from analysis_service.identity import IDENTITY_VERSION, execution_fingerprint
-from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.parsing import Sha256Hex
-from analysis_service.report import NodeRun
-from analysis_service.sampling import SamplingConfig, TierSampling
+from katra.certification import CertificationError, TierResolver
+from katra.charges import UPSTREAM_MAX_CHARS
+from katra.identity import IDENTITY_VERSION, execution_fingerprint
+from katra.model_tiers import TIER_NAMES, TierName
+from katra.parsing import Sha256Hex
+from katra.report import NodeRun
+from katra.sampling import SamplingConfig, TierSampling
 
 #: The checkout this harness is part of. Every reader of the tree's identity
 #: asks about this directory, so the commit an artifact stops on and the tree
@@ -95,7 +95,7 @@ class NodeExecution(BaseModel):
     substituting the requested route where the served build is unknown is
     exactly the silent weakening certification exists to prevent. A node
     execution without a served build carries no fingerprint either (see
-    :class:`~analysis_service.report.NodeRun`), so it is absent from this record
+    :class:`~katra.report.NodeRun`), so it is absent from this record
     rather than present with a hole in it.
 
     ``tier`` is resolved once, here, from the deployment's node -> tier walk.
@@ -114,7 +114,7 @@ class NodeExecution(BaseModel):
     identity. Every other field feeds a fingerprint or keys the record; this one
     is evidence a gateway volunteered about which organisation answered, and it
     is recorded so a reader can see a spread that no identity captures. It never
-    enters a hash — see :class:`~analysis_service.report.NodeRun`.
+    enters a hash — see :class:`~katra.report.NodeRun`.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -269,7 +269,7 @@ class RunProvenance(BaseModel):
         )
 
     def observations(self) -> dict[str, frozenset[str]]:
-        """The node -> fingerprint sets :func:`~analysis_service.certification.certify` rules on.
+        """The node -> fingerprint sets :func:`~katra.certification.certify` rules on.
 
         Derived here rather than folded alongside during the sweep, so the
         verdict and the artifact cannot be computed from two different walks of
@@ -321,7 +321,7 @@ class RunProvenance(BaseModel):
         """Recompute every recorded fingerprint; raise on the first that differs.
 
         The serialized hash is never the input to a promotion — the canonical
-        :func:`~analysis_service.identity.execution_fingerprint` recomputes it
+        :func:`~katra.identity.execution_fingerprint` recomputes it
         from the recorded identity. This check is what makes the stored value
         evidence rather than an assertion: an artifact whose hash does not follow
         from the identity beside it is refused, so a hand-edited fingerprint
@@ -440,7 +440,7 @@ def tree_identity(root: Path | None = None) -> str:
 
     Empty where there is no checkout to ask — an installed copy, or a tree
     without ``git`` — so an artifact never carries a guess. Read once per sweep,
-    beside :func:`~analysis_service.identity.build_identity`, because the two
+    beside :func:`~katra.identity.build_identity`, because the two
     answer different questions: the build names a release, and this names the
     exact tree a release does not.
     """
@@ -476,7 +476,7 @@ def provenance_of(
     ``tier_of`` is: it is the sweep's own observation, and re-reading it here
     would let the record describe something other than what produced the
     fingerprints beside it. The instruction digest is not passed at all — it
-    rides on each :class:`~analysis_service.report.NodeRun`, because this flat
+    rides on each :class:`~katra.report.NodeRun`, because this flat
     list spans every graph the sweep built and a lookup by node name could not
     tell two of them apart.
     """

@@ -135,7 +135,7 @@ a measured change, so fold it into the change or say why it stays.
 `references/experiment-protocol.md` holds the ladder. Stop at the rung the
 claim needs: a correctness claim is finished by a reproduction, a regression
 test through the production function and the affected consumers. Set
-`ANALYSIS_OFFLINE=1` for every offline step, so a call that would reach a
+`KATRA_OFFLINE=1` for every offline step, so a call that would reach a
 provider fails instead. Propose paid work only with the eight answers that
 file lists under "Before you propose paid work".
 

@@ -14,11 +14,11 @@ readings:
   the reference's place and a candidate in the lane's captured
   ``<case>.lanes.json``, or ``absent``.
 * ``same_leads``: whether the captured and the rebuilt candidate sets hold the
-  same :func:`~analysis_service.candidates.leads`. A lead is a lane, a rule
+  same :func:`~katra.candidates.leads`. A lead is a lane, a rule
   and elements only, so a candidate's facts and a rule's question text are not
   part of this reading.
 * ``same_lane_artifacts``: whether the lane's captured artifacts (each
-  :data:`~analysis_service.graph.LaneArtifact`) are, byte for byte, the ones
+  :data:`~katra.graph.LaneArtifact`) are, byte for byte, the ones
   that :func:`~evals.harness.triggers.rebuilt_lane_inputs` writes today. A
   changed fact or question text reads ``differs`` here. The lane's other
   inputs have no rebuild from the archive, and
@@ -76,26 +76,6 @@ from typing import Any, Literal, get_args
 
 from pydantic import ValidationError
 
-from analysis_service.analysis import control_state
-from analysis_service.assertions import (
-    SETTLING_REASONS,
-    Assertion,
-    ProjectedField,
-    Projection,
-    assertion_id,
-    project,
-    projected_attribute,
-)
-from analysis_service.candidates import CandidateSet, leads
-from analysis_service.evidence import catalog_refs
-from analysis_service.graph import (
-    STATE_EVIDENCE_CATALOG,
-    STATE_SYSTEM_MODEL,
-    LaneArtifact,
-    unfence,
-)
-from analysis_service.report import Report
-from analysis_service.system_model import Element
 from evals.harness.artifact import EvalArtifact
 from evals.harness.bundle import finished_file, read_report, stride_block
 from evals.harness.identity import CaseFlows
@@ -125,6 +105,26 @@ from evals.harness.scorecard import (
     charged_misses,
 )
 from evals.harness.triggers import archived_lead_rules, rebuilt_lane_inputs
+from katra.analysis import control_state
+from katra.assertions import (
+    SETTLING_REASONS,
+    Assertion,
+    ProjectedField,
+    Projection,
+    assertion_id,
+    project,
+    projected_attribute,
+)
+from katra.candidates import CandidateSet, leads
+from katra.evidence import catalog_refs
+from katra.graph import (
+    STATE_EVIDENCE_CATALOG,
+    STATE_SYSTEM_MODEL,
+    LaneArtifact,
+    unfence,
+)
+from katra.report import Report
+from katra.system_model import Element
 
 #: How the closest candidate stands to the reference's place, or ``absent``
 #: where no candidate in the lane shares an element with it.
@@ -253,7 +253,7 @@ def trace_lane(
 #: is the report's catalog, joined to the signed row through
 #: :func:`~evals.harness.replay.replay_assertions`. The projected model is the
 #: report's ``system_model``, read at the field
-#: :func:`~analysis_service.assertions.projected_attribute` names. The lane
+#: :func:`~katra.assertions.projected_attribute` names. The lane
 #: system model and the lane evidence catalog are the shared keys the sweep
 #: captured, and the candidate facts are the captured lane's candidates.
 PlaceStage = Literal[

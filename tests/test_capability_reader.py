@@ -11,22 +11,22 @@ from typing import Literal
 
 import pytest
 
-from analysis_service import frameworks, graph
-from analysis_service.budgets import llm_calls_for
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.capability_reader import (
+from katra import frameworks, graph
+from katra.budgets import llm_calls_for
+from katra.capabilities import CAPABILITIES
+from katra.capability_reader import (
     CapabilityReading,
     CapabilityRow,
     with_stated_capabilities,
 )
-from analysis_service.claims import ApplicabilityEntry, FrameworkName
-from analysis_service.frameworks import PACKAGES, reads_capabilities
-from analysis_service.jobs import JobRecord, PipelineAwaiting
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.report import FrameworkSelection
-from analysis_service.sources import ANSWERS_LABEL, DEFAULT_DESCRIPTION_LABEL, Source
-from analysis_service.system_model import CapabilityStatement, SystemModel
+from katra.claims import ApplicabilityEntry, FrameworkName
+from katra.frameworks import PACKAGES, reads_capabilities
+from katra.jobs import JobRecord, PipelineAwaiting
+from katra.markdown_loader import MarkdownLoader
+from katra.prompts import compose_capabilities_prompt
+from katra.report import FrameworkSelection
+from katra.sources import ANSWERS_LABEL, DEFAULT_DESCRIPTION_LABEL, Source
+from katra.system_model import CapabilityStatement, SystemModel
 from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,

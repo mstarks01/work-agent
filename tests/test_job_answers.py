@@ -1,7 +1,7 @@
 """The job answer operations: one store in, saved answers, a started job or a
 typed refusal out.
 
-These tests drive :class:`~analysis_service.job_answers.JobAnswers` over an
+These tests drive :class:`~katra.job_answers.JobAnswers` over an
 in-memory store and a stub runner, with no route between the test and the
 rule. The ``/v1`` route tests hold the HTTP mapping of each refusal.
 """
@@ -16,19 +16,19 @@ from uuid import UUID
 
 import pytest
 
-from analysis_service import budgets
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.answer_state import (
+from katra import budgets
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.answer_state import (
     AlreadyResumed,
     Answers,
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.claims import FrameworkName, UnknownRef
-from analysis_service.errors import ConfigError
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.fact_writes import LineageConflict, check_fact_answers
-from analysis_service.job_answers import (
+from katra.claims import FrameworkName, UnknownRef
+from katra.errors import ConfigError
+from katra.fact_answers import FactAnswer
+from katra.fact_writes import LineageConflict, check_fact_answers
+from katra.job_answers import (
     OWNER_FILE_GONE,
     AnswersSaved,
     DraftSaved,
@@ -42,12 +42,12 @@ from analysis_service.job_answers import (
     Started,
     Submission,
 )
-from analysis_service.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
-from analysis_service.links import LinkAnswer
-from analysis_service.owner_files import OwnerFile
-from analysis_service.report import FrameworkSelection
-from analysis_service.selection import SelectionError
-from analysis_service.sources import ANSWERS_LABEL, Source, SourceLimits
+from katra.jobs import InMemoryJobStore, JobRecord, StubPipelineRunner
+from katra.links import LinkAnswer
+from katra.owner_files import OwnerFile
+from katra.report import FrameworkSelection
+from katra.selection import SelectionError
+from katra.sources import ANSWERS_LABEL, Source, SourceLimits
 from tests.factories import (
     SEEDING_BUDGET,
     admit,
@@ -606,7 +606,7 @@ class TestTheOneAdmission:
         store = InMemoryJobStore()
 
         def unconfigured(selection, entry):
-            raise ConfigError("ANALYSIS_TIERS_FILE is unset")
+            raise ConfigError("KATRA_TIERS_FILE is unset")
 
         record = JobRecord.create(
             assertion_pass=True,
@@ -648,7 +648,7 @@ class TestTheOneAdmission:
 
 
 def valid_model_sources():
-    from analysis_service.sources import Source
+    from katra.sources import Source
     from tests.factories import DESCRIPTION_TEXT
 
     return [Source.description(DESCRIPTION_TEXT, label="overview")]
@@ -683,7 +683,7 @@ class TestAContradictionIsNamed:
         assert Refused("refused").fields() == {}
 
     def test_both_drivers_add_the_same_field_to_the_body(self):
-        from analysis_service import api
+        from katra import api
         from webapp import main
 
         refused = Refused("refused", (self.PART, self.ANCESTOR))

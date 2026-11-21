@@ -20,8 +20,8 @@ from collections.abc import Callable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Any, Literal
 
-from analysis_service import Report
-from analysis_service.claims import (
+from katra import Report
+from katra.claims import (
     REJECTION_MEANINGS,
     VERDICT_LABELS,
     Claim,
@@ -29,9 +29,9 @@ from analysis_service.claims import (
     Severity,
     Verdict,
 )
-from analysis_service.frameworks import lane_of
-from analysis_service.job_controls import RULING_LISTS, SectionEntry, section_summary
-from analysis_service.open_facts import element_names
+from katra.frameworks import lane_of
+from katra.job_controls import RULING_LISTS, SectionEntry, section_summary
+from katra.open_facts import element_names
 
 #: The characters that start Markdown markup or an HTML tag inline.
 _MARKUP = re.compile(r"([\\`*_\[\]<>#|!~&])")

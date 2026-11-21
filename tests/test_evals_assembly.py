@@ -15,15 +15,15 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from analysis_service import graph
-from analysis_service.assertions import AssertionCatalog, AssertionRecord
-from analysis_service.claims import CLAIM_BOUND_MARKS, Severity, Verdict
-from analysis_service.report import Report
 from evals.harness import assembly
 from evals.harness.artifact import RepoCommit, load_artifact
 from evals.harness.bundle import reports_dir
 from evals.harness.reference import load_case
 from evals.harness.run import main
+from katra import graph
+from katra.assertions import AssertionCatalog, AssertionRecord
+from katra.claims import CLAIM_BOUND_MARKS, Severity, Verdict
+from katra.report import Report
 from tests.factories import repo_package_loaders, valid_model
 from tests.source_tree import REPO_ROOT
 from tests.test_assertion_use import ABSENCE, SHOPPERS

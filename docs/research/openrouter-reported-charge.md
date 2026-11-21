@@ -15,7 +15,7 @@ arithmetic that priced the run has no rate to multiply by either.
 OpenRouter reports what it charged. Two claims stood between that figure and
 this repository's record, and neither could be settled offline: whether the
 figure arrives at all, and whether litellm files it where
-`analysis_service.charges` looks.
+`katra.charges` looks.
 
 ## The answer: it arrives, and the record keeps it
 
@@ -33,7 +33,7 @@ The last row is what `NodeRun.reported_charge_usd` is read from, so the figure
 crossed every seam: OpenRouter to litellm, litellm to the capturing client, the
 client to the adapter, and the adapter to the executor.
 
-The bound tier's client was `analysis_service.charges.ChargeCapturingClient`,
+The bound tier's client was `katra.charges.ChargeCapturingClient`,
 which is the wiring decision made from the registry and the declared
 arrangement rather than from a vendor's name.
 
@@ -114,7 +114,7 @@ whole reported charge on every call and reports a cost of nothing.
 ## One trap, for whoever runs the probe next
 
 The service refuses a completion that stopped at `max_output_tokens`
-(`analysis_service.retry`), so a one-token call raises `TruncatedCompletionError`
+(`katra.retry`), so a one-token call raises `TruncatedCompletionError`
 after the provider has already charged for it. The smallest call this service
 will *accept* is one the model finishes on its own. The probe asks for a
 one-word reply under a cap of 16.

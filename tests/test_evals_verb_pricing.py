@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.actions import VerbError
 from evals import verify_corpus
 from evals.harness.artifact import load_artifact
 from evals.harness.bundle import runs_from_reports, stride_threats
 from evals.harness.calibration import load_pairs
 from evals.harness.reference import flows_by_case, load_corpus
 from evals.harness.verb_pricing import parse_groups, price
+from katra.actions import VerbError
 from tests.test_evals_identity import FRONTIER
 
 BASELINE_DIR = (

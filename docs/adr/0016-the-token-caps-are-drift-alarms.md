@@ -67,7 +67,7 @@ measurement in this repo says a shorter instruction finds more threats.
 against it. `envelope` returns to its one `GLOSSARY.md` meaning.
 
 **One table, keyed by asset kind: `TOKEN_CAPS` in
-`analysis_service.token_caps`.** Eight module constants across two modules become
+`katra.token_caps`.** Eight module constants across two modules become
 thirteen entries in one dictionary. The package half is keyed by *kind* rather
 than by package, so a framework nobody has written yet is already covered.
 

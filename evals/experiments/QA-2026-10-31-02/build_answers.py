@@ -5,14 +5,14 @@ yes or no. Run it as ``python build_answers.py <case> <out dir>``."""
 import sys
 from pathlib import Path
 
-from analysis_service.claims import UnknownRef
-from analysis_service.early_questions import QUESTION_PRIOR, element_type
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.links import with_link_answers
-from analysis_service.parsing import table_entry
-from analysis_service.question_kinds import QUESTION_KINDS
-from analysis_service.sources import Source, render_sources
-from analysis_service.system_model import SystemModel
+from katra.claims import UnknownRef
+from katra.early_questions import QUESTION_PRIOR, element_type
+from katra.fact_answers import FactAnswer
+from katra.links import with_link_answers
+from katra.parsing import table_entry
+from katra.question_kinds import QUESTION_KINDS
+from katra.sources import Source, render_sources
+from katra.system_model import SystemModel
 
 
 def main(case: str, out: Path) -> None:

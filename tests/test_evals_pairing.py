@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from analysis_service.frameworks.asvs.catalog import requirements_for
 from evals.harness.applicability import (
     APPLIED_CELLS,
     declared_level,
@@ -26,6 +25,7 @@ from evals.harness.pairing import (
     render,
     render_html,
 )
+from katra.frameworks.asvs.catalog import requirements_for
 from tests.eval_factories import corpus_case
 from tests.test_evals_applicability import CASE_ID, Block, Scoped, ruling
 

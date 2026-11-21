@@ -7,9 +7,9 @@ Start it from a clone::
 Its Settings page sets the models and the keys.
 
 It embeds the service in process: its jobs live in a service job store, and
-:mod:`analysis_service.job_answers` admits, stores and starts them for this
+:mod:`katra.job_answers` admits, stores and starts them for this
 app as it does for ``/v1``. The store is the one the service's backend
-settings select, and ``memory`` where ``ANALYSIS_JOB_STORE`` is unset. It does
+settings select, and ``memory`` where ``KATRA_JOB_STORE`` is unset. It does
 not go through the ``/v1`` HTTP surface, so it needs no bearer token and no
 CORS, and it runs real models against real prose, because there is no
 credential-free path here.
@@ -36,7 +36,7 @@ The security posture is deliberate throughout:
   be one this install carries, and a submitted option must satisfy that
   package's own options model, both before an engine exists. The form's
   checkboxes decide nothing: the one submission
-  (:meth:`~analysis_service.job_answers.JobAnswers.submit`) re-derives the
+  (:meth:`~katra.job_answers.JobAnswers.submit`) re-derives the
   selection from the carried list, so an invented name, a repeated one and a
   reordered pair are refused or normalised rather than reaching the graph.
 * The injection point is the whole trust boundary. A report carries the
@@ -131,51 +131,51 @@ from fastapi.responses import (
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from analysis_service import (
+from katra import (
     ConfigError,
     FrameworkName,
     FrameworkSelection,
     Report,
     Source,
 )
-from analysis_service.answer_bodies import (
+from katra.answer_bodies import (
     BodyRefused,
     read_amendment,
     read_answers,
     read_corrections,
 )
-from analysis_service.answer_forms import (
+from katra.answer_forms import (
     answer_choices,
     answer_form,
     answer_limit,
     answer_suggestions,
     facets_json,
 )
-from analysis_service.answer_shares import SharedAnswer
-from analysis_service.answer_state import (
+from katra.answer_shares import SharedAnswer
+from katra.answer_state import (
     ANSWER_LIMITS,
     AlreadyResumed,
     AnswerState,
     SourcesOverLimit,
     StaleRevision,
 )
-from analysis_service.api import (
+from katra.api import (
     JOB_REFUSAL_STATUS,
     FrameworkRequest,
     JobSubmission,
     max_body_bytes,
     max_control_body_bytes,
 )
-from analysis_service.assertions import FACET_ANSWERS
-from analysis_service.budgets import BudgetPolicy
-from analysis_service.certification import CertificationGate
-from analysis_service.claims import UNIT_VERDICT_WORDS, VERDICT_LABELS, UnknownKey
-from analysis_service.config_files import (
+from katra.assertions import FACET_ANSWERS
+from katra.budgets import BudgetPolicy
+from katra.certification import CertificationGate
+from katra.claims import UNIT_VERDICT_WORDS, VERDICT_LABELS, UnknownKey
+from katra.config_files import (
     SETTINGS_FILE,
     SettingsFileError,
     settings_dir,
 )
-from analysis_service.controls import (
+from katra.controls import (
     CONTROL_ID,
     CONTROL_ID_PATTERN,
     EVIDENCE_ID_PATTERN,
@@ -186,13 +186,13 @@ from analysis_service.controls import (
     EvidenceRefusal,
     evidence_too_large,
 )
-from analysis_service.critic import SEVERITY_ORDER
-from analysis_service.deployment import Deployment
-from analysis_service.diagrams import install_reader, reader_fault
-from analysis_service.element_hues import element_hues
-from analysis_service.engine import DEFAULT_CALLER
-from analysis_service.errors import refusal_text
-from analysis_service.fact_answers import (
+from katra.critic import SEVERITY_ORDER
+from katra.deployment import Deployment
+from katra.diagrams import install_reader, reader_fault
+from katra.element_hues import element_hues
+from katra.engine import DEFAULT_CALLER
+from katra.errors import refusal_text
+from katra.fact_answers import (
     FactAnswer,
     SkipKey,
     answer_facets,
@@ -201,9 +201,9 @@ from analysis_service.fact_answers import (
     fact_label,
     merged_facts,
 )
-from analysis_service.fixes import fixes_by_framework
-from analysis_service.frameworks import PACKAGES, package_for
-from analysis_service.job_answers import (
+from katra.fixes import fixes_by_framework
+from katra.frameworks import PACKAGES, package_for
+from katra.job_answers import (
     Answerable,
     DraftSaved,
     JobAnswers,
@@ -218,7 +218,7 @@ from analysis_service.job_answers import (
     UnreadableSchema,
     Withheld,
 )
-from analysis_service.job_controls import (
+from katra.job_controls import (
     RULING_LISTS,
     ControlScopeEntry,
     SectionEntry,
@@ -226,7 +226,7 @@ from analysis_service.job_controls import (
     controls_used,
     section_summary,
 )
-from analysis_service.job_state import (
+from katra.job_state import (
     JobState,
     NotContinuedReason,
     StoredRefusal,
@@ -236,7 +236,7 @@ from analysis_service.job_state import (
     waits_for_answers,
     why_not_continued,
 )
-from analysis_service.jobs import (
+from katra.jobs import (
     DeleteRefusal,
     Envelope,
     JobEvent,
@@ -251,18 +251,18 @@ from analysis_service.jobs import (
     parent_of,
     readable,
 )
-from analysis_service.links import (
+from katra.links import (
     LinkAnswer,
     components,
     fold_principal,
 )
-from analysis_service.mermaid import styled_mermaid
-from analysis_service.model_tiers import ModelTierConfig
-from analysis_service.open_facts import (
+from katra.mermaid import styled_mermaid
+from katra.model_tiers import ModelTierConfig
+from katra.open_facts import (
     gaps,
     reference_labels,
 )
-from analysis_service.owner_files import (
+from katra.owner_files import (
     NO_TEXT,
     NOT_PLAIN_TEXT,
     NOT_UTF_8,
@@ -273,13 +273,13 @@ from analysis_service.owner_files import (
     too_large,
     upload_refusal,
 )
-from analysis_service.principals import Identity, Principal, log_created
-from analysis_service.questions import question_fallback
-from analysis_service.report_changes import report_changes
-from analysis_service.report_conditions import conditions, corrected_findings
-from analysis_service.selection import SelectionError
-from analysis_service.settings_variables import deployment_env
-from analysis_service.sources import (
+from katra.principals import Identity, Principal, log_created
+from katra.questions import question_fallback
+from katra.report_changes import report_changes
+from katra.report_conditions import conditions, corrected_findings
+from katra.selection import SelectionError
+from katra.settings_variables import deployment_env
+from katra.sources import (
     ANSWERS_LABEL,
     FORMATS,
     MAX_LABEL_CHARS,
@@ -291,12 +291,12 @@ from analysis_service.sources import (
     SourceLimits,
     clean_system_name,
 )
-from analysis_service.store_backends import (
+from katra.store_backends import (
     audited_delete,
     store_lifespan,
 )
-from analysis_service.system_model import ELEMENT_TYPE_NOUNS
-from analysis_service.vendors import (
+from katra.system_model import ELEMENT_TYPE_NOUNS
+from katra.vendors import (
     CREDENTIAL_MODE_NOTES,
     VendorName,
     missing_sdk,
@@ -454,7 +454,7 @@ class Workspace:
 
     The workspace holds nothing of the Deployment, so it outlives a swap of
     the :class:`Cell`. Each read through the job operations takes the
-    :class:`~analysis_service.job_answers.JobAnswers` that the route read
+    :class:`~katra.job_answers.JobAnswers` that the route read
     from the cell.
     """
 
@@ -613,7 +613,7 @@ class Workspace:
 
         The jobs are chosen on entry and deleted on a clean exit, so a
         submission the body refuses deletes nothing. Each delete goes through
-        :func:`~analysis_service.store_backends.audited_delete` with the cause
+        :func:`~katra.store_backends.audited_delete` with the cause
         ``workspace`` and the time of the choice, so a chosen job that changes
         before the delete stays, and the workspace then holds one job over its
         bound. A job that answers the job ``answering``, paused or finished,
@@ -809,7 +809,7 @@ _MEMORY_STORE_NOTE = (
     " To keep them, reset the job store on the Settings page."
 )
 
-#: The page's statement of :func:`~analysis_service.sources.clean_system_name`.
+#: The page's statement of :func:`~katra.sources.clean_system_name`.
 #: A fixed sentence, so a refusal never echoes the name it refused.
 _NAME_REFUSED = (
     f"Use an analysis name of at most {MAX_SYSTEM_NAME_CHARS} characters, on one"
@@ -830,10 +830,10 @@ class _Submission(BaseModel):
     """The body of ``POST /analyze``, and the one statement of the keys it takes.
 
     Each field that ``POST /v1/jobs`` also takes is the field
-    :class:`~analysis_service.api.JobSubmission` declares, so the two entry
+    :class:`~katra.api.JobSubmission` declares, so the two entry
     points refuse the same values with the same sentence. ``name`` is the
     form's ``system_name``; the route reads it with
-    :func:`~analysis_service.sources.clean_system_name`.
+    :func:`~katra.sources.clean_system_name`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -845,7 +845,7 @@ class _Submission(BaseModel):
     name: str | None = None
     #: The Owner Files whose text the new job copies (ADR 0119). Only this
     #: route takes them: ``POST /v1/jobs`` has no Files.
-    #: :meth:`~analysis_service.job_answers.JobAnswers.owner_file_sources`
+    #: :meth:`~katra.job_answers.JobAnswers.owner_file_sources`
     #: refuses more of them than the deployment's source limit.
     owner_files: list[Annotated[str, Field(pattern=OWNER_FILE_ID)]] = Field(
         default_factory=list, max_length=MAX_SOURCES_CEILING
@@ -887,7 +887,7 @@ class _FileUpload(BaseModel):
     """The body of ``POST /workspace/files``: an upload to Files.
 
     The browser reads the file and sends its text, so no route takes a file.
-    :func:`~analysis_service.owner_files.upload_refusal` checks the content.
+    :func:`~katra.owner_files.upload_refusal` checks the content.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -1008,7 +1008,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     the failure to a page.
 
     Two stages, and the split is the whole content of the diagnostic. Resolving
-    the :class:`~analysis_service.deployment.Deployment` reads the config files;
+    the :class:`~katra.deployment.Deployment` reads the config files;
     building a runner off it resolves the vendor's credentials and runs every
     tier's ``(vendor, model, sampling)`` through LiteLLM's own check. So a
     *config* failure leaves no tiers to report, while a *credential* failure
@@ -1020,7 +1020,7 @@ def build_startup(env: Mapping[str, str]) -> Startup:
     adapters is what resolves the credentials.** Binding does not depend on
     which frameworks a submission picks, so any selection proves the same
     thing, and the probe names the whole carried set.
-    :meth:`~analysis_service.deployment.Deployment.runner` memoizes per
+    :meth:`~katra.deployment.Deployment.runner` memoizes per
     selection, so each other pick composes its own graph once and no
     submission binds the adapters twice.
 
@@ -1122,7 +1122,7 @@ def render_report(
     shows how each finding moved since it. ``parent`` is the ID of the run
     whose answers started this one, or ``None``.
 
-    ``state`` is the run's :class:`~analysis_service.answer_state.AnswerState`:
+    ``state`` is the run's :class:`~katra.answer_state.AnswerState`:
     its answers, whether a follow-up wrote its report, what the pause showed,
     what its owner corrected since and the run its follow-up started. It
     decides what the page still asks and how it labels each question, from
@@ -1353,7 +1353,7 @@ def _earlier_payload(
     """The answers a first report read, so its follow-up can take new ones.
 
     The follow-up admits a new answer to an earlier fact or link
-    (:func:`~analysis_service.links.check_answers`), so the page offers it.
+    (:func:`~katra.links.check_answers`), so the page offers it.
     A fact the follow-up still ``asked``, such as a facet answer with facets
     left out, is left to its question, because one submission answers a fact
     once. Its answer is ``retained``, so that question starts from it.
@@ -1446,7 +1446,7 @@ def file_refusals(max_bytes: int, max_files: int) -> dict[FileRefusal, str]:
 def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
     """Each :data:`FileRefusal` of the Controls page. The file refusals are
     those of an evidence file, in the words of
-    :func:`~analysis_service.controls.control_refusal`, and ``at_limit`` is
+    :func:`~katra.controls.control_refusal`, and ``at_limit`` is
     the refusal of a new Control where the owner holds the most Controls."""
     return {
         "too_large": evidence_too_large(limits.max_evidence_bytes),
@@ -1460,7 +1460,7 @@ def evidence_refusals(limits: ControlLimits) -> dict[FileRefusal, str]:
 def _section_of(record: JobRecord, report: Report) -> list[SectionEntry]:
     """The report's Controls section, from the job's copy and the report's
     rulings (ADR 0127). ``record`` holds the copy that
-    :meth:`~analysis_service.job_answers.JobAnswers.answerable` read."""
+    :meth:`~katra.job_answers.JobAnswers.answerable` read."""
     return controls_section(
         record.controls,
         record.control_scopes,
@@ -1621,7 +1621,7 @@ async def _json_body(request: Request, limit: int) -> object:
 
 async def _job_body(request: Request, answers: JobAnswers) -> object:
     """A job route's body, read by :func:`_json_body` under the deployment's
-    raw-body guard, :func:`~analysis_service.api.max_body_bytes`."""
+    raw-body guard, :func:`~katra.api.max_body_bytes`."""
     return await _json_body(request, max_body_bytes(answers.limits))
 
 
@@ -1646,7 +1646,7 @@ def create_app(
     :func:`build_startup` for the startup and for each save.
 
     The app reads one mapping:
-    :func:`~analysis_service.settings_variables.deployment_env` adds the lines
+    :func:`~katra.settings_variables.deployment_env` adds the lines
     of ``settings.env`` in the settings directory to the process environment
     (ADR 0092). Where it refuses the file, the cell stays empty and the
     diagnostic page names the refusal, and the store reads the process
@@ -1657,12 +1657,12 @@ def create_app(
     ``workspace``, it builds its store with
     :func:`~webapp.settings_view.build_app_store` from the service's backend
     settings, and an unusable setting raises, also where the Deployment then
-    fails to build. Where ``ANALYSIS_JOB_STORE`` is unset, the store is
+    fails to build. Where ``KATRA_JOB_STORE`` is unset, the store is
     ``sql`` on SQLite in the data directory, which the app makes and
     migrates, so a first run needs no setting and keeps its runs
     (ADR 0111). The app logs the store class it built. At startup, before the app
     takes a request, the app always runs
-    :func:`~analysis_service.store_backends.store_lifespan` over the store, as
+    :func:`~katra.store_backends.store_lifespan` over the store, as
     the service does.
 
     The app holds what the routes run on in one :class:`Cell`, as
@@ -1684,7 +1684,7 @@ def create_app(
     cell = Cell(state.current(workspace.store))
     save_lock = asyncio.Lock()
     app = FastAPI(
-        title="Work Agent",
+        title="Katra",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -2659,8 +2659,8 @@ def _framework_fields(frameworks: Sequence[FrameworkName]) -> str:
     an empty options model has no fields to walk.
 
     Every box starts unticked so the submitter chooses the analyses to run. The
-    :func:`~analysis_service.selection.resolve_selection` allow-list is what
-    rules on the answer, in :meth:`~analysis_service.job_answers.JobAnswers.submit`.
+    :func:`~katra.selection.resolve_selection` allow-list is what
+    rules on the answer, in :meth:`~katra.job_answers.JobAnswers.submit`.
     """
     rows = []
     for name in frameworks:
@@ -2924,7 +2924,7 @@ def _sdk_item(vendor: VendorName) -> str:
     return (
         f"<li><code>{escape(sdk.module)}</code> "
         f'<span class="{css_class}">{label}</span> — '
-        f"<code>pip install analysis-service[{escape(sdk.extra)}]</code></li>"
+        f"<code>pip install katra[{escape(sdk.extra)}]</code></li>"
     )
 
 

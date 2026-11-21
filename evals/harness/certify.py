@@ -1,13 +1,13 @@
 """Promoting a sweep winner: re-pin the sampling file and bless its fingerprints.
 
 This is the write half of certification. The pure check lives in the service, at
-:mod:`analysis_service.certification`, which certifies each job it completes.
+:mod:`katra.certification`, which certifies each job it completes.
 This module is what only a sanctioned sweep does: it re-pins this deployment's
 sampling file in place, and records the fingerprints that pinning implies.
 
 It is this deployment's file rather than the repository's. Both files are
-located through :class:`~analysis_service.deployment.Deployment`, so a sweep run
-against a redirected ``ANALYSIS_SAMPLING`` promotes into the file it measured.
+located through :class:`~katra.deployment.Deployment`, so a sweep run
+against a redirected ``KATRA_SAMPLING`` promotes into the file it measured.
 
 The write path is single-sourced. One ``SamplingConfig`` both re-pins the file's
 values and derives the fingerprints recorded in the manifest, so the two cannot
@@ -38,16 +38,16 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from analysis_service.certification import (
+from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
+from katra.certification import (
     MANIFEST_VERSION,
     BlessedManifest,
     CertificationError,
     load_manifest,
 )
-from analysis_service.identity import execution_fingerprint
-from analysis_service.model_tiers import TIER_NAMES, TierName
-from analysis_service.sampling import SamplingConfig, SamplingParam, TierSampling
-from evals.harness.provenance import ProvenanceError, RunProvenance, TierIdentity
+from katra.identity import execution_fingerprint
+from katra.model_tiers import TIER_NAMES, TierName
+from katra.sampling import SamplingConfig, SamplingParam, TierSampling
 
 
 @dataclass(frozen=True)
@@ -127,7 +127,7 @@ def promote(
     a human decision that must state a rationale, not a silent sweep write.
 
     Both paths are the deployment's, not the repo's. A sweep measures whatever
-    ``ANALYSIS_SAMPLING`` names, so promoting its winner has to re-pin that same
+    ``KATRA_SAMPLING`` names, so promoting its winner has to re-pin that same
     file — re-pinning the checked-in copy instead would bless a fingerprint
     describing params the measured configuration never held. The manifest is
     deployment-local by design and follows for the same reason.
@@ -197,7 +197,7 @@ class PromotionPlan:
 
     Built before anything is written so the operator approves a concrete list of
     identities rather than a command. Every fingerprint here is **recomputed**
-    by :func:`~analysis_service.identity.execution_fingerprint` from the
+    by :func:`~katra.identity.execution_fingerprint` from the
     artifact's recorded identity — the artifact's stored hashes are verified
     against the same function and never copied forward, so an edited artifact
     cannot smuggle a fingerprint into the manifest.

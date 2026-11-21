@@ -6,7 +6,7 @@ import gc
 import weakref
 from collections import OrderedDict
 
-from analysis_service.memo import REMEMBERED, Memo, remembered
+from katra.memo import REMEMBERED, Memo, remembered
 
 
 class _Registry:

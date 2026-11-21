@@ -46,13 +46,13 @@
 # The rule matches a shape rather than a list of numbered builds, so the check
 # does not break when a vendor retires a build.
 #
-# ENV OVERRIDES are two vars per tier: ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR and
-# _MODEL, plus ANALYSIS_MODEL_CREDENTIALS_{VENDOR}, ANALYSIS_MODEL_CHARGES_{VENDOR}
-# and ANALYSIS_MODEL_UPSTREAMS_{VENDOR} for the three vendor tables below. `_MODEL` alone is the ops case (retune on a deployed revision without
+# ENV OVERRIDES are two vars per tier: KATRA_MODEL_{BASE,STRONG,REVIEW}_VENDOR and
+# _MODEL, plus KATRA_MODEL_CREDENTIALS_{VENDOR}, KATRA_MODEL_CHARGES_{VENDOR}
+# and KATRA_MODEL_UPSTREAMS_{VENDOR} for the three vendor tables below. `_MODEL` alone is the ops case (retune on a deployed revision without
 # an image rebuild). `_VENDOR` alone is a build-time error — a cross-vendor pair
 # like anthropic + gemini-2.5-pro passes every downstream check and would die on
-# node one of a paid-for job. Any unrecognised ANALYSIS_MODEL_* var also raises,
-# so a deployment that sets ANALYSIS_MODEL_FLASH fails loudly instead of being
+# node one of a paid-for job. Any unrecognised KATRA_MODEL_* var also raises,
+# so a deployment that sets KATRA_MODEL_FLASH fails loudly instead of being
 # silently ignored.
 #
 # NOTHING IS SELECTED BY DEFAULT, and that is the point. A default model would
@@ -97,7 +97,7 @@ version = 9
 review_independence = "shared"
 
 # CHOOSE A VENDOR AND MODEL FOR EACH TIER. Fill in the template below, or set
-# ANALYSIS_MODEL_{BASE,STRONG,REVIEW}_VENDOR together with the matching _MODEL —
+# KATRA_MODEL_{BASE,STRONG,REVIEW}_VENDOR together with the matching _MODEL —
 # the two halves must move together, since a vendor without its model is not a
 # usable selection. Model identifiers must be pinned: the identifier may not
 # carry `latest`, `preview`, `exp` or `experimental` as a whole word, and Claude
@@ -117,7 +117,7 @@ review_independence = "shared"
 # model = "<model>"
 #
 # A VENDOR THAT ALLOWS MORE THAN ONE CREDENTIAL MODE declares which one this
-# deployment uses, here or in ANALYSIS_MODEL_CREDENTIALS_{VENDOR}. Bedrock is
+# deployment uses, here or in KATRA_MODEL_CREDENTIALS_{VENDOR}. Bedrock is
 # the one that does, and a missing declaration is a load error naming it:
 #
 # [credentials]
@@ -127,7 +127,7 @@ review_independence = "shared"
 # is nothing to choose.
 #
 # A VENDOR THAT STATES WHAT IT CHARGED declares the arrangement this deployment
-# runs under, here or in ANALYSIS_MODEL_CHARGES_{VENDOR}. OpenRouter is the one
+# runs under, here or in KATRA_MODEL_CHARGES_{VENDOR}. OpenRouter is the one
 # that does, and a missing declaration is a load error naming it:
 #
 # [charges]
@@ -149,7 +149,7 @@ review_independence = "shared"
 # with a single arrangement.
 #
 # A VENDOR THAT ROUTES TO MORE THAN ONE UPSTREAM may be pinned to the ones a
-# request may reach, here or in ANALYSIS_MODEL_UPSTREAMS_{VENDOR} as a
+# request may reach, here or in KATRA_MODEL_UPSTREAMS_{VENDOR} as a
 # comma-separated list. Optional: an analysis is an analysis whichever upstream
 # answers. A Baseline is named after the one upstream the record says served
 # it, so a sweep meant to be published pins one. The slugs are the gateway's
@@ -174,7 +174,7 @@ review_independence = "shared"
 # empty tier tables above. One worked pair would be the one example a reader
 # copies, which makes it a privileged default. The vendors below are alphabetical, equally
 # detailed, and every one of them is a real pair the offline conformance suite
-# profiles (src/analysis_service/conformance.py):
+# profiles (src/katra/conformance.py):
 #
 #   anthropic   base "claude-sonnet-5"       strong "claude-opus-5-5"
 #   bedrock     base "global.anthropic.claude-sonnet-4-6"
@@ -207,7 +207,7 @@ review_independence = "shared"
 # newer Claude is a one-line edit. What a generation still decides is which
 # params it accepts — 4.7 onward rejects `temperature`, which the shipped
 # sampling does not set — so read config/sampling.toml before stating one. Run
-# `uv run python -m analysis_service.conformance` to see what each pair supports
+# `uv run python -m katra.conformance` to see what each pair supports
 # before choosing.
 #
 # The three tiers select independently, so a mixed set — a cheap workhorse from
@@ -215,7 +215,7 @@ review_independence = "shared"
 # than a special case.
 #
 # BEDROCK NEEDS ITS CLIENT LIBRARY IN THE IMAGE: `pip install
-# analysis-service[bedrock]`. The build refuses to bind a Bedrock tier without
+# katra[bedrock]`. The build refuses to bind a Bedrock tier without
 # it, and names the extra.
 
 [nodes]
@@ -226,7 +226,7 @@ repair = "base"
 assert = "base"
 # The capability reader also reads the sources and writes rows the gate checks,
 # so it is transcription on the workhorse tier too. A job runs it only where a
-# selected framework reads capabilities, and ANALYSIS_CAPABILITY_READER=false
+# selected framework reads capabilities, and KATRA_CAPABILITY_READER=false
 # turns it off, but every install names its tier, as it does for the assertion
 # pass.
 capabilities = "base"

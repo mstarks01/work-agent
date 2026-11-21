@@ -14,7 +14,7 @@ from importlib.metadata import packages_distributions
 
 import pytest
 
-from analysis_service.frameworks import PACKAGES
+from katra.frameworks import PACKAGES
 from tests.source_tree import PYTHON, REPO_ROOT, parse, source_files, without
 
 pytestmark = pytest.mark.lint
@@ -22,7 +22,7 @@ pytestmark = pytest.mark.lint
 #: The parts of :data:`~tests.source_tree.PYTHON` that the wheel does not ship.
 NOT_THE_WHEEL: dict[str, str] = dict.fromkeys(
     ("webapp", "evals", "examples", ".github/scripts"),
-    "the wheel ships only src/analysis_service, so its dependencies declare"
+    "the wheel ships only src/katra, so its dependencies declare"
     " only what that package imports",
 )
 
@@ -90,7 +90,7 @@ def test_every_distribution_the_package_imports_is_declared():
 
     undeclared = sorted(
         name
-        for name in imported - sys.stdlib_module_names - {"analysis_service"}
+        for name in imported - sys.stdlib_module_names - {"katra"}
         if name in provides
         and not any(normalized(dist) in declared for dist in provides[name])
     )
@@ -110,9 +110,7 @@ def test_no_document_is_reachable_from_the_evidence_seam():
     resolves what a finding rests on. There is no code path by which a
     retrieved document could become a Ground.
     """
-    assert _importers("from analysis_service.knowledge import", {}) == {
-        "src/analysis_service/graph.py"
-    }
+    assert _importers("from katra.knowledge import", {}) == {"src/katra/graph.py"}
 
 
 def test_nothing_outside_the_prompt_seam_reads_a_candidate():
@@ -127,8 +125,8 @@ def test_nothing_outside_the_prompt_seam_reads_a_candidate():
     candidate's type and never read one. Neither the critic nor the report can
     see one, so no code path exists that turns a fired rule into a threat.
     """
-    package = "src/analysis_service"
-    assert _importers("from analysis_service.candidates import", NOT_A_JOB) == {
+    package = "src/katra"
+    assert _importers("from katra.candidates import", NOT_A_JOB) == {
         f"{package}/coverage.py",
         f"{package}/early_questions.py",
         f"{package}/fan_in.py",
@@ -146,6 +144,6 @@ def test_nothing_turns_the_context_into_evidence():
     name or a rule ID to a ``Ground``.
     """
     assert _importers("AnalysisContext", {}) == {
-        "src/analysis_service/graph.py",
-        "src/analysis_service/report.py",
+        "src/katra/graph.py",
+        "src/katra/report.py",
     }

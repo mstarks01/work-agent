@@ -27,21 +27,21 @@ from pathlib import Path
 
 from google.adk.models.lite_llm import _to_litellm_response_format
 
-from analysis_service import model_gate
-from analysis_service.capability_reader import (
+from katra import model_gate
+from katra.capability_reader import (
     CapabilityReading,
     with_stated_capabilities,
 )
-from analysis_service.charges import reported_charge_of
-from analysis_service.execution import seed_state
-from analysis_service.frameworks.asvs.applicability import applicability_for
-from analysis_service.graph import STATE_INPUT_TEXT, after_gate
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.offline import refuse_live_inference
-from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.sources import Source
-from analysis_service.system_model import SystemModel
-from analysis_service.vendors import CredentialMode, vendor_for_route
+from katra.charges import reported_charge_of
+from katra.execution import seed_state
+from katra.frameworks.asvs.applicability import applicability_for
+from katra.graph import STATE_INPUT_TEXT, after_gate
+from katra.markdown_loader import MarkdownLoader
+from katra.offline import refuse_live_inference
+from katra.prompts import compose_capabilities_prompt
+from katra.sources import Source
+from katra.system_model import SystemModel
+from katra.vendors import CredentialMode, vendor_for_route
 
 #: The base tier's output cap in ``config/sampling.toml``.
 MAX_OUTPUT_TOKENS = 16384

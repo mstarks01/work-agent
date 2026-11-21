@@ -27,15 +27,15 @@ from alembic.migration import MigrationContext
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
-from analysis_service import jobs as jobs_module
-from analysis_service import store_backends
-from analysis_service.answer_sets import AnswerSet, SentAnswers
-from analysis_service.api import create_app
-from analysis_service.carried_renames import ElementRename
-from analysis_service.certification import CertifyResult
-from analysis_service.fact_answers import FactAnswer
-from analysis_service.job_controls import AppliedScope, ControlFact, ControlFacts
-from analysis_service.jobs import (
+from katra import jobs as jobs_module
+from katra import store_backends
+from katra.answer_sets import AnswerSet, SentAnswers
+from katra.api import create_app
+from katra.carried_renames import ElementRename
+from katra.certification import CertifyResult
+from katra.fact_answers import FactAnswer
+from katra.job_controls import AppliedScope, ControlFact, ControlFacts
+from katra.jobs import (
     GENERIC_FAILURE_MESSAGE,
     RESTART_FAILURE_MESSAGE,
     Checkpoint,
@@ -50,10 +50,10 @@ from analysis_service.jobs import (
     parent_of,
     readable,
 )
-from analysis_service.objects import build_object_store, object_key
-from analysis_service.report import NodeRun, Report, TokenUsage
-from analysis_service.sources import Source
-from analysis_service.sql_store import (
+from katra.objects import build_object_store, object_key
+from katra.report import NodeRun, Report, TokenUsage
+from katra.sources import Source
+from katra.sql_store import (
     METADATA,
     CorruptObject,
     RecordObjectField,
@@ -62,9 +62,9 @@ from analysis_service.sql_store import (
     database_url,
     engine_for,
 )
-from analysis_service.store_backends import JOB_STORES, build_store
-from analysis_service.store_settings import StoreConfigError, holds_password
-from analysis_service.validation import ValidationIssue
+from katra.store_backends import JOB_STORES, build_store
+from katra.store_settings import StoreConfigError, holds_password
+from katra.validation import ValidationIssue
 from tests.factories import (
     DEFAULT_FRAMEWORKS,
     SEEDING_BUDGET,
@@ -152,66 +152,66 @@ class TestTheStartupRefusals:
     @pytest.mark.parametrize(
         ("change", "message"),
         [
-            ({"ANALYSIS_JOB_STORE": None}, "set ANALYSIS_JOB_STORE"),
-            ({"ANALYSIS_JOB_STORE": "redis"}, "unknown value for"),
-            ({"ANALYSIS_OBJECT_STORE": None}, "set ANALYSIS_OBJECT_STORE"),
-            ({"ANALYSIS_OBJECT_STORE": "tape"}, "unknown value for"),
+            ({"KATRA_JOB_STORE": None}, "set KATRA_JOB_STORE"),
+            ({"KATRA_JOB_STORE": "redis"}, "unknown value for"),
+            ({"KATRA_OBJECT_STORE": None}, "set KATRA_OBJECT_STORE"),
+            ({"KATRA_OBJECT_STORE": "tape"}, "unknown value for"),
             (
                 {
-                    "ANALYSIS_JOB_STORE": "memory",
-                    "ANALYSIS_DATABASE_URL": None,
-                    "ANALYSIS_OBJECT_ROOT": None,
+                    "KATRA_JOB_STORE": "memory",
+                    "KATRA_DATABASE_URL": None,
+                    "KATRA_OBJECT_ROOT": None,
                 },
-                "memory job store takes no ANALYSIS_OBJECT_STORE; unset it$",
+                "memory job store takes no KATRA_OBJECT_STORE; unset it$",
             ),
             (
                 {
-                    "ANALYSIS_JOB_STORE": "memory",
-                    "ANALYSIS_OBJECT_STORE": None,
-                    "ANALYSIS_OBJECT_ROOT": None,
+                    "KATRA_JOB_STORE": "memory",
+                    "KATRA_OBJECT_STORE": None,
+                    "KATRA_OBJECT_ROOT": None,
                 },
-                "memory job store takes no ANALYSIS_DATABASE_URL; unset it$",
+                "memory job store takes no KATRA_DATABASE_URL; unset it$",
             ),
             (
-                {"ANALYSIS_OBJECT_BUCKET": "jobs"},
-                "filesystem object store takes no ANALYSIS_OBJECT_BUCKET",
+                {"KATRA_OBJECT_BUCKET": "jobs"},
+                "filesystem object store takes no KATRA_OBJECT_BUCKET",
             ),
             (
-                {"ANALYSIS_OBJECT_ROOTS": "/srv/objects"},
-                "filesystem object store takes no ANALYSIS_OBJECT_ROOTS",
+                {"KATRA_OBJECT_ROOTS": "/srv/objects"},
+                "filesystem object store takes no KATRA_OBJECT_ROOTS",
             ),
-            ({"ANALYSIS_DATABASE_URL": None}, "set ANALYSIS_DATABASE_URL"),
-            ({"ANALYSIS_DATABASE_URL": "not a url"}, "is not a database URL"),
+            ({"KATRA_DATABASE_URL": None}, "set KATRA_DATABASE_URL"),
+            ({"KATRA_DATABASE_URL": "not a url"}, "is not a database URL"),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://u:hunter2@[::1/x"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://u:hunter2@[::1/x"},
                 "is not a database URL$",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "sqlite+aiosqlite://user:hunter2@/x.db"},
+                {"KATRA_DATABASE_URL": "sqlite+aiosqlite://user:hunter2@/x.db"},
                 "holds a password",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "sqlite+aiosqlite:///x.db?password=hunter2"},
+                {"KATRA_DATABASE_URL": "sqlite+aiosqlite:///x.db?password=hunter2"},
                 "holds a password",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+psycopg2://db/jobs"},
+                {"KATRA_DATABASE_URL": "postgresql+psycopg2://db/jobs"},
                 "unknown value for",
             ),
             (
-                {"ANALYSIS_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
+                {"KATRA_DATABASE_URL": "postgresql+asyncpg://analysis@db.internal"},
                 "PostgreSQL names no database",
             ),
             (
-                {"ANALYSIS_DATABASE_CREDENTIALS": "password"},
-                "SQLite database takes no ANALYSIS_DATABASE_CREDENTIALS",
+                {"KATRA_DATABASE_CREDENTIALS": "password"},
+                "SQLite database takes no KATRA_DATABASE_CREDENTIALS",
             ),
             (
-                {"ANALYSIS_DATABASE_PASSWORD": "hunter2"},
-                "SQLite database takes no ANALYSIS_DATABASE_PASSWORD;",
+                {"KATRA_DATABASE_PASSWORD": "hunter2"},
+                "SQLite database takes no KATRA_DATABASE_PASSWORD;",
             ),
-            ({"ANALYSIS_OBJECT_ROOT": None}, "set ANALYSIS_OBJECT_ROOT"),
-            ({"ANALYSIS_OBJECT_ROOT": "objects"}, "absolute path"),
+            ({"KATRA_OBJECT_ROOT": None}, "set KATRA_OBJECT_ROOT"),
+            ({"KATRA_OBJECT_ROOT": "objects"}, "absolute path"),
         ],
     )
     def test_an_unusable_setting(self, env, change, message):
@@ -239,13 +239,13 @@ class TestTheStartupRefusals:
     def test_the_settings_page_withholds_each_url_the_startup_refuses(self, url):
         """The startup and the Settings page read one rule of a password."""
         with pytest.raises(StoreConfigError) as refused:
-            database_url({"ANALYSIS_DATABASE_URL": url})
+            database_url({"KATRA_DATABASE_URL": url})
         assert "PASS" not in str(refused.value)
         assert holds_password(url)
         assert _withheld(url) is None
 
     def test_a_schema_that_is_not_at_the_latest_revision(self, env, tmp_path):
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
+        env["KATRA_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
         with pytest.raises(
             StoreConfigError, match="revision None.*run python -m .* first$"
         ):
@@ -254,7 +254,7 @@ class TestTheStartupRefusals:
     def test_a_revision_this_build_does_not_hold(self, env):
         """No migration reaches the head from a revision the tree does not
         hold, so the refusal names the remedy that works."""
-        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        database = env["KATRA_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         engine = create_engine(f"sqlite:///{database}")
         with engine.begin() as connection:
             connection.exec_driver_sql(
@@ -264,7 +264,7 @@ class TestTheStartupRefusals:
         with pytest.raises(RevisionNotHeld, match="r9999, which this build") as refused:
             start(env)
         assert "delete its file" in str(refused.value)
-        assert "python -m analysis_service.migrations" in str(refused.value)
+        assert "python -m katra.migrations" in str(refused.value)
         assert database not in str(refused.value)
 
     @pytest.mark.parametrize(
@@ -289,7 +289,7 @@ class TestTheStartupRefusals:
         """A schema change edits revision 0001 in place, so a database made
         before it is at the head revision, and the migration changes nothing
         in it. The refusal names the remedy that works, and no path."""
-        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        database = env["KATRA_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         engine = create_engine(f"sqlite:///{database}")
         with engine.begin() as connection:
             connection.exec_driver_sql(change)
@@ -307,13 +307,13 @@ class TestTheStartupRefusals:
     def test_a_missing_database_file(self, env, tmp_path):
         """The service never makes the file: only the migration step does."""
         missing = tmp_path / "missing.db"
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(missing)
+        env["KATRA_DATABASE_URL"] = sqlite_url(missing)
         with pytest.raises(StoreConfigError, match="does not exist"):
             start(env)
         assert not missing.exists()
 
     def test_a_database_file_that_others_can_open(self, env):
-        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        database = env["KATRA_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         os.chmod(database, 0o640)
         with pytest.raises(StoreConfigError, match="set its mode to 0600"):
             start(env)
@@ -322,9 +322,7 @@ class TestTheStartupRefusals:
     def test_a_database_directory_that_others_can_open(self, env, mode):
         """Another user who can write the directory can put a link or a hot
         journal beside the file between the check and a connection."""
-        database = Path(
-            env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
-        )
+        database = Path(env["KATRA_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///"))
         os.chmod(database.parent, mode)
         with pytest.raises(StoreConfigError, match="set its mode to 0700"):
             start(env)
@@ -338,38 +336,36 @@ class TestTheStartupRefusals:
         assert not database.exists()
 
     def test_a_database_file_that_is_a_symbolic_link(self, env, tmp_path):
-        database = env["ANALYSIS_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
+        database = env["KATRA_DATABASE_URL"].removeprefix("sqlite+aiosqlite:///")
         link = tmp_path / "link.db"
         link.symlink_to(database)
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(link)
+        env["KATRA_DATABASE_URL"] = sqlite_url(link)
         with pytest.raises(StoreConfigError, match="not a regular file"):
             start(env)
 
     def test_a_relative_database_path(self, env):
-        env["ANALYSIS_DATABASE_URL"] = "sqlite+aiosqlite:///jobs.db"
+        env["KATRA_DATABASE_URL"] = "sqlite+aiosqlite:///jobs.db"
         with pytest.raises(StoreConfigError, match="absolute path"):
             start(env)
 
     def test_a_missing_root(self, env):
-        os.rmdir(env["ANALYSIS_OBJECT_ROOT"])
+        os.rmdir(env["KATRA_OBJECT_ROOT"])
         with pytest.raises(StoreConfigError, match="does not exist"):
             start(env)
 
     def test_a_root_that_is_a_file(self, env, tmp_path):
-        env["ANALYSIS_OBJECT_ROOT"] = str(tmp_path / "jobs.db")
+        env["KATRA_OBJECT_ROOT"] = str(tmp_path / "jobs.db")
         with pytest.raises(StoreConfigError, match="not a directory"):
             start(env)
 
     @pytest.mark.parametrize("mode", [0o750, 0o705, 0o720])
     def test_a_root_a_group_or_others_can_open(self, env, mode):
-        os.chmod(env["ANALYSIS_OBJECT_ROOT"], mode)
+        os.chmod(env["KATRA_OBJECT_ROOT"], mode)
         with pytest.raises(StoreConfigError, match="a group or others"):
             start(env)
 
     def test_a_root_another_user_owns(self, env, monkeypatch):
-        monkeypatch.setattr(
-            "analysis_service.objects.os.geteuid", lambda: os.getuid() + 1
-        )
+        monkeypatch.setattr("katra.objects.os.geteuid", lambda: os.getuid() + 1)
         with pytest.raises(StoreConfigError, match="another user owns"):
             start(env)
 
@@ -381,21 +377,21 @@ class TestTheStartupOrder:
     """Settings, the schema revision, the object store, the restart scan, requests."""
 
     def test_the_schema_is_checked_before_the_object_store(self, env, tmp_path):
-        env["ANALYSIS_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
-        os.rmdir(env["ANALYSIS_OBJECT_ROOT"])
+        env["KATRA_DATABASE_URL"] = sqlite_url(empty_database(tmp_path))
+        os.rmdir(env["KATRA_OBJECT_ROOT"])
         with pytest.raises(StoreConfigError, match="revision"):
             start(env)
 
     def test_a_failed_check_stops_the_startup_before_the_restart_scan(self, env):
         store = build_store(env)
         job = queued(store)
-        os.chmod(env["ANALYSIS_OBJECT_ROOT"], 0o750)
+        os.chmod(env["KATRA_OBJECT_ROOT"], 0o750)
         with (
             pytest.raises(StoreConfigError),
             TestClient(app_over(store)),
         ):
             pass
-        os.chmod(env["ANALYSIS_OBJECT_ROOT"], 0o700)
+        os.chmod(env["KATRA_OBJECT_ROOT"], 0o700)
         assert asyncio.run(store.get(job)).status == "queued"
 
 
@@ -624,7 +620,7 @@ def completed_job(store: JobStore) -> JobRecord:
 
 
 def report_file(env: dict[str, str], record: JobRecord) -> Path:
-    return Path(env["ANALYSIS_OBJECT_ROOT"], record.owner_id, record.id, "report.json")
+    return Path(env["KATRA_OBJECT_ROOT"], record.owner_id, record.id, "report.json")
 
 
 def of_another_version(env: dict[str, str], store: JobStore, record: JobRecord) -> None:
@@ -634,7 +630,7 @@ def of_another_version(env: dict[str, str], store: JobStore, record: JobRecord) 
     asyncio.run(store.save(record))
     sources = b'[{"x": 1}]'
     report_file(env, record).with_name("sources.json").write_bytes(sources)
-    database = env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+    database = env["KATRA_DATABASE_URL"].partition(":///")[2]
     with sqlite3.connect(database) as connection:
         connection.execute(
             "UPDATE jobs SET sources_sha256 = ? WHERE id = ?",
@@ -651,7 +647,7 @@ class TestTheDigestCheck:
         path = report_file(env, record)
         path.write_bytes(path.read_bytes().replace(b'"', b"'", 1))
         with (
-            caplog.at_level(logging.ERROR, "analysis_service.sql_store"),
+            caplog.at_level(logging.ERROR, "katra.sql_store"),
             pytest.raises(CorruptObject),
         ):
             asyncio.run(store.report_json(record.id, "alice"))
@@ -1000,7 +996,7 @@ class TestAStoredValueThisServiceDoesNotList:
         store = build_store(env)
         job = queued(store)
         store_unlisted(database_of(env), job, "an event kind")
-        with caplog.at_level(logging.ERROR, "analysis_service.sql_store"):
+        with caplog.at_level(logging.ERROR, "katra.sql_store"):
             assert asyncio.run(store.fail_in_flight()) == []
         assert job in caplog.text
         with sqlite3.connect(database_of(env)) as connection:
@@ -1014,7 +1010,7 @@ class TestAStoredValueThisServiceDoesNotList:
         store = build_store(env)
         record = completed_job(store)
         store_unlisted(database_of(env), record.id, "an issue code")
-        with caplog.at_level(logging.WARNING, "analysis_service.sql_store"):
+        with caplog.at_level(logging.WARNING, "katra.sql_store"):
             asyncio.run(store.owned(record.id, "alice"))
         assert "validation_issues.0.code" in caplog.text
         assert "a-removed-code" not in caplog.text
@@ -1023,7 +1019,7 @@ class TestAStoredValueThisServiceDoesNotList:
         store = build_store(env)
         record = completed_job(store)
         store_unlisted(database_of(env), record.id, "event text that is not JSON")
-        with caplog.at_level(logging.WARNING, "analysis_service.sql_store"):
+        with caplog.at_level(logging.WARNING, "katra.sql_store"):
             asyncio.run(store.owned(record.id, "alice"))
         assert "['events.0']" in caplog.text
 
@@ -1103,7 +1099,7 @@ class TestAStoreFailureAsARunStartsOrEnds:
 
         monkeypatch.setattr(store, "get", refuse)
         runner = CountingRunner()
-        with caplog.at_level(logging.ERROR, "analysis_service.jobs"):
+        with caplog.at_level(logging.ERROR, "katra.jobs"):
             asyncio.run(execute_job(store, runner, record.id, deadline_seconds=5))
         assert runner.runs == 0
         assert "until the restart scan fails it" in caplog.text
@@ -1182,7 +1178,7 @@ class TestAStoreFailureAsARunStartsOrEnds:
 
         monkeypatch.setattr(SqlJobStore, "_write", refuse_each_end)
         runner = CountingRunner()
-        with caplog.at_level(logging.ERROR, "analysis_service.jobs"):
+        with caplog.at_level(logging.ERROR, "katra.jobs"):
             stored = executed(store, runner)
         assert runner.runs == 1
         assert stored.status == "running"

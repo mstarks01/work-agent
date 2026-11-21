@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from analysis_service.evidence import evidence_catalog, render_catalog
-from analysis_service.graph import FrameworkNodes, after_gate, framework_lane_inputs
 from evals.harness.reference import load_case
 from evals.harness.replay import signed_reference
+from katra.evidence import evidence_catalog, render_catalog
+from katra.graph import FrameworkNodes, after_gate, framework_lane_inputs
 from tests.test_prompt_lints import PACKAGE_LOADERS
 
 case = load_case("evals/corpus/05-cookbook-queue-webapp")

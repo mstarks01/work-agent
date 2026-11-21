@@ -1,6 +1,6 @@
 """Driving the real graph and stamping what each node execution presented.
 
-These test :class:`~analysis_service.execution.GraphExecutor` at its own
+These test :class:`~katra.execution.GraphExecutor` at its own
 interface, because that is where stamping lives and both drivers — the
 service and the eval harness — cross it. No Vertex endpoint is involved: each
 LLM node is bound to a scripted stand-in that reports a ``model_version`` the
@@ -18,28 +18,28 @@ from datetime import UTC, datetime
 import pytest
 from google.adk.sessions import InMemorySessionService
 
-from analysis_service import execution, graph
-from analysis_service.compact import COMPACT_FORMAT, FULL_FORMAT
-from analysis_service.execution import (
+from evals.harness.instruments import (
+    charges_by_node,
+    latency_by_node,
+    usage_by_node,
+)
+from katra import execution, graph
+from katra.compact import COMPACT_FORMAT, FULL_FORMAT
+from katra.execution import (
     GraphExecutor,
     GraphFailed,
     GraphRun,
     _NodeFinish,
     seed_state,
 )
-from analysis_service.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
-from analysis_service.report import InputRef, Job, Report
-from analysis_service.sampling import (
+from katra.frameworks.stride.record import STRIDE_CATEGORIES, DraftThreat
+from katra.report import InputRef, Job, Report
+from katra.sampling import (
     TierSampling,
     load_sampling,
 )
-from analysis_service.sources import Source, render_sources
-from analysis_service.system_model import normalize_element_ids
-from evals.harness.instruments import (
-    charges_by_node,
-    latency_by_node,
-    usage_by_node,
-)
+from katra.sources import Source, render_sources
+from katra.system_model import normalize_element_ids
 from tests.factories import (
     BASE_MODEL,
     DESCRIPTION_TEXT,

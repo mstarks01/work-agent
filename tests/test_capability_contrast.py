@@ -18,18 +18,18 @@ from typing import Any
 import pytest
 from pydantic import Field
 
-from analysis_service import graph
-from analysis_service.capability_reader import (
+from katra import graph
+from katra.capability_reader import (
     CapabilityReading,
     CapabilityRow,
     with_stated_capabilities,
 )
-from analysis_service.frameworks.asvs.applicability import applicability_for
-from analysis_service.jobs import JobRecord, PipelineAwaiting
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.sources import DEFAULT_DESCRIPTION_LABEL, Source
-from analysis_service.system_model import SystemModel
+from katra.frameworks.asvs.applicability import applicability_for
+from katra.jobs import JobRecord, PipelineAwaiting
+from katra.markdown_loader import MarkdownLoader
+from katra.prompts import compose_capabilities_prompt
+from katra.sources import DEFAULT_DESCRIPTION_LABEL, Source
+from katra.system_model import SystemModel
 from tests.factories import (
     DESCRIPTION_TEXT,
     PROJECT_ROOT,

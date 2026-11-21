@@ -1,9 +1,9 @@
 r"""Tier 1: the structural gates, and the only ones that block.
 
 Thresholds are split by nature, and these are the absolute, per-case,
-zero-tolerance ones. A :class:`~analysis_service.report.Report`'s references
+zero-tolerance ones. A :class:`~katra.report.Report`'s references
 resolve, its claim IDs are unique within each block, its severity bands match
-:func:`~analysis_service.claims.derive_severity_level`, and each block's summary
+:func:`~katra.claims.derive_severity_level`, and each block's summary
 counts match its own contents. They gate from day one because they are
 deterministic, free, and already enforced by shipped validators. Must-find
 recall computes and reports, and does not block until baselines exist.
@@ -22,7 +22,7 @@ their answers against each other. It also carries the written list of the rules
 this module does not re-assert, and why each one holds anyway.
 
 The checks run per block, and every message names the framework. A report
-carries one :class:`~analysis_service.claims.FrameworkAnalysis` per framework
+carries one :class:`~katra.claims.FrameworkAnalysis` per framework
 the job selected, so a claim ID is unique only within its own block, and a
 failure that did not say whose block it was in would send a reader through all
 of them. The neutral half runs over every block. The severity check is STRIDE's,
@@ -39,12 +39,12 @@ from __future__ import annotations
 
 from collections import Counter
 
-from analysis_service.claims import (
+from katra.claims import (
     FrameworkAnalysis,
     derive_severity_level,
 )
-from analysis_service.frameworks import package_for
-from analysis_service.report import Report
+from katra.frameworks import package_for
+from katra.report import Report
 
 
 def report_issues(report: Report) -> list[str]:

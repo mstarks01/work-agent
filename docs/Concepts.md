@@ -1,6 +1,6 @@
 # Concepts
 
-This page explains the terms used by Work Agent. For implementation details,
+This page explains the terms used by Katra. For implementation details,
 see [Architecture](Architecture.md).
 
 ## Source
@@ -48,7 +48,7 @@ apply and what the submitted prose cannot settle.
 A **framework package** is the implementation of that question: its lanes,
 rules, output record, prompts, local reference material, and reviewer guidance.
 The repository currently registers `stride` and `asvs` in
-`analysis_service.frameworks.PACKAGES`.
+`katra.frameworks.PACKAGES`.
 
 ## Precondition
 
@@ -116,7 +116,7 @@ the shopper to the storefront uses a session cookie, and the source says so in
 these words. A closed list of predicates says which facts a row may record.
 
 Assertions come from a pass that runs by default. An operator turns it off
-with `ANALYSIS_ASSERTIONS=false`; see
+with `KATRA_ASSERTIONS=false`; see
 [Configuration](Configuration.md#optional-passes).
 
 The pass exists because the system model has a field for only some facts. It

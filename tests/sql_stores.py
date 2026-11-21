@@ -42,9 +42,9 @@ import pytest
 from google.auth import compute_engine
 from sqlalchemy.engine import URL, make_url
 
-from analysis_service import gcs_objects, migrations
-from analysis_service.objects import S3_KEY_FILES, ObjectStoreName
-from analysis_service.sql_store import engine_for
+from katra import gcs_objects, migrations
+from katra.objects import S3_KEY_FILES, ObjectStoreName
+from katra.sql_store import engine_for
 
 REQUIRE_POSTGRES = os.environ.get("REQUIRE_POSTGRES") == "1"
 REQUIRE_GCS = os.environ.get("REQUIRE_GCS") == "1"
@@ -65,7 +65,7 @@ def sqlite_url(path: Path) -> str:
 
 def migrate(path: Path) -> None:
     """Run the deploy step on the SQLite database at ``path``."""
-    upgrade({"ANALYSIS_DATABASE_URL": sqlite_url(path)})
+    upgrade({"KATRA_DATABASE_URL": sqlite_url(path)})
 
 
 def in_a_thread(work, *args):
@@ -96,7 +96,7 @@ def filesystem_env(directory: Path) -> dict[str, str]:
     """The settings of a fresh object root under ``directory``."""
     root = directory / "objects"
     root.mkdir(mode=0o700)
-    return {"ANALYSIS_OBJECT_STORE": "filesystem", "ANALYSIS_OBJECT_ROOT": str(root)}
+    return {"KATRA_OBJECT_STORE": "filesystem", "KATRA_OBJECT_ROOT": str(root)}
 
 
 #: The key pair of each test bucket. moto accepts any pair.
@@ -112,10 +112,10 @@ def s3_env(directory: Path) -> dict[str, str]:
     ``directory``. moto must serve the S3 API: take the ``moto_s3`` fixture."""
     assert os.environ.get("AWS_CONFIG_FILE") == os.devnull, "take moto_s3 first"
     env = {
-        "ANALYSIS_OBJECT_STORE": "s3",
-        "ANALYSIS_OBJECT_BUCKET": f"jobs-{uuid.uuid4().hex}",
-        "ANALYSIS_OBJECT_REGION": TEST_REGION,
-        "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
+        "KATRA_OBJECT_STORE": "s3",
+        "KATRA_OBJECT_BUCKET": f"jobs-{uuid.uuid4().hex}",
+        "KATRA_OBJECT_REGION": TEST_REGION,
+        "KATRA_OBJECT_CREDENTIALS": "api_key",
     }
     for argument, var in S3_KEY_FILES.items():
         path = directory / var.lower()
@@ -123,7 +123,7 @@ def s3_env(directory: Path) -> dict[str, str]:
         path.chmod(0o600)
         env[var] = str(path)
     boto3.Session(**TEST_KEYS).client("s3", region_name=TEST_REGION).create_bucket(
-        Bucket=env["ANALYSIS_OBJECT_BUCKET"]
+        Bucket=env["KATRA_OBJECT_BUCKET"]
     )
     return env
 
@@ -152,9 +152,9 @@ def gcs_env(directory: Path) -> dict[str, str]:
     bucket = f"jobs-{uuid.uuid4().hex}"
     gcs_objects.make_client(PLATFORM_CREDENTIAL).create_bucket(bucket)
     return {
-        "ANALYSIS_OBJECT_STORE": "gcs",
-        "ANALYSIS_OBJECT_BUCKET": bucket,
-        "ANALYSIS_OBJECT_CREDENTIALS": "iam",
+        "KATRA_OBJECT_STORE": "gcs",
+        "KATRA_OBJECT_BUCKET": bucket,
+        "KATRA_OBJECT_CREDENTIALS": "iam",
     }
 
 
@@ -196,15 +196,15 @@ def sql_env(directory: Path, objects: ObjectStoreName = "filesystem") -> dict[st
     database = directory / "jobs.db"
     shutil.copy(_migrated(), database)
     return {
-        "ANALYSIS_JOB_STORE": "sql",
-        "ANALYSIS_DATABASE_URL": sqlite_url(database),
+        "KATRA_JOB_STORE": "sql",
+        "KATRA_DATABASE_URL": sqlite_url(database),
         **OBJECT_ENVS[objects].settings(directory),
     }
 
 
 def database_of(env: dict[str, str]) -> str:
     """The path of the SQLite database that ``env`` names."""
-    return env["ANALYSIS_DATABASE_URL"].partition(":///")[2]
+    return env["KATRA_DATABASE_URL"].partition(":///")[2]
 
 
 def lane_url() -> URL:
@@ -227,10 +227,10 @@ def lane_env(url: URL | None = None, **settings: str) -> dict[str, str]:
     """
     url = lane_url() if url is None else url
     env = {
-        "ANALYSIS_DATABASE_URL": url.render_as_string(hide_password=False),
-        "ANALYSIS_DATABASE_CREDENTIALS": "password",
-        "ANALYSIS_DATABASE_PASSWORD_FILE": os.environ["TEST_POSTGRES_PASSWORD_FILE"],
-        "ANALYSIS_DATABASE_CA_FILE": os.environ["TEST_POSTGRES_CA_FILE"],
+        "KATRA_DATABASE_URL": url.render_as_string(hide_password=False),
+        "KATRA_DATABASE_CREDENTIALS": "password",
+        "KATRA_DATABASE_PASSWORD_FILE": os.environ["TEST_POSTGRES_PASSWORD_FILE"],
+        "KATRA_DATABASE_CA_FILE": os.environ["TEST_POSTGRES_CA_FILE"],
     }
     env.update(settings)
     return {name: value for name, value in env.items() if value}
@@ -289,7 +289,7 @@ def postgres_env(
     store under ``directory``, which is new."""
     url = lane_url().set(database=new_database(_migrated_on_postgres()))
     return {
-        "ANALYSIS_JOB_STORE": "sql",
+        "KATRA_JOB_STORE": "sql",
         **lane_env(url),
         **OBJECT_ENVS[objects].settings(directory),
     }

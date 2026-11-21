@@ -52,11 +52,11 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from analysis_service.errors import MAX_RENDERED_ERRORS
 from evals import review_submission as review_submissions
 from evals.harness import envelope as envelopes
 from evals.harness import sitting as sittings
 from evals.harness.sitting import MIN_OWN_LIST, own_list_is_written
+from katra.errors import MAX_RENDERED_ERRORS
 from webapp.page import (
     LOOPBACK_HOSTS,
     WORKSPACE_STYLE,

@@ -2,7 +2,7 @@
 
 Each check is exercised against a report broken in one way after it parsed.
 The gates are re-asserted in :mod:`evals.harness.structural` rather than
-delegated to :class:`~analysis_service.report.Report`'s own validator, so a
+delegated to :class:`~katra.report.Report`'s own validator, so a
 report edited in place still fails them. ``tests/test_structural_readers.py``
 breaks one sound report each way either reader names and holds the two readers
 against each other.
@@ -15,8 +15,8 @@ framework whose block it came from.
 
 from __future__ import annotations
 
-from analysis_service.claims import UnknownRef, Verdict
 from evals.harness.structural import report_issues
+from katra.claims import UnknownRef, Verdict
 from tests.factories import sample_report, sample_threat
 
 

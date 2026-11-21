@@ -1,0 +1,1166 @@
+"""Mechanical checks around a framework's critic: what it reads, and what it ruled.
+
+This is the deterministic half of the critic step. Mechanical checks belong in
+code, and prompts carry only judgement. Everything here is a check no model
+should be asked to perform: that the critic ruled on exactly the drafts it was
+given, each ruling carrying a well-formed verdict and each ``needs-info``
+naming an unknown the model contains; that a re-ask changed only what the
+problems named; and, at assembly, that a ruling becomes a claim from the copy
+this service already holds. The view a critic reads is built here too, with
+the facts code can compute already on it, so the first pass and the re-ask
+cannot disagree about what a critic sees.
+
+The checks that run *before* a critic reads anything — element references,
+unique IDs, grounds that resolve, quotes that are in the source they name —
+are the fan-in's, in :mod:`katra.fan_in`. A package's critic prompt
+names those as already done, so its judgement goes to evidence, lanes
+and whatever else that framework grades. For grounds, it goes to
+the one question code cannot answer: whether a quote that is verbatim actually
+supports the finding it was filed under.
+
+The checks are neutral, and there is one seam per framework rather than one
+across frameworks. Every check here reads
+:class:`~katra.claims.Claim`,
+:class:`~katra.claims.Ruling` and the package contract, so a second
+framework's output goes through the same code.
+
+The assemble seam is where a ruling becomes a claim. A critic emits judgements
+keyed by draft ID rather than the drafts themselves, as a
+:class:`~katra.claims.Ruling`. The agent's own fields therefore reach
+the report from the copy this service already holds, rather than round-tripping
+through a model that was never asked to change them.
+
+Model output is untrusted input (OWASP LLM05), and the service validates it here
+before anything reaches the report. The review check is returned rather than
+raised, so the graph can route a malformed first pass to its bounded re-ask
+(ADR 0005); assembly fails closed, and lists every issue at once.
+"""
+
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Collection, Iterable, Mapping, Sequence
+from typing import Any, NamedTuple, get_args
+
+from katra.assertions import AssertionCatalog
+from katra.claims import (
+    ASSERTION_GROUNDS,
+    Claim,
+    ControlRowRef,
+    CriticStep,
+    ProposedVerdict,
+    RepairedQuote,
+    RuledClaim,
+    Ruling,
+    SeverityLevel,
+    UnknownKey,
+    UnknownRef,
+    UnreconciledRuling,
+    UnverifiedGround,
+    Verdict,
+    rests_on,
+)
+from katra.evidence import ground_gloss
+from katra.frameworks import FrameworkPackage, FrameworkSchemas
+from katra.job_controls import (
+    PART_WORDS_TEXT,
+    AppliedControl,
+    CopiedEvidence,
+    quotes_control,
+    shown_controls,
+)
+from katra.question_kinds import parse_question_kind
+from katra.references import snap
+from katra.sources import quotable
+from katra.system_model import SystemModel, attribute_names
+
+# Most severe first — the order a graded framework's ``claims`` array carries.
+# The service holds the order because it holds
+# :data:`~katra.claims.SeverityLevel`; whether a framework grades at all
+# is its record's business, and one that does not is ordered by ID alone.
+#
+# Read off that type rather than listed again, so a band added there is ordered
+# the day it lands. The reversal is the whole difference: the type is declared
+# least severe first and a claims array reads most severe first.
+#
+# **The reversal is why the type's order is load bearing.** A band appended to
+# :data:`~katra.claims.SeverityLevel` as the *least* severe reverses
+# into the first rank here, and :func:`_claim_order` then sorts it above
+# ``critical``. That is a wrong order rather than a raised error, and no reader
+# here can see it. ``tests/test_critic.py`` pins the order and the vocabulary it
+# covers, because neither side checks the other: which word outranks which is
+# the material, and it lives in no table.
+SEVERITY_ORDER: tuple[SeverityLevel, ...] = tuple(reversed(get_args(SeverityLevel)))
+
+
+class CriticOutputError(ValueError):
+    """The critic's output does not account for exactly the drafts it saw."""
+
+
+class AssembledClaims(NamedTuple):
+    """One critic's ruled claims, split into that block's two arrays."""
+
+    claims: list[RuledClaim]
+    rejected_claims: list[RuledClaim]
+
+
+def snap_rulings(
+    rulings: Iterable[Ruling], element_ids: Collection[str]
+) -> list[Ruling]:
+    """The same fold over the one reference a ruling carries.
+
+    A ruling names no element of its own — deliberately, because the critic
+    does not re-emit drafts — except inside a ``needs-info``
+    verdict's ``related_unknowns``, which points at the unknown that has to be
+    answered. Unresolvable there is not fatal on the first look: it routes to
+    the bounded ``recritic``. Snapping it means a re-ask goes to a critic
+    that pointed somewhere real rather than on one that mis-typed a slug.
+
+    An entry that names one fact in two forms keeps the one form
+    :func:`_one_form` states a precedence for. Each fact is then named once, by
+    :func:`_one_per_fact`, so the seam and assembly agree about which entries a
+    verdict carries.
+    """
+    return [
+        ruling.model_copy(
+            update={
+                "verdict": ruling.verdict.model_copy(
+                    update={
+                        "related_unknowns": _one_per_fact(
+                            [
+                                # An attribute reference and a question kind
+                                # name an element, so each has an ID to snap.
+                                # A subject or an assertion names none.
+                                ref.model_copy(
+                                    update={
+                                        "element_id": snap(ref.element_id, element_ids)
+                                    }
+                                )
+                                if ref.element_id
+                                else ref
+                                for ref in map(
+                                    _one_form, ruling.verdict.related_unknowns
+                                )
+                            ]
+                        )
+                    }
+                )
+            }
+        )
+        for ruling in rulings
+    ]
+
+
+def _one_form(ref: UnknownRef) -> UnknownRef:
+    """An entry naming one fact in two forms, as the form that states it.
+
+    Two mixes have a stated precedence, and the ASVS critic wrote each of
+    them on case 01 (#1476):
+
+    * **A question kind and a subject** keep the kind. ``subject`` is the
+      form for a fact no kind fits, so its subject restates the kind's fixed
+      question (54 of 203 rulings).
+    * **A subject and an element with no attribute** keep the subject. An
+      element alone names no field, so the subject is the only statement of
+      the fact (74 of 203 rulings).
+
+    Any other mix stays for the review seam.
+    """
+    spellings = set(ref.spellings)
+    if spellings == {"question", "subject"}:
+        return ref.model_copy(update={"subject": ""})
+    if spellings == {"attribute", "subject"} and not ref.attribute:
+        return ref.model_copy(update={"element_id": ""})
+    return ref
+
+
+def _place(ref: UnknownRef) -> tuple[str, str, str]:
+    """Where an entry points: its element, and its attribute or question."""
+    return (ref.element_id, ref.attribute, ref.question)
+
+
+def _one_per_fact(refs: Sequence[UnknownRef]) -> list[UnknownRef]:
+    """A verdict's entries, with each fact named once.
+
+    An entry with the key of one before it adds nothing. An entry that mixes
+    spellings is dropped where a sound entry names the same element and
+    attribute or question, because that twin already asks the fact. A mixed
+    entry with no twin stays, and the review seam sends it back.
+    """
+    sound = {_place(ref) for ref in refs if ref.sound and any(_place(ref))}
+    kept: list[UnknownRef] = []
+    seen: set[UnknownKey] = set()
+    for ref in refs:
+        twinned = ref.mixed and _place(ref) in sound
+        if not twinned and ref.key not in seen:
+            seen.add(ref.key)
+            kept.append(ref)
+    return kept
+
+
+class ReviewProblems(NamedTuple):
+    """The mechanical check's verdict on one set of rulings.
+
+    ``problems`` is what the re-ask is asked to fix: one
+    :class:`~katra.claims.UnreconciledRuling` per problem, carrying
+    the claim it is about, which check found it, and the sentence a model
+    reads. ``implicated`` is the subset of *drafted* IDs whose drafts the
+    re-ask cannot fix without reading: a draft it never ruled, which it must
+    rule now, and every draft a per-ruling problem names, such as a needs-info
+    verdict to repoint, a reason to write, or a confirmed exclusion to reject.
+    None is answerable from an ID.
+
+    Both come out of one pass so they cannot disagree about what went wrong —
+    the reason this is a record rather than two functions over the same inputs.
+    Falsy when the rulings are assemblable, so callers read it as the check.
+
+    ``messages`` is the sentences alone, and it is a property rather than a
+    field so the prompt and the mark cannot carry different words.
+    """
+
+    problems: list[UnreconciledRuling]
+    implicated: frozenset[str]
+    #: The rulings as :func:`complete_rulings` left them, so assembly reads
+    #: the set the check ran over rather than completing it a second time.
+    rulings: tuple[Ruling, ...] = ()
+    #: Every *drafted* ID some problem names: ``implicated`` plus the IDs the
+    #: critic ruled twice. It is the whole of what a re-ask may change; a
+    #: ruling on any other drafted ID is already correct and is kept from the
+    #: first pass by :func:`merge_retry`, whatever the re-ask returns for it.
+    repairable: frozenset[str] = frozenset()
+
+    @property
+    def messages(self) -> list[str]:
+        """Each problem's sentence, in the words the re-ask reads."""
+        return problem_messages(self.problems)
+
+    def __bool__(self) -> bool:
+        return bool(self.problems)
+
+
+def problem_messages(problems: Iterable[UnreconciledRuling]) -> list[str]:
+    """Each problem's sentence, in the words the re-ask reads.
+
+    The one home of the sentence list: the check's record, the round's
+    outcomes and the failure a job reports all spell it through this.
+    """
+    return [problem.message for problem in problems]
+
+
+def _verdict_shape_issues(rulings: Iterable[Ruling]) -> list[UnreconciledRuling]:
+    """Every completed ruling whose fields cannot make a coherent verdict.
+
+    The status is read off the fields, so two combinations are left to check:
+    a rejection that also names open facts, and a verdict other than
+    ``confirmed`` that states no reason. Asked here rather than in the schema,
+    because a validator that raises does so at the node boundary, killing the
+    critic node — one pass over every draft in the job — with the re-ask that
+    exists for exactly this class of problem still unreached.
+
+    So they are returned, like every other problem this module finds, and the
+    router sends them to ``recritic``. Each names its claim, because the fix
+    is per-ruling: a reason to write, or a list to drop.
+    """
+    issues = []
+    for ruling in rulings:
+        verdict = ruling.verdict
+        if verdict.rejected_because is not None and verdict.related_unknowns:
+            issues.append(
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is rejected for"
+                    f" {verdict.rejected_because} but also names open facts in"
+                    " related_unknowns: a draft that fails a check rests on no"
+                    " open fact, so drop the list, or clear rejected_because"
+                    " where the argument follows once those facts hold",
+                )
+            )
+        if verdict.status != "confirmed" and not verdict.reason:
+            issues.append(
+                UnreconciledRuling.of(
+                    claim_id=ruling.id,
+                    kind="verdict-shape",
+                    message=f"claim {ruling.id!r} is ruled {verdict.status} and states"
+                    " no reason",
+                )
+            )
+    return issues
+
+
+def _confirmed_exclusion_issues(
+    drafts: Sequence[Claim], rulings: Iterable[Ruling]
+) -> list[UnreconciledRuling]:
+    """Every completed ruling that confirms a draft ruling its own unit out.
+
+    A draft that excludes its unit (:meth:`~katra.claims.Claim.excludes`)
+    says the unit does not apply, and ``confirmed`` says it does. So the two
+    cannot make one verdict. Which rejection the draft takes is the critic's
+    judgement, so the ruling goes to the re-ask rather than to a rule here.
+    """
+    excluding = {draft.id for draft in drafts if type(draft).excludes(draft)}
+    return [
+        UnreconciledRuling.of(
+            claim_id=ruling.id,
+            kind="verdict-shape",
+            message=f"claim {ruling.id!r} excludes its requirement and is ruled"
+            " confirmed, which says the requirement applies: rule it rejected,"
+            " set rejected_because to evidence where the stated facts show it"
+            " does not apply, or to reasoning where they do not, and write the"
+            " reason",
+        )
+        for ruling in rulings
+        if ruling.id in excluding and ruling.verdict.status == "confirmed"
+    ]
+
+
+def _unresolved_unknown_ref_issues(
+    rulings: Iterable[Ruling], system_model: SystemModel
+) -> list[UnreconciledRuling]:
+    """Every ``related_unknowns`` entry naming an element or attribute not there.
+
+    The ``attribute`` half is the element type's security-relevant fields —
+    :func:`~katra.system_model.attribute_names`, the list the
+    evidence catalog walks — so ``name``, ``notes`` and ``description`` are
+    refused here exactly as no catalog entry is ever written for them. A reader
+    that accepted every pydantic field on the element would let the critic
+    answer with a needs-info on ``notes``, which it did in 14 of the 38 reports
+    archived under ``evals/runs/``: a question about a sentence, pointed at a
+    field that happened to resolve. The check stops at the attribute's
+    existence. It deliberately does not require the named attribute to *hold*
+    the ``unknown`` sentinel: that would encode a judgement as a mechanical rule
+    and misfire on a stated-but-vague value — "some encryption" in
+    ``encryption_at_rest``, where a needs-info is legitimate and the field is
+    not literally ``unknown``.
+
+    A ``Ground``'s unknown-attribute branch is spelled identically to
+    :class:`~katra.claims.UnknownRef` and is checked one step
+    deeper, by catalog membership
+    (:func:`~katra.evidence.ground_issues`). The two differ because
+    their writers differ: a ground is written by code out of the catalog, so
+    "is it in the catalog" is the invariant the writer held; a ref is written
+    by the critic, whose question about a stated value is a judgement. The
+    blast radius differs too: a failure here lands in ``review_issues`` and
+    routes to the bounded ``recritic`` re-ask, where a grounds failure kills
+    the job outright.
+    """
+    by_id = {element.id: element for element in system_model.elements()}
+    issues = []
+    # Snapped for the check as well as for the report, so the router and
+    # assembly agree about which references resolve. Assembly snaps the rulings
+    # it actually carries; here a local copy is enough, because nothing in this
+    # function's return survives it.
+    for ruling in snap_rulings(rulings, by_id.keys()):
+        for ref in ruling.verdict.related_unknowns:
+            # The two spellings with no place in the model are checked for
+            # saying something, and nothing else. A subject names no element,
+            # and an assertion names a row of a catalog this function does not
+            # hold — the seam that does hold it is the one that built the
+            # ground, and a reference it could not resolve never reached a
+            # draft. Both are the whole reason the spellings exist.
+            if ref.mixed:
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} names one open fact in"
+                        f" {len(ref.spellings)} ways at once"
+                        f" ({', '.join(ref.spellings)}); an entry uses one:"
+                        " an element and attribute, an assertion, a question"
+                        " kind with its element, or a subject",
+                    )
+                )
+                continue
+            if ref.facets and ref.kind != "question":
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} names facets on a"
+                        f" {ref.kind} entry; facets name parts of a question"
+                        " kind, so only a question entry carries them",
+                    )
+                )
+                continue
+            if ref.kind == "question":
+                # A kind of question about an element: the kind is the
+                # table's, and the element is the model's, so both are checked
+                # and nothing else is.
+                unknown_kind = parse_question_kind(ref.question) is None
+                if unknown_kind or ref.element_id not in by_id:
+                    issues.append(
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} asks question"
+                            f" {ref.question!r} about {ref.element_id!r}; a"
+                            " question names a kind from the list and an"
+                            " element of this model, or the fact goes in"
+                            " `subject`",
+                        )
+                    )
+                continue
+            if not ref.names_an_element:
+                if not (ref.subject.strip() or ref.assertion.strip()):
+                    issues.append(
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} is ruled needs-info and its"
+                            " related_unknowns entry names no element"
+                            " attribute, no open fact and no subject, so"
+                            " nothing says what has to be answered",
+                        )
+                    )
+                elif not quotable(ref.subject):
+                    # An answer's line quotes the subject, and a lane quotes
+                    # that line with the submitter's authority (ADR 0043).
+                    issues.append(
+                        UnreconciledRuling.of(
+                            claim_id=ruling.id,
+                            kind="unresolved-unknown",
+                            message=f"claim {ruling.id!r} states a subject that"
+                            " an answer's line cannot quote: write the question"
+                            " on one line, with no double quote and no control"
+                            " or formatting character",
+                        )
+                    )
+                continue
+            element = by_id.get(ref.element_id)
+            if element is None:
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} hangs its needs-info verdict on"
+                        f" element {ref.element_id!r}, which is not in the system"
+                        " model",
+                    )
+                )
+            elif ref.attribute not in attribute_names(element):
+                # The available set is named, not just the missing one. An
+                # attribute is a fixed field per element *type*, so a critic
+                # reaching for `exposure` on an external entity has named a real
+                # attribute of the wrong type rather than invented one. Telling
+                # the re-ask only what is wrong leaves it guessing; telling it
+                # what is there is what lets it repoint rather than fall back on
+                # whichever field resolves everywhere.
+                issues.append(
+                    UnreconciledRuling.of(
+                        claim_id=ruling.id,
+                        kind="unresolved-unknown",
+                        message=f"claim {ruling.id!r} hangs its needs-info verdict on"
+                        f" attribute {ref.attribute!r}, which element"
+                        f" {ref.element_id!r} does not have. That element has:"
+                        f" {', '.join(attribute_names(element))}."
+                        " Name one of those, or state the question in"
+                        " `subject` if it is not about this model at all",
+                    )
+                )
+    return issues
+
+
+#: The rows each draft was shown, each with its Control, by draft ID
+#: (:func:`shown_rows`).
+ShownRows = Mapping[str, Mapping[ControlRowRef, AppliedControl]]
+
+
+def shown_rows(
+    drafts: Iterable[Claim],
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
+) -> dict[str, dict[ControlRowRef, AppliedControl]]:
+    """Each draft's ID against the Control rows its ``controls`` key shows,
+    each with its Control."""
+    return {
+        draft.id: {
+            ControlRowRef(control=control.id, unit=row.unit): control
+            for control in shown_controls(draft, package, controls)
+            for row in control.rows
+        }
+        for draft in drafts
+    }
+
+
+def _reaches_control_step(verdict: ProposedVerdict) -> bool:
+    """Whether the critic's control step rules on this verdict's draft (ADR 0126).
+
+    **The one reader** of the steps that reach the control step, which
+    ``ONE_READERS`` in ``tests/test_one_reader_lints.py`` holds. A draft kept,
+    or rejected for ``control``, reached the step. A draft rejected for
+    ``evidence``, ``reasoning`` or ``lane`` stopped at an earlier step, so it
+    answers no Control row.
+    """
+    reached: frozenset[CriticStep | None] = frozenset({None, "control"})
+    return verdict.rejected_because in reached
+
+
+def _without_control_rows(verdict: ProposedVerdict, **update: Any) -> ProposedVerdict:
+    """``verdict`` with ``update`` and no Control row: a verdict on a draft that
+    did not reach the control step."""
+    return verdict.model_copy(
+        update={**update, "control_row": None, "refused_controls": []}
+    )
+
+
+def _control_row_issues(
+    rulings: Iterable[Ruling], shown: ShownRows
+) -> list[UnreconciledRuling]:
+    """Every completed ruling whose Control rows do not answer what it was shown.
+
+    A ``control_row`` goes on a ``control`` rejection and on no other, and a
+    ruling names only rows its draft was shown (ADR 0126). A draft that reached
+    the control step, kept or rejected for ``control``, answers each shown row
+    in ``control_row`` or in ``refused_controls``. A draft rejected at an
+    earlier step answers none, and :func:`complete_rulings` drops any row it
+    names. A ``control`` rejection's reason quotes the name or a line of the
+    evidence of the Control it names (:func:`quotes_control`).
+    """
+    issues = []
+    for ruling in rulings:
+        verdict = ruling.verdict
+        rows = shown.get(ruling.id, {})
+        messages = []
+        if verdict.rejected_because == "control" and verdict.control_row is None:
+            messages.append(
+                "is rejected for control and names no control_row: name the row"
+                " whose evidence covers the draft"
+            )
+        if verdict.control_row is not None and verdict.rejected_because != "control":
+            messages.append(
+                "names a control_row on a ruling not rejected for control: a"
+                " control_row goes only on a control rejection"
+            )
+        named = [
+            ControlRowRef(control=ref.control, unit=ref.unit)
+            for ref in (verdict.control_row, *verdict.refused_controls)
+            if ref is not None
+        ]
+        messages += [
+            f"names the row {ref.unit} of {ref.control}, which the draft was not shown"
+            for ref in named
+            if ref not in rows
+        ]
+        applied = rows.get(verdict.control_row) if verdict.control_row else None
+        if (
+            verdict.rejected_because == "control"
+            and applied
+            and not quotes_control(verdict.reason, applied)
+        ):
+            messages.append(
+                f"is rejected for control and its reason quotes neither the name"
+                f" nor a line of the evidence of {applied.id}: quote, in double"
+                " quotes, the line of the excerpt that covers the draft or at"
+                f" least {PART_WORDS_TEXT} words of it, with the document's label,"
+                " or the Control's name"
+            )
+        if _reaches_control_step(verdict):
+            messages += [
+                f"leaves the row {ref.unit} of {ref.control} unanswered: answer it"
+                " in control_row or in refused_controls"
+                for ref in sorted(
+                    rows.keys() - set(named), key=lambda ref: (ref.control, ref.unit)
+                )
+            ]
+        issues += [
+            UnreconciledRuling.of(
+                claim_id=ruling.id,
+                kind="control-row",
+                message=f"claim {ruling.id!r} {message}",
+            )
+            for message in messages
+        ]
+    return issues
+
+
+def _duplicate_id_issues(
+    entries: Iterable[Claim | Ruling],
+) -> list[UnreconciledRuling]:
+    counts = Counter(entry.id for entry in entries)
+    return [
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="duplicate-id",
+            message=f"claim ID {claim_id!r} is used by {count} drafts",
+        )
+        for claim_id, count in counts.items()
+        if count > 1
+    ]
+
+
+def complete_rulings(
+    drafts: Sequence[Claim], rulings: Sequence[Ruling]
+) -> list[Ruling]:
+    """Each ruling with what the draft's grounds settle already filled in.
+
+    A ruling that names no failed check gains, in ``related_unknowns``, every
+    unknown ground of its draft that the critic did not dismiss in
+    ``immaterial_unknowns``, beside any open fact the critic named. Where the
+    critic wrote no reason, it gains one naming every open fact it carries, the
+    critic's own included. So a draft that rests on
+    an unstated fact reads ``needs-info`` whether or not the critic listed it,
+    and silence never confirms. Code supplies those references because a
+    hand-written pair naming an attribute the model does not carry is a failure
+    the service can prevent and a critic cannot (#409).
+
+    **A missing ruling is not filled in here**, with one exception. Every draft
+    is shown, so a draft with no ruling means the critic dropped it, and
+    :func:`review_issues` routes that to the bounded re-ask. Completing it from
+    the draft's own grounds would hand back an automatic verdict for a claim
+    nobody reviewed, and it would arrive silently, on the path where the critic
+    failed.
+
+    A ruling on a draft the package's own table calls misfiled
+    (:meth:`~katra.claims.Claim.misfiled`) becomes a ``lane``
+    rejection with the table's reason, whatever the critic ruled. That is the
+    one rejection this service writes rather than reads. So it is also the
+    exception: a misfiled draft the critic left unruled gains that rejection,
+    because a re-ask could only produce a ruling this would replace. The
+    ruling carries no package field, so a rating such as STRIDE's
+    ``confidence`` stays empty: nobody rated the draft.
+
+    An ``immaterial_unknowns`` entry that names no unknown ground of the draft
+    is removed. It dismisses nothing, and left in place it reads as though it
+    answered a question. A near-miss spelling of a cited fact therefore leaves
+    that fact open, and the ruling reads ``needs-info`` on it.
+
+    A rejection at a step before the control step loses its ``control_row``
+    and its ``refused_controls``: the draft did not reach the control step, so
+    it answers no row. Apart from these two removals a rejection passes
+    through untouched, and so does a ruling that names no drafted ID: the
+    reconciliation check owns that.
+    """
+    by_id = {draft.id: draft.unknown_grounds() for draft in drafts}
+    misfiled = {
+        draft.id: reason for draft in drafts if (reason := type(draft).misfiled(draft))
+    }
+    completed = []
+    for ruling in rulings:
+        ruling = _without_stray_dismissals(ruling, by_id.get(ruling.id, []))
+        if ruling.id in misfiled:
+            # A lane error is a table lookup, so the ruling is the table's
+            # whatever the critic said (#442). The reason names the lanes the verb
+            # belongs to, which is what the audit array must give a reader, and
+            # the step is `lane` by construction: the table is the lane check.
+            verdict = _without_control_rows(
+                ruling.verdict,
+                reason=misfiled[ruling.id],
+                related_unknowns=[],
+                rejected_because="lane",
+            )
+            completed.append(ruling.model_copy(update={"verdict": verdict}))
+            continue
+        # A pair the critic dismissed is not one this claim hangs on, so it is
+        # not filled in beside the ones that are. Without this the service
+        # would hand back, as the question a reader must answer, the very fact
+        # the critic just said the argument does not use.
+        dismissed = ruling.verdict.dismissed_refs()
+        derived = [ref for ref in by_id.get(ruling.id, []) if ref.key not in dismissed]
+        if ruling.verdict.rejected_because is not None:
+            if not _reaches_control_step(ruling.verdict):
+                verdict = _without_control_rows(ruling.verdict)
+                ruling = ruling.model_copy(update={"verdict": verdict})
+            completed.append(ruling)
+            continue
+        named = {ref.key for ref in ruling.verdict.related_unknowns}
+        related = [
+            *ruling.verdict.related_unknowns,
+            *(ref for ref in derived if ref.key not in named),
+        ]
+        if not related:
+            completed.append(ruling)
+            continue
+        verdict = ruling.verdict.model_copy(
+            update={
+                "related_unknowns": related,
+                "reason": ruling.verdict.reason or rests_on(related),
+            }
+        )
+        completed.append(ruling.model_copy(update={"verdict": verdict}))
+    ruled = {ruling.id for ruling in rulings}
+    completed += [
+        Ruling(
+            id=claim_id,
+            verdict=ProposedVerdict(reason=reason, rejected_because="lane"),
+        )
+        for claim_id, reason in misfiled.items()
+        if claim_id not in ruled
+    ]
+    return completed
+
+
+def _without_stray_dismissals(ruling: Ruling, cited: Iterable[UnknownRef]) -> Ruling:
+    """``ruling`` with only the dismissals that name one of ``cited``."""
+    keys = {ref.key for ref in cited}
+    kept = [ref for ref in ruling.verdict.immaterial_unknowns if ref.key in keys]
+    if len(kept) == len(ruling.verdict.immaterial_unknowns):
+        return ruling
+    verdict = ruling.verdict.model_copy(update={"immaterial_unknowns": kept})
+    return ruling.model_copy(update={"verdict": verdict})
+
+
+def review_issues(
+    drafts: Sequence[Claim],
+    rulings: Sequence[Ruling],
+    system_model: SystemModel,
+    shown: ShownRows,
+) -> ReviewProblems:
+    """Every way the critic's rulings fail to account for the drafts it saw.
+
+    The mechanical check, returned rather than raised, so the graph can *route*
+    on it: a falsy result means the rulings are assemblable, a truthy one is
+    what the bounded re-ask is asked to fix. The critic must rule on exactly the
+    drafted set — no claim invented, none dropped — with unique IDs, with each
+    verdict's fields making a coherent verdict, and each ``needs-info`` naming
+    only unknowns the model actually contains. It reads the rulings after
+    :func:`complete_rulings`, so the status each one reads is the one code
+    decides.
+
+    **Verdict shape is checked here rather than by the schema**, and that is
+    the reason this function is worth reading twice. The rules are conditional
+    on one field's value, which no provider schema can express, so they can
+    only be enforced after the fact — and enforcing them in a pydantic validator means
+    enforcing them at the node boundary, where a raise kills the critic node
+    and the whole job with it. Every other problem in this list gets a bounded
+    re-ask; a missing reason is not a worse fault than a dropped draft, and
+    there is no reason for it to be the fatal one.
+
+    **A malformed claim ID is checked here too, and by accident rather than by
+    design.** Nothing below looks at an ID's spelling — which is what lets this
+    run over a framework whose IDs are requirement numbers: the set comparison at
+    the top requires the ruled IDs to equal the drafted ones, which an ill-formed
+    ID fails on both sides at once — the draft it meant to name reads as dropped,
+    and the ID it actually wrote reads as invented. That is a stronger
+    constraint than a pattern and it produces better messages, so
+    :class:`~katra.claims.Ruling` carries no pattern to fire first and
+    fatally.
+
+    Element references are deliberately **not** checked: a ruling carries none.
+    They are the join seam's business (:func:`~katra.fan_in.join_drafts`
+    drops and marks a reference the model does not contain, and fails closed
+    on a ground it cannot derive), and since the critic does not re-emit
+    them there is no second place they can break. An issue
+    listed here has to be one the re-ask can actually fix, and a draft's bad
+    reference never was.
+
+    ``shown`` is the Control rows each draft was shown, each with its Control
+    (:func:`shown_rows`), which the rulings answer.
+    """
+    rulings = complete_rulings(drafts, rulings)
+    drafted_ids = {draft.id for draft in drafts}
+    ruled_ids = {ruling.id for ruling in rulings}
+    dropped = sorted(drafted_ids - ruled_ids)
+    per_ruling = (
+        _verdict_shape_issues(rulings)
+        + _confirmed_exclusion_issues(drafts, rulings)
+        + _unresolved_unknown_ref_issues(rulings, system_model)
+        + _control_row_issues(rulings, shown)
+    )
+    problems = [
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="dropped",
+            message=f"critic dropped draft {claim_id!r}",
+        )
+        for claim_id in dropped
+    ]
+    problems += [
+        UnreconciledRuling.of(
+            claim_id=claim_id,
+            kind="invented",
+            message=(
+                f"critic returned claim {claim_id!r}, which no lane agent drafted"
+            ),
+        )
+        for claim_id in sorted(ruled_ids - drafted_ids)
+    ]
+    problems += _duplicate_id_issues(rulings)
+    problems += per_ruling
+    # A duplicate ID implicates no draft: the re-ask drops one of two rulings on
+    # an ID it already ruled, which is answerable from the rulings alone. An
+    # invented ID implicates none either — there is no draft behind it to show.
+    #
+    # Every per-ruling problem does implicate one. Naming the unknown a
+    # needs-info hangs on, or writing the reason a rejection must give a reader,
+    # cannot be done from an ID — both are assertions about a specific claim,
+    # and a re-ask that cannot read it would have to invent one.
+    implicated = set(dropped) | {
+        issue.claim_id for issue in per_ruling if issue.claim_id in drafted_ids
+    }
+    duplicated = {
+        claim_id
+        for claim_id, count in Counter(ruling.id for ruling in rulings).items()
+        if count > 1 and claim_id in drafted_ids
+    }
+    return ReviewProblems(
+        problems=problems,
+        implicated=frozenset(implicated),
+        rulings=tuple(rulings),
+        repairable=frozenset(implicated | duplicated),
+    )
+
+
+def merge_retry(
+    first: Sequence[Mapping[str, Any]],
+    retry: Sequence[Mapping[str, Any]],
+    repairable: Collection[str],
+    drafted: Collection[str],
+) -> tuple[list[Mapping[str, Any]], list[UnreconciledRuling]]:
+    """The re-ask's rulings for what the problems named, the first pass's for the rest.
+
+    The re-ask prompt asks for exactly this, and this function enforces it: the
+    re-ask's ruling applies only to IDs a problem named. Without it, a re-ask
+    that changed a confirmed ruling to rejected while it added the one it
+    dropped would be accepted whole, and the change would reach the report as
+    if the review had reasoned it out.
+
+    Over payloads the caller has already put in the ruling model's own
+    spelling, because what is merged is what ``reviewed`` holds and what
+    ``assemble`` reads back, and a comparison over two providers' spellings of
+    one ruling would read a ``null`` against an absent key as a change. Two
+    rules, and the second list says where the re-ask stepped outside them:
+
+    * a drafted ID a problem named takes the re-ask's ruling, every copy of it,
+      so a duplicated repair still fails the check that follows;
+    * a drafted ID no problem named keeps the first pass's ruling, and a
+      re-ask ruling that differs from it is recorded and discarded.
+
+    An ID no lane agent drafted is not resolved here. The first pass's copy
+    is left out, because removing it was the re-ask's whole instruction; a
+    copy the re-ask returned anyway is passed through, so the check that
+    follows names it and the job fails. A re-ask that
+    invents is the service's defect, and a mark is not the place for one.
+    """
+    named = set(repairable)
+    known = set(drafted)
+    kept_first = {
+        ruling["id"]: ruling
+        for ruling in first
+        if ruling["id"] in known and ruling["id"] not in named
+    }
+    merged: list[Mapping[str, Any]] = list(kept_first.values())
+    drift: list[UnreconciledRuling] = []
+    for ruling in retry:
+        claim_id = ruling["id"]
+        if claim_id in named or claim_id not in known:
+            merged.append(ruling)
+        elif ruling != kept_first.get(claim_id):
+            drift.append(
+                UnreconciledRuling.of(
+                    claim_id=claim_id,
+                    kind="unbriefed-change",
+                    message=(
+                        f"re-ask changed ruling {claim_id!r}, which no problem"
+                        " named; the first ruling was kept"
+                    ),
+                )
+            )
+    return merged, drift
+
+
+def _ruled(draft: Claim, ruling: Ruling, ruled_record: type[RuledClaim]) -> RuledClaim:
+    """One draft plus the critic's ruling on it, as the package's ruled record.
+
+    The draft's own fields are carried across from the copy the service already
+    held rather than from anything the critic emitted, so a review cannot alter
+    a description or an element reference.
+
+    **What a ruling adds is stated by the ruling's own shape, not by a list
+    here.** Every field a package's :class:`~katra.claims.Ruling`
+    subclass declares beyond ``id`` and ``verdict`` is merged onto the draft,
+    and a field holding ``None`` is left out. STRIDE's ``confidence`` and
+    ``recommendation`` are judgements the draft never had. No ruling field
+    replaces a field the agent wrote, so the agent's severity and its
+    justification always reach the report together.
+
+    The verdict is **rebuilt** rather than carried across, promoting the
+    critic's unruled :class:`~katra.claims.ProposedVerdict` to the
+    :class:`~katra.claims.Verdict` the report defines, with the
+    status its fields decide. It cannot fail: :func:`review_issues` has already
+    passed on exactly these rulings, and its verdict checks are that model's
+    validator asked one seam earlier. A
+    raise here would mean the two had drifted, which is why the promotion is
+    left able to raise rather than coerced.
+    """
+    overrides = {
+        field: value
+        for field, value in ruling.model_dump(exclude=set(Ruling.model_fields)).items()
+        if value is not None
+    }
+    return ruled_record(
+        **{**draft.model_dump(), **overrides},
+        verdict=Verdict(**ruling.verdict.model_dump(), status=ruling.verdict.status),
+    )
+
+
+def assemble_claims(
+    drafts: Sequence[Claim],
+    rulings: Sequence[Ruling],
+    system_model: SystemModel,
+    schemas: FrameworkSchemas,
+    shown: ShownRows,
+) -> AssembledClaims:
+    """Merge one critic's rulings onto its drafts, split into the block's arrays.
+
+    :func:`review_issues` is the gate — one definition of what "well-formed
+    critic output" means, shared with the router that decides whether to
+    re-ask. Assembly runs only after that gate has passed, but re-checks here
+    and fails closed regardless: nothing reaches the report on output that did
+    not survive the check. Rejected claims ride in their own audit array; the
+    rest are ordered by :func:`_claim_order`.
+
+    Claims are built in ``drafts`` order — the package's own lane order, as
+    :func:`~katra.fan_in.join_drafts` left them — so the audit array does not inherit
+    whatever order the critic happened to emit its rulings in.
+    """
+    problems = review_issues(drafts, rulings, system_model, shown)
+    if problems:
+        raise CriticOutputError("; ".join(problems.messages))
+
+    rulings = snap_rulings(
+        problems.rulings, {element.id for element in system_model.elements()}
+    )
+    ruling_by_id = {ruling.id: ruling for ruling in rulings}
+    reviewed = [
+        _ruled(draft, ruling_by_id[draft.id], schemas.ruled_record) for draft in drafts
+    ]
+    actionable = [claim for claim in reviewed if claim.verdict.status != "rejected"]
+    rejected = [claim for claim in reviewed if claim.verdict.status == "rejected"]
+    return AssembledClaims(sorted(actionable, key=_claim_order), rejected)
+
+
+def _claim_order(claim: RuledClaim) -> tuple[int, str]:
+    """Most severe first where the framework grades harm, then by ID.
+
+    ``severity`` is read off the record rather than declared, the same way
+    :meth:`~katra.frameworks.FrameworkPackage.carries_severity` reads
+    it: a framework that grades nothing has every claim on one rank and falls
+    through to the ID, which is a stable order rather than the critic's emission
+    order.
+    """
+    severity = getattr(claim, "severity", None)
+    rank = SEVERITY_ORDER.index(severity.level) if severity is not None else 0
+    return rank, claim.id
+
+
+#: Draft fields no critic rules on, so no critic is shown them. **Empty**, and
+#: the constant stays because what belongs in it is a live question: every field
+#: here takes prompt space for a judgement nobody asked for, and every field
+#: wrongly here is a judgement nobody can make.
+#:
+#: ``mitigations`` sat here while the critic ruled only on a draft's argument.
+#: A mitigation is what the report tells an operator to *do*, it is copied into
+#: the report verbatim, and a well-formed recommendation can still be
+#: irrelevant to the claim it sits under or wrong about what would close it.
+#: Nothing else reviews it, so leaving it out of the view meant nothing
+#: reviewed it at all.
+_DRAFT_UNRULED_FIELDS: frozenset[str] = frozenset()
+
+
+def _ruling_view(
+    drafts: Sequence[Claim],
+    repaired: Sequence[RepairedQuote],
+    unverified: Sequence[UnverifiedGround],
+    assertions: AssertionCatalog | None,
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
+) -> list[dict]:
+    """The drafts as a critic reads them, with no empty branches.
+
+    The two shared steps read ``description`` (evidence) and the lane, over
+    ``grounds``. Everything else here is for whatever its own framework grades.
+
+    ``mitigations`` is the largest block, and it is a package's field rather
+    than the neutral claim's: a
+    :class:`~katra.claims.Mitigation` is a 200-character summary plus
+    2000 characters of detail and a draft carries a list of them. It is shown
+    because it is what the report tells an operator to do, it is copied into the
+    report from this same draft, and no other seam looks at it — so a package
+    whose critic text asks for a reading of it gets one, and a package whose
+    claims recommend nothing carries no such field and is shown none.
+
+    **A recommendation never decides a claim.** Validity and advice are
+    separate judgements, so a package's text rules the advice and rules the
+    claim on its own argument; ``frameworks/stride/critic.md`` is where that is
+    said, because ``mitigations`` is STRIDE's field and the shared prompt has
+    no business reading one.
+
+    ``exclude_defaults`` is what drops the empty branches of a
+    :class:`~katra.claims.Ground`. That model is one flat object
+    rather than a discriminated union — a deliberate choice, for provider
+    schema-compiler reasons it documents itself — so four of its six fields are
+    the empty string on any given ground, and rendering them uses a line each
+    on a field whose own validator forbids it carrying anything.
+
+    THE HAZARD THIS ADDS, stated rather than left to be discovered: a field
+    added to a package's record with a default disappears from that
+    framework's critic's view whenever it holds that default, silently and with
+    nothing downstream able to see it. Every field a critic rules on is required
+    today and so cannot be dropped;
+    ``test_ruling_view_keeps_every_field_the_critic_rules_on`` is what holds that
+    true for the next field.
+
+    ``framework`` and ``framework_version`` go too, under the same rule: they are
+    the same pair on every draft in one critic's prompt — it rules one
+    framework's drafts — so they are a constant repeated per claim.
+    """
+    repairs_by_claim: dict[str, list[dict]] = {}
+    for mark in repaired:
+        repairs_by_claim.setdefault(mark.claim_id, []).append(
+            {"index": mark.index, "written": mark.written, "moved": mark.moved}
+        )
+    unverified_by_claim: dict[str, list[dict]] = {}
+    for bad in unverified:
+        unverified_by_claim.setdefault(bad.claim_id, []).append(
+            {"index": bad.index, "reason": bad.reason}
+        )
+    views = []
+    excerpted: set[str] = set()
+    for draft in drafts:
+        view = draft.model_dump(
+            mode="json",
+            exclude={*_DRAFT_UNRULED_FIELDS, "framework", "framework_version"},
+            exclude_defaults=True,
+        )
+        # Computed, never drafted: which quote grounds the service rewrote to
+        # the source's own span, what the agent wrote, and what the rewrite
+        # moved. The critic reads the span as the ground's text already; this
+        # is what tells it the span is not the agent's evidence. ``moved`` is
+        # empty on a repair the fan-in makes, which refuses a span that
+        # changes a negation or a number.
+        if draft.id in repairs_by_claim:
+            view["repaired_quotes"] = repairs_by_claim[draft.id]
+        # Computed, never drafted: which quote grounds the service looked for
+        # and did not find. The entry still renders, because ``grounds`` is
+        # ``min_length=1`` and dropping the last one would delete the finding
+        # — so without this the critic reads an invented sentence beside a
+        # verified one and is told every quote was matched (#1082).
+        if draft.id in unverified_by_claim:
+            view["unverified_quotes"] = unverified_by_claim[draft.id]
+        # Computed too: the rows behind this draft's assertion grounds,
+        # resolved. A ground carries the row's identity and nothing else, and
+        # the identity is a digest of the value and the scope, so a critic
+        # asked whether the argument follows from the facts could not read the
+        # facts (#1082).
+        if rows := _assertion_rows(draft, assertions):
+            view["assertion_facts"] = rows
+        # Also computed: the package's own table says this draft's action is not
+        # one its lane files. The ruling is settled in code; the key tells the
+        # critic not to make a judgement on it.
+        if reason := type(draft).misfiled(draft):
+            view["filed_in_wrong_lane"] = reason
+        # The framework's own words for the unit this draft rules on, so the
+        # evidence step judges the description against the requirement rather
+        # than against the draft's paraphrase of it (#659). Absent for a
+        # framework whose claims are an open set.
+        if text := type(draft).unit_text(draft):
+            view["unit_text"] = text
+        # Computed: each applied Control that reaches this draft, with the rows
+        # on its unit and the service's copy of each evidence file. The copy's
+        # text rides on the first draft that shows the file (ADR 0126).
+        if shown := shown_controls(draft, package, controls):
+            view["controls"] = [
+                _control_entry(control, package, excerpted) for control in shown
+            ]
+        views.append(view)
+    return views
+
+
+def _control_entry(
+    control: AppliedControl, package: FrameworkPackage, excerpted: set[str]
+) -> dict:
+    """One applied Control as a draft's ``controls`` key shows it.
+
+    ``excerpted`` holds the digest of each file an earlier entry of the view
+    carries the text of. A file in it is named by its digest alone, so one
+    view holds each text once; this adds the rest to it.
+    """
+    return {
+        "control": control.id,
+        "name": control.name,
+        "scope": {
+            "outcome": control.scope.outcome,
+            "elements": list(control.scope.element_ids()),
+        },
+        "rows": [
+            {"unit": row.unit, "label": package.record.text_of_unit(row.unit)}
+            for row in control.rows
+        ],
+        "evidence": [_evidence_entry(file, excerpted) for file in control.evidence],
+    }
+
+
+def _evidence_entry(file: CopiedEvidence, excerpted: set[str]) -> dict:
+    """One evidence file of a ``controls`` entry, with its text where no
+    earlier entry of the view carries it."""
+    entry = {"label": file.name, "class": file.evidence_class, "sha256": file.sha256}
+    if file.sha256 not in excerpted:
+        excerpted.add(file.sha256)
+        entry["excerpt"] = file.text
+    return entry
+
+
+def _assertion_rows(draft: Claim, assertions: AssertionCatalog | None) -> list[dict]:
+    """One draft's assertion grounds, resolved to the words the row states.
+
+    Read through :func:`~katra.evidence.ground_gloss`, which is what
+    rendered the same row into the table the lane agent selected it from, so
+    the two agents cannot be told two things about one fact.
+
+    Empty for a draft citing none, and for every draft on a job that ran no
+    assertion catalog, which is every job with ``KATRA_ASSERTIONS`` off.
+    """
+    if assertions is None:
+        return []
+    return [
+        {"assertion": ground.assertion, "says": ground_gloss(ground, assertions)}
+        for ground in draft.grounds
+        if ground.kind in ASSERTION_GROUNDS
+    ]
+
+
+def critic_view(
+    drafts: Sequence[Claim],
+    *,
+    only: Collection[str] | None,
+    repaired: Sequence[RepairedQuote],
+    unverified: Sequence[UnverifiedGround],
+    assertions: AssertionCatalog | None,
+    package: FrameworkPackage,
+    controls: Sequence[AppliedControl],
+) -> list[dict]:
+    """The drafts a critic is shown, with everything computed for it already.
+
+    One function rather than four calls in the right order, because the
+    :class:`~katra.critic_round.CriticRound` builds this view twice —
+    once for the first pass over the whole fan-in, once for the bounded re-ask
+    over the few drafts it names — and the two must agree about what a critic
+    reads.
+
+    **Every draft is shown.** A draft citing an unknown ground is conditional,
+    and :meth:`Claim.settled_by_grounds` still says so in code — but whether an
+    argument follows from the facts it cites is a different question from
+    whether those facts are open, and only the second can be answered by a
+    rule. Showing the critic the first set and not the second left roughly four
+    fifths of a report's findings with their reasoning read by nobody, and a
+    draft could reach that state by citing an unknown it did not depend on.
+
+    ``repaired`` is the fan-in's :class:`~katra.claims.RepairedQuote`
+    marks, rendered onto the draft each one names so the evidence step reads
+    what the agent wrote beside the span the service put in its place.
+    ``unverified`` is the other half of the same seam: the quote grounds the
+    service looked for and did not find, which still render because a draft
+    must keep at least one ground. **Both passes get both**, so a critic told
+    once that a quote was invented does not read the same quote clean on the
+    second look.
+
+    ``assertions`` is the job's assertion catalog, read for the rows this
+    draft's assertion grounds point at. A ground carries the row's computed
+    identity, whose value and scope are digests, so without this the critic is
+    asked whether a claim follows from a fact it cannot read.
+
+    ``controls`` is each Control that applies to the job, and ``package`` reads
+    the unit of each draft, so each draft carries the Controls that reach it.
+    """
+    chosen = list(drafts) if only is None else [d for d in drafts if d.id in only]
+    return _ruling_view(chosen, repaired, unverified, assertions, package, controls)

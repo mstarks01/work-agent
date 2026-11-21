@@ -22,11 +22,11 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from analysis_service.deployment import Deployment
-from analysis_service.engine import EngineInputError
-from analysis_service.jobs import InMemoryJobStore, PipelineRejected
-from analysis_service.report import InputRef
-from analysis_service.sources import MAX_SYSTEM_NAME_CHARS, Source, clean_system_name
+from katra.deployment import Deployment
+from katra.engine import EngineInputError
+from katra.jobs import InMemoryJobStore, PipelineRejected
+from katra.report import InputRef
+from katra.sources import MAX_SYSTEM_NAME_CHARS, Source, clean_system_name
 from tests.factories import TEST_TIER_ENV
 from tests.test_api import auth, make_client, submission
 from tests.test_engine import RecordingRunner, analyze, engine_for

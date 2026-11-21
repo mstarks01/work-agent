@@ -32,7 +32,7 @@
   const FINAL = JSON.parse(document.getElementById("final").textContent);
   // False for an analysis submitted with no questions: its report has no
   // Questions section.
-  const ANALYSIS_ASKS = JSON.parse(document.getElementById("asks").textContent);
+  const KATRA_ASKS = JSON.parse(document.getElementById("asks").textContent);
   // The run this report's follow-up started, where one locks it: the report
   // then asks nothing, and its follow-up's report is the next one to read.
   const RESUMED_BY = JSON.parse(document.getElementById("resumed_by").textContent);
@@ -73,10 +73,10 @@
   // A display label for each element ID, a flow's as its two endpoints, and
   // for each evidence reference a lane may cite, such as an unstated attribute
   // or a boundary crossing. Built server-side by
-  // analysis_service.open_facts.reference_labels, so the page parses no
+  // katra.open_facts.reference_labels, so the page parses no
   // reference.
   const NAMES = JSON.parse(document.getElementById("names").textContent);
-  // The hue of each element, from analysis_service.element_hues: its tags,
+  // The hue of each element, from katra.element_hues: its tags,
   // its box in the diagram and the Mermaid download share it.
   const HUES = JSON.parse(document.getElementById("element_hues").textContent);
   // Each data flow by its ID, so a reference to one draws its two endpoints.
@@ -87,7 +87,7 @@
   const LANES = JSON.parse(document.getElementById("lanes").textContent);
   const laneOf = (framework, claim) => LANES[framework] ? claim[LANES[framework]] : null;
   // How each finding moved since the report a follow-up's answers came from,
-  // matched server-side by analysis_service.report_changes. Empty for any
+  // matched server-side by katra.report_changes. Empty for any
   // other report.
   const CHANGES = JSON.parse(document.getElementById("changes").textContent).findings || [];
   const CHANGED = new Map(CHANGES.filter(c => c.change !== "gone")
@@ -322,8 +322,8 @@
   // The page has three sections: the report, its questions, and how it was
   // made. The report is the one a reader lands on, and ?view= names another,
   // so a reload stays where the reader was.
-  const SECTIONS = ANALYSIS_ASKS ? ["report", "questions", "about"] : ["report", "about"];
-  $("questions-tab").hidden = !ANALYSIS_ASKS;
+  const SECTIONS = KATRA_ASKS ? ["report", "questions", "about"] : ["report", "about"];
+  $("questions-tab").hidden = !KATRA_ASKS;
   const showSection = (name) => {
     SECTIONS.forEach(each => {
       $(`${each}-view`).hidden = each !== name;
@@ -2194,7 +2194,7 @@
     beforeExport.closed.forEach(d => { d.open = true; });
     $("report-view").hidden = false;
     $("questions-view").hidden = true;
-    exportQuestions.hidden = !ANALYSIS_ASKS;
+    exportQuestions.hidden = !KATRA_ASKS;
     $("about-view").hidden = false;
     $("preview-bar").hidden = false;
   };

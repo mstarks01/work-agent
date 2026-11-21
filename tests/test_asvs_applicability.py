@@ -7,7 +7,7 @@ from itertools import combinations
 
 import pytest
 
-from analysis_service.capabilities import (
+from katra.capabilities import (
     ALWAYS,
     CAPABILITIES,
     CapabilityFact,
@@ -16,14 +16,14 @@ from analysis_service.capabilities import (
     lineage,
     resolve,
 )
-from analysis_service.frameworks.asvs import applicability
-from analysis_service.frameworks.asvs.applicability import (
+from katra.frameworks.asvs import applicability
+from katra.frameworks.asvs.applicability import (
     APPLICABILITY,
     RATIONALES,
     REVIEWED_BY,
     applicability_for,
 )
-from analysis_service.frameworks.asvs.catalog import REQUIREMENTS
+from katra.frameworks.asvs.catalog import REQUIREMENTS
 
 
 def _known(**states: Presence) -> dict[str, CapabilityFact]:

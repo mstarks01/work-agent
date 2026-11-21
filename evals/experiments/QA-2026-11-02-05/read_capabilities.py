@@ -1,6 +1,6 @@
 """The capability reader's instruction and user turn, as a job sends them, on each case.
 
-The request is rebuilt with :func:`~analysis_service.node_requests.node_request`
+The request is rebuilt with :func:`~katra.node_requests.node_request`
 and sent with :func:`~evals.harness.node_call.node_call`, on the deployment's
 route, sampling and structured output for the ``capabilities`` node. In a job
 the node runs right after the validity gate, so its user turn is the gate's
@@ -16,7 +16,7 @@ filling of every case.
 The output names the tier, its selection, its sampling, the pinned upstreams
 and the commit, and keeps what the provider answered for each call.
 
-Usage, from the repository root, under ``bash -l`` with ``ANALYSIS_TIERS_FILE``
+Usage, from the repository root, under ``bash -l`` with ``KATRA_TIERS_FILE``
 set:
 
     read_capabilities.py <out.json> <case dir> [<case dir> ...]
@@ -32,23 +32,23 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from analysis_service.capabilities import CAPABILITIES
-from analysis_service.capability_reader import (
+from evals.harness.artifact import repo_commit
+from evals.harness.node_call import node_call
+from katra.capabilities import CAPABILITIES
+from katra.capability_reader import (
     CapabilityReading,
     with_stated_capabilities,
 )
-from analysis_service.deployment import Deployment
-from analysis_service.execution import seed_state
-from analysis_service.frameworks.asvs.applicability import applicability_for
-from analysis_service.frameworks.asvs.catalog import ASVS_LEVELS
-from analysis_service.graph import CAPABILITIES_NODE, after_gate
-from analysis_service.markdown_loader import MarkdownLoader
-from analysis_service.node_requests import node_request
-from analysis_service.prompts import compose_capabilities_prompt
-from analysis_service.sources import Source, text_digest
-from analysis_service.system_model import SystemModel
-from evals.harness.artifact import repo_commit
-from evals.harness.node_call import node_call
+from katra.deployment import Deployment
+from katra.execution import seed_state
+from katra.frameworks.asvs.applicability import applicability_for
+from katra.frameworks.asvs.catalog import ASVS_LEVELS
+from katra.graph import CAPABILITIES_NODE, after_gate
+from katra.markdown_loader import MarkdownLoader
+from katra.node_requests import node_request
+from katra.prompts import compose_capabilities_prompt
+from katra.sources import Source, text_digest
+from katra.system_model import SystemModel
 
 #: What the validity gate hands the next node on its valid route.
 VALID_TURN = {"issue_count": 0}

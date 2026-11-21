@@ -34,7 +34,7 @@ after the captured input. `run.py critic-replay` does the same for a critic
 call, and `run.py recritic-replay` sends one critic re-ask over one injected
 fault of a named shape. `run.py lane-replay --fresh-leads` rebuilds a lane's
 leads with the current rules through the function the prepare node calls. A replay costs one
-model call, about $0.03 to $0.06 on the strong tier, and `ANALYSIS_OFFLINE`
+model call, about $0.03 to $0.06 on the strong tier, and `KATRA_OFFLINE`
 refuses it.
 
 **The ledger.** `evals/experiments/` holds one JSONL file per audit. Read it
@@ -75,14 +75,14 @@ smaller than that from sampling.
 the final part of its user turn: address every lead and every boundary
 crossing, and file a finding that rests on an open fact as a conditional draft.
 The text is `frameworks/stride/lane_closing.md`, the table that selects it is
-`LANE_CLOSING_DOC` in `analysis_service.frameworks`, and a callback on the lane
+`LANE_CLOSING_DOC` in `katra.frameworks`, and a callback on the lane
 agents adds it. The position matters: the same words inside `output.md` raised
 lane output 18%, where the final user part raised it about 75%
 (`QA-2026-09-26-01-E4`, `-E5`). ASVS closes nothing, because its scope table
 gives every selected requirement an entry. Cost: reports about twice as long,
 mostly conditional findings, and about 20% more per lane call.
 
-**Grouped conditional findings.** `analysis_service.open_facts` groups a
+**Grouped conditional findings.** `katra.open_facts` groups a
 report's needs-info findings under the open fact that would settle them, and
 the first-run report page shows each conditional finding once, in a
 collapsible group per fact. It reads only the report, so it cannot disagree
@@ -176,7 +176,7 @@ rows and the committed rulings instead.
    give the figures above (E1: 49 `same`, 12 `different`; E2: sentence arm 8
    and 8, comparison arm 3 and 4, by distinct missed must-find).
 3. Read ADR 0030 and the lane-closing code path: the table, the callback in
-   `analysis_service.graph`, and the test in `tests/test_evals_lane_replay.py`
+   `katra.graph`, and the test in `tests/test_evals_lane_replay.py`
    that a STRIDE lane's request ends with the closing and the critic's does
    not.
 4. Run `python -m evals.harness.run experiments --signature "a lane passes by

@@ -42,13 +42,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from analysis_service.claims import (
-    FrameworkAnalysis,
-    FrameworkName,
-    quote_check_ran,
-)
-from analysis_service.identity import IDENTITY_VERSION
-from analysis_service.report import NodeRun, Report, TokenUsage
 from evals.harness import (
     applicability,
     attribution,
@@ -71,6 +64,13 @@ from evals.harness.provenance import RunProvenance
 from evals.harness.reference import GoldenCase
 from evals.harness.scorer import CaseScore
 from evals.harness.writing import CaseWriting
+from katra.claims import (
+    FrameworkAnalysis,
+    FrameworkName,
+    quote_check_ran,
+)
+from katra.identity import IDENTITY_VERSION
+from katra.report import NodeRun, Report, TokenUsage
 
 
 def charges_by_node(nodes: Iterable[NodeRun]) -> dict[str, float]:
@@ -695,7 +695,7 @@ def artifact_blocks(sweep: Sweep) -> dict[str, Any]:
 #: framework-neutral instruments every block already gets.
 #:
 #: **Keyed, never branched.** A package added to
-#: :data:`~analysis_service.frameworks.PACKAGES` and missing here raises at the
+#: :data:`~katra.frameworks.PACKAGES` and missing here raises at the
 #: first case that carries its block, which is the whole reason this is a table.
 #: A branch on a package name would score nothing for an unlisted package, and
 #: would say nothing.

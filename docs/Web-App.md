@@ -22,7 +22,7 @@ whatever you type, and every analysis costs whatever your vendor charges.
 The app lives in a top-level `webapp/` directory and **never ships in the wheel**.
 There is no `pip install` that gets you this app, no console script, and no
 `[web]` extra — deliberately. `webapp/main.py` is a standalone driver script
-outside `src/analysis_service`, the same as `examples/`, so no packaging
+outside `src/katra`, the same as `examples/`, so no packaging
 mechanism names it; that's independent of what the wheel bundles for the
 *engine* itself (skills, prompts, config all ship with it — see
 [Configuration](Configuration.md#config-paths-override-where-files-are-read-from)).
@@ -117,7 +117,7 @@ appears only after the credential check passes. The report carries the
 form field, not a query parameter, not a header. The framework picker is not an
 exception to this: it chooses what the app analyses, never what analyses it.
 Model selection lives in
-[`config/model_tiers.toml`](../config/model_tiers.toml) and the `ANALYSIS_MODEL_*`
+[`config/model_tiers.toml`](../config/model_tiers.toml) and the `KATRA_MODEL_*`
 overrides. To change a model, use the [Settings page](#the-settings-page). The
 app has no authentication, so its save accepts only a request from the app's own
 page on loopback: the same `Host` and `Sec-Fetch-Site` checks as each other
@@ -132,7 +132,7 @@ answers has four stages: the system map, the details of the system model, the
 choice of the checks for your system, and the questions. Its last step fills the
 bar. A run toward a report has five stages: the system map, the details, the
 choice of the checks, the review of the findings and the report assembly. Where
-a deployment turns `ANALYSIS_ASSERTIONS` off, the run makes no choice of checks,
+a deployment turns `KATRA_ASSERTIONS` off, the run makes no choice of checks,
 so each run has one stage less. A job keeps the setting it started with, so a
 change on the Settings page does not change the bar of a run in flight. The
 status line names the next stage in plain words, and the page shows no graph
@@ -308,8 +308,8 @@ Credential mode: iam. This vendor passes no credential material. The platform
 supplies the identity, and the vendor's SDK resolves it from the environment
 this process runs in.
 
-ANALYSIS_VERTEX_PROJECT   NOT SET
-ANALYSIS_VERTEX_LOCATION  NOT SET
+KATRA_VERTEX_PROJECT   NOT SET
+KATRA_VERTEX_LOCATION  NOT SET
 ```
 
 A vendor whose provider needs a client library gets a row for that too, naming
@@ -698,20 +698,20 @@ The app keeps its runs in a job store. It reads the store settings of the
 [`/v1` service](HTTP-API.md#job-storage) and builds the store as the service
 does, with one difference: where a store setting is unset, the app gives a
 default. With no store setting, the app keeps its runs in SQLite and a file
-root in its data directory, `$XDG_DATA_HOME/work-agent`, or
-`~/.local/share/work-agent` where `XDG_DATA_HOME` is unset
+root in its data directory, `$XDG_DATA_HOME/katra`, or
+`~/.local/share/katra` where `XDG_DATA_HOME` is unset
 ([ADR 0111](adr/0111-the-first-run-app-keeps-its-runs-in-sqlite-by-default.md)):
 
 | Setting | Default |
 | --- | --- |
-| `ANALYSIS_JOB_STORE` | `sql` |
-| `ANALYSIS_DATABASE_URL` | `sqlite+aiosqlite:///` and the data directory, then `/jobs.db` |
-| `ANALYSIS_OBJECT_STORE` | `filesystem` |
-| `ANALYSIS_OBJECT_ROOT` | the data directory, then `/objects` |
+| `KATRA_JOB_STORE` | `sql` |
+| `KATRA_DATABASE_URL` | `sqlite+aiosqlite:///` and the data directory, then `/jobs.db` |
+| `KATRA_OBJECT_STORE` | `filesystem` |
+| `KATRA_OBJECT_ROOT` | the data directory, then `/objects` |
 
 A default applies only where the selected rows read it. So with
-`ANALYSIS_JOB_STORE=memory`, the app gives no database or object setting, and
-with `ANALYSIS_OBJECT_STORE=s3`, it gives no object root. The Settings page
+`KATRA_JOB_STORE=memory`, the app gives no database or object setting, and
+with `KATRA_OBJECT_STORE=s3`, it gives no object root. The Settings page
 shows each default value, and a change there takes effect at the next start.
 
 So a first run needs no setting and no command, and a restart keeps every
@@ -788,7 +788,7 @@ file.** The form page reads the file in the browser. It refuses a file larger
 than the deployment's `max_source_bytes` before it reads a byte, then refuses
 bytes that are not strict UTF-8, then refuses any control character other than
 a tab or a line break. The file's extension finds its row in the format
-table, `analysis_service.sources.FORMATS`, which the server renders into the
+table, `katra.sources.FORMATS`, which the server renders into the
 page with the `accept` value of the file field. A file with no row is refused,
 and the upload takes the row's default kind: a `.txt`, `.vtt` or `.srt` file is
 a `transcript`, and a `.mmd` or `.mermaid` file is a `diagram` (ADR 0120).

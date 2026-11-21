@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import pytest
 
-from analysis_service.answer_state import passes_floor
-from analysis_service.assertions import EXTRACTED, AssertionCatalog
-from analysis_service.early_questions import early_questions
-from analysis_service.fact_answers import key_ref
-from analysis_service.open_facts import prepared_model, source_states
-from analysis_service.question_kinds import (
+from katra.answer_state import passes_floor
+from katra.assertions import EXTRACTED, AssertionCatalog
+from katra.early_questions import early_questions
+from katra.fact_answers import key_ref
+from katra.open_facts import prepared_model, source_states
+from katra.question_kinds import (
     QUESTION_KINDS,
     QuestionKindName,
     parse_question_kind,
 )
-from analysis_service.report import Report
-from analysis_service.system_model import SystemModel
+from katra.report import Report
+from katra.system_model import SystemModel
 from tests.factories import PROJECT_ROOT, valid_model
 
 #: The committed Baselines, which CI reads too; a gitignored run is not here.

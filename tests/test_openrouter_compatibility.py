@@ -30,13 +30,13 @@ import pytest
 # Imported through ``model_gate`` so the model-cost map is pinned before
 # anything here reaches litellm, exactly as every other module in this suite
 # does it.
-from analysis_service.model_gate import (
+from katra.model_gate import (
     emulates_structured_output,
     library_sends_no_native_schema,
     native_structured_output,
 )
-from analysis_service.retry import _is_transient
-from analysis_service.vendors import vendor_for
+from katra.retry import _is_transient
+from katra.vendors import vendor_for
 from tests.test_retry import mapped_provider_exception
 
 VENDOR = "openrouter"
@@ -187,7 +187,7 @@ class TestTheSchemaPathIsNativeHere:
 class TestStreamingIsNotAPathThisServiceTakes:
     """The fourth question, answered rather than tested into the void.
 
-    :class:`~analysis_service.provider.ExecutedLlm` refuses a streaming call
+    :class:`~katra.provider.ExecutedLlm` refuses a streaming call
     outright — it would cross no seam, count no attempt and check no finish
     reason — and nothing in the graph asks for one, because every node binds an
     output schema. So chunk assembly is unreached machinery here, and an

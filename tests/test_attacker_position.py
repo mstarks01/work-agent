@@ -11,7 +11,7 @@ from typing import get_args
 
 import pytest
 
-from analysis_service.frameworks.stride.record import (
+from katra.frameworks.stride.record import (
     ArchivedThreatProposals,
     AttackerPosition,
     ThreatProposal,

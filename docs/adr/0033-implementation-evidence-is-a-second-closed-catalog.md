@@ -23,7 +23,7 @@
 An ASVS **Claim** today rests on prose. A **Lane Agent** may say a requirement
 needs `code` or `config`, and the service withholds that claim as a **Scope
 Entry** in state `needs-other-evidence`, because
-`analysis_service.sources.CARRIED_EVIDENCE_KINDS` names prose alone. The
+`katra.sources.CARRIED_EVIDENCE_KINDS` names prose alone. The
 constant is threaded as an argument to every reader, and its own docstring
 says it becomes a job property the day a job carries something else.
 

@@ -43,7 +43,7 @@ it is waits on a ruling (#961 step 3).
 
 ## Assertion fates, one per signed reference row
 
-Read off :func:`~analysis_service.assertions.identity_parts`, against the
+Read off :func:`~katra.assertions.identity_parts`, against the
 produced rows on the same subject and predicate:
 
 * ``found``: the same scope and the same canonical value.
@@ -92,36 +92,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, get_args
 
-from analysis_service.assertions import (
-    ABSENT,
-    GRAPH_BOUND,
-    REGISTRY,
-    SPAN_REFUSALS,
-    UNKNOWN,
-    Assertion,
-    AssertionCatalog,
-    AssertionRecord,
-    CatalogProposal,
-    assertion_id,
-    identity_parts,
-    offered,
-    referent_type,
-    snap_subject,
-)
-from analysis_service.evidence import prepared_view
-from analysis_service.execution import source_texts
-from analysis_service.grounding import normalize
-from analysis_service.parsing import table_entry
-from analysis_service.sources import text_digest
-from analysis_service.system_model import (
-    FLOW_DELIMITER,
-    DataFlow,
-    FlowIdError,
-    SystemModel,
-    flow_id_version,
-    flow_label,
-    parse_flow_id,
-)
 from evals.harness import fact_trace
 from evals.harness.alignment import (
     Alignment,
@@ -145,6 +115,36 @@ from evals.harness.provenance import ProvenanceError
 from evals.harness.rates import ratio, shown_figure
 from evals.harness.reference import GoldenCase
 from evals.reference_facts import facts_path, load_facts, reference_catalog
+from katra.assertions import (
+    ABSENT,
+    GRAPH_BOUND,
+    REGISTRY,
+    SPAN_REFUSALS,
+    UNKNOWN,
+    Assertion,
+    AssertionCatalog,
+    AssertionRecord,
+    CatalogProposal,
+    assertion_id,
+    identity_parts,
+    offered,
+    referent_type,
+    snap_subject,
+)
+from katra.evidence import prepared_view
+from katra.execution import source_texts
+from katra.grounding import normalize
+from katra.parsing import table_entry
+from katra.sources import text_digest
+from katra.system_model import (
+    FLOW_DELIMITER,
+    DataFlow,
+    FlowIdError,
+    SystemModel,
+    flow_id_version,
+    flow_label,
+    parse_flow_id,
+)
 
 Fate = Literal[
     "found",
@@ -1087,8 +1087,8 @@ def _offered(record: AssertionRecord, model: SystemModel) -> int:
     """How many rows the evidence catalog would offer a lane from this record.
 
     Asked of the model the lanes would read, which
-    :func:`~analysis_service.evidence.prepared_view` makes as ``prepare``
-    makes it, through :func:`~analysis_service.assertions.offered`, the
+    :func:`~katra.evidence.prepared_view` makes as ``prepare``
+    makes it, through :func:`~katra.assertions.offered`, the
     evidence catalog's own reader, so this count and the table a lane sees
     cannot disagree.
     """

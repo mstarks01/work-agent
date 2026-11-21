@@ -1,0 +1,739 @@
+"""Is a quoted span actually in the source it names?
+
+This module answers one question mechanically. A ``quote`` **Ground** claims a
+verbatim span from a named **Source**, and this module decides whether that span
+is there. That is deliberately the whole of the check. It proves a quote is
+present, and never that it supports the finding. Nothing here can tell a
+verbatim but irrelevant quote from a load-bearing one. That judgement is the
+critic's, and the prompt's rule about stating rather than mentioning is the only
+thing that addresses it.
+
+Model output is untrusted input (OWASP LLM05). A quote is bytes a model chose,
+matched against bytes a caller submitted, and this module interprets neither as
+anything but text. It compiles no regular expression from either side, so the
+ladder proper cannot cost more than the quote's length times the source's.
+
+The repair rung is where cost has to be bounded on purpose, because there both
+lengths multiply into a search. :data:`MAX_REPAIR_WORK` is that
+bound, and the constant carries the measurements behind it. It is a budget the
+scan spends, not a size it is refused for: what costs the time is how many
+windows survive pruning, and no function of the two lengths can see that.
+Without the budget a caller sizes the rung's work directly — both terms come
+from the submitted text — and one quote runs for minutes.
+
+The ladder is pinned, and each rung is a policy decision rather than a
+convenience. The figures below are measured over the 12 corpus cases' 206
+element excerpts, which the same "quote verbatim" instruction produced against
+the same kind of input, and are the closest proxy available:
+
+===============  ========  =============  ===================================
+policy           verified  false-reject   concession
+===============  ========  =============  ===================================
+exact                  45         78.2%   none — byte-identical substring
++whitespace           204          1.0%   whitespace runs collapse
++typography           204          1.0%   NFKC, smart quotes and dashes fold
++case                 204          1.0%   case-insensitive
++fragments            204          1.0%   ``…`` marks a cut
++markdown             205          0.5%   inline ``` ` ``` ``*`` ``_`` ignored
++punctuation          205          0.5%   all punctuation ignored
+===============  ========  =============  ===================================
+
+Two facts govern the shape. Exact equality is catastrophically wrong, and not
+because models are sloppy. Sources are hard-wrapped, so a quote of two
+consecutive words routinely straddles a newline the submitter never sees and the
+model did not invent. Collapsing whitespace runs takes 78.2% to 1.0%, and it
+carries the entire result. Typography, case and fragment handling each recovered
+nothing. They stay only because each is a real permission the prompt grants or a
+real substitution models make, and nobody should believe they are load-bearing.
+
+Punctuation-blindness is refused. It recovers nothing the markdown rung does
+not, so it is a concession that gains no precision and loses real precision. The
+ladder stops at ``+markdown``, where the measured false-rejection rate is 0 in
+206, with one true rejection. That rejection was a quote that excised a span and
+stitched a subject onto a predicate, unmarked, producing a sentence the source
+never contains. That is the manufactured citation this check exists to catch.
+
+This is not a similarity threshold. Best-window similarity puts the lowest
+accepted quote at 0.986 and the highest rejected one at 0.963. They are
+separable in principle, by 2.3 points, fitted to a single negative example. Any
+threshold a person would pick by intuition, such as 0.90 or 0.95, accepts the
+fabricated stitch. A deterministic ladder is also explainable to a submitter —
+"this word is not in your document" — and a threshold is not.
+
+The repair rung is a different thing. :func:`repair_prepared` runs only after the
+ladder refused a quote, and it does not accept the quote. It finds the source's
+own span nearest to it and hands that span back, so the report carries the
+submitter's words and never the model's. The agent's words survive beside it as
+a mark. Its candidates are windows of the source whose word count is the
+quote's, or up to two words more, which is what keeps the fabricated stitch out:
+a stitch is short and the span it was cut from is long, so the two are never
+compared. The threshold, :data:`REPAIR_THRESHOLD`, decides only how far a window
+may differ from the quote before the rung gives up and the quote stays
+unverified.
+
+False acceptance is not a problem at these lengths. Every corpus quote matched
+against all 11 sources it did not come from gave 0 spurious matches in 2,266
+wrong-source pairs. Quotes run from 29 to 229 characters, with a median of 80.
+That is long enough for the text check to discriminate the source on its own,
+rather than leaning on the label check to do it.
+"""
+
+from __future__ import annotations
+
+import bisect
+import re
+import time
+import unicodedata
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from typing import Literal, NamedTuple
+
+#: How alike a source window and a refused quote must be, as a
+#: :class:`difflib.SequenceMatcher` ratio over their normalized forms, for the
+#: rung to hand the window back. At the corpus median of 80 characters this is
+#: at most eight characters of difference: a dropped article, a changed
+#: preposition, a tidied plural. It is not fitted to a measurement yet. The
+#: eval sweep's repaired count is the number that moves it.
+REPAIR_THRESHOLD = 0.9
+
+#: How many words longer than the quote a candidate window may be. Never
+#: shorter: a tidy drops or swaps words, so the span it came from is as long
+#: or longer, and a shorter window that wins on ratio has cut a word the quote
+#: carried.
+_REPAIR_WIDTH_SLACK = 2
+
+#: How much character comparison the repair rung may do before it gives up,
+#: counted as it happens rather than predicted from the input's shape.
+#:
+#: Counted, because no prediction from shape orders these costs, so the loop
+#: counts work. :meth:`~difflib.SequenceMatcher.ratio` costs characters, and a
+#: prediction in characters still cannot order these two:
+#:
+#: ===================  ==========  ========  =======
+#: source               predicted   real CPU  ratio
+#: ===================  ==========  ========  =======
+#: 100 KiB of English   288,000,000    0.39s   pruned
+#: 100 KiB repetitive   111,974,400    5.95s   unpruned
+#: ===================  ==========  ========  =======
+#:
+#: The cheaper case scores higher, by 39x on the rate. The shape decides
+#: everything and the shape is the caller's:
+#: :meth:`~difflib.SequenceMatcher.quick_ratio` prunes almost every window of
+#: ordinary prose and almost none of a source whose windows share the quote's
+#: character multiset. No constant over the input can admit the first and refuse
+#: the second, because the first is the larger number.
+#:
+#: So the loop counts its work against this budget as it goes, and it counts
+#: **both** kinds of work at **different rates**.
+#:
+#: A charge for only the comparisons that survive the prune would read zero on
+#: the input where the prune itself is the cost: the join and ``quick_ratio``
+#: are each linear in the span and run on every window, so on such a charge an
+#: English source and a 333-word quote spend 0 of 50,000,000 units and run 8.4
+#: seconds. A budget
+#: nothing charges is not a budget.
+#:
+#: And one rate does not serve both, because ``ratio`` is not linear in the
+#: product it is charged by. Pruning moves at roughly 7 million characters a
+#: second. Comparison measured 19 million units a second on one shape and 4
+#: million on another, where every window shared the quote's multiset and the
+#: matching blocks degenerated. The weights below are that spread, and the
+#: budget buys about a second and a half of the worst of it.
+#:
+#: The longest quote this rung will try to repair, in normalized characters.
+#:
+#: No cost model of `difflib` holds, so this caps the input. A model that
+#: prices a comparison from its operands can be wrong by 200x: 156,976 matching
+#: pairs ran in 0.015 s and 332,002 ran in 6.5 s. `SequenceMatcher` recurses on the blocks
+#: it finds, and nothing computable from the inputs sees how many that will be.
+#:
+#: So this does not predict the cost. It caps the input, and the worst case is
+#: measured rather than modelled. Against the shape that beats everything else
+#: -- an inverted phase, where the prune passes every window:
+#:
+#: =============  ==========
+#: quote chars    worst call
+#: =============  ==========
+#: 300            0.166s
+#: 400            0.515s
+#: 1000           6.444s
+#: =============  ==========
+#:
+#: The 400 row is measured at the widest span ``quick_ratio`` still admits, 488
+#: characters, not at a span equal to the quote; the same shape costs 0.400 s at
+#: 400. The deadline check runs before the comparison, so a scan overshoots it
+#: by at most one call of this size.
+#:
+#: Four hundred costs nothing real. Across 784 spans of all 13 corpus sources
+#: the normalized quote length runs to a median of 134, a 99th percentile of 279
+#: and a maximum of 305, so no case in the corpus reaches this and the rung
+#: keeps every repair it makes today. A longer quote answers `None`, which is
+#: what the threshold already answers when no window is close enough.
+MAX_REPAIR_QUOTE_CHARS = 400
+
+
+#: **A bound on the operands does not price the comparison.**
+#: `difflib` recurses on the matching blocks it finds, so its cost is not a
+#: function of the operands: 156,976 matching character pairs ran in 0.015 s
+#: while 332,002 ran in 6.5 s, a 200x spread on the only cheap statistic that
+#: looked promising. Word counts, character products, prune-aware budgets and a
+#: junk heuristic each misprice it too.
+#:
+#: :data:`MAX_REPAIR_QUOTE_CHARS` is what actually bounds a single comparison,
+#: by capping what goes into one. This budget bounds the *number* of them, which
+#: is a count rather than a prediction, and the deadline below catches whatever
+#: both of those still misprice. Three bounds, because each one alone misses a
+#: case the others catch.
+#:
+#: The weights are the measured ratio between a character of pruning and a unit
+#: of comparison. They are re-derived whenever the comparison changes shape.
+#: `autojunk` stays off: it drops 12.4% of the repairs a stripped-punctuation
+#: quote needs, while the transposition the test uses loses 0.0%.
+MAX_REPAIR_WORK = 250_000_000
+
+#: What one pruned window costs, per character of the window. Pruning is the
+#: cheaper work and every window pays it.
+#: A ratio at or above this is the span itself; nothing later can beat it,
+#: so the scan stops rather than ranking the rest of the document.
+_CERTAIN = 0.9999
+
+#: The backstop, on a **per-thread** clock. `time.process_time()` sums CPU
+#: across every thread in the process and `graph.py` runs eight node bodies on
+#: one pool, so that clock would make the effective deadline about 0.22 s under
+#: a full pool: one busy caller would truncate another job's repairs and the
+#: report would become a function of unrelated traffic.
+#:
+#: Four seconds, because legitimate work measured 1.98 s and a backstop that
+#: legitimate work brushes against is not a backstop -- at 2.0 s a slower
+#: machine would silently truncate a repair that should be made. It has to
+#: stay finite: the shape that beats the budget, a small alphabet where every
+#: window survives the prune, runs 56.72 s with the budget alone, because the
+#: budget prices each of its comparisons at a hundredth of what they cost.
+_REPAIR_DEADLINE_SECONDS = 4.0
+
+#: What every repair in one node body may spend together, in thread CPU
+#: seconds. The three bounds above hold for ONE scan, and a body runs one scan
+#: per quote ground the ladder refused: at 64,000 output tokens a lane emits
+#: about 400 such grounds, so a body of scans that each stop at the deadline
+#: runs 2.9 hours for six lanes and 8.1 for seventeen, on a 440-byte source.
+#: The job deadline settles the job and the thread runs on, and `graph.py`
+#: names this bound as the reason that is harmless.
+#:
+#: A cost that turns on how many inputs survive a filter is bounded where the
+#: work happens, not per input. Thirty seconds is fifteen scans at the slowest
+#: legitimate single scan measured (1.98 s) and three thousand at the corpus's
+#: own 0.01 s; a corpus job repairs under five. Measured against the shape that
+#: reaches every scan's deadline, a body of nine such quotes stops at 30.0 s
+#: where it ran 39 s unbounded, and the overshoot is one comparison.
+MAX_REPAIR_SECONDS_PER_BODY = 30.0
+_PRUNE_COST = 13
+
+#: What one full comparison costs, per character-pair. Five to three, because
+#: that is the measured spread between the two rates; see MAX_REPAIR_WORK.
+_COMPARE_COST = 1
+
+#: Characters a model routinely substitutes for their ASCII originals when it
+#: believes it is quoting verbatim. NFKC folds most of the width and ligature
+#: cases; these are the ones it leaves alone.
+_TYPOGRAPHIC_FOLDS = {
+    "‘": "'",
+    "’": "'",
+    "‚": "'",
+    "“": '"',
+    "”": '"',
+    "„": '"',
+    "‐": "-",
+    "‒": "-",
+    "–": "-",
+    "—": "-",
+    "―": "-",
+}
+
+# A cut, however the model spelled it. Both forms are in play: the prompt asks
+# for `…` and models emit the three-dot form regardless.
+_ELLIPSIS = re.compile(r"…|\.\.\.")
+
+# Inline markdown markers. A source is submitted as prose that is frequently
+# markdown, so a model quoting ``` `main` ``` as ``main`` has not altered a
+# word — it dropped a marker the renderer would have dropped too.
+_INLINE_MARKUP = re.compile(r"[`*_]")
+
+
+def normalize(text: str) -> str:
+    """Apply the pinned ladder's four normalization rungs, in order.
+
+    Run over the quote and the source alike — a rung applied to one side only
+    would compare two different dialects of the same string.
+    """
+    folded = unicodedata.normalize("NFKC", text)
+    folded = "".join(_TYPOGRAPHIC_FOLDS.get(char, char) for char in folded)
+    folded = _INLINE_MARKUP.sub("", folded.casefold())
+    return " ".join(folded.split())
+
+
+def keeps_text(text: str) -> bool:
+    """Whether ``text`` keeps a character under :func:`normalize`.
+
+    **The one reader of that test.** :func:`normalize` deletes markup as well
+    as whitespace, so a piece of a quote that folds to nothing is no fragment.
+    The assertion gate keys free text by the same fold, so a value that folds
+    to nothing would share one key with every other such value, and the gate
+    refuses it as ``illegal-value``.
+    """
+    return bool(normalize(text))
+
+
+def verify_quote(quote: str, source: str) -> bool:
+    """Does ``quote`` appear in ``source`` under the pinned ladder?
+
+    The single-source form, for a caller holding raw text. A caller checking
+    many quotes against the same few sources should normalize each source once
+    and call :func:`verify_normalized` instead — the ladder folds every
+    character of the haystack, so re-folding a whole submission per quote is
+    the same answer computed repeatedly.
+    """
+    return verify_normalized(quote, normalize(source))
+
+
+def verify_normalized(quote: str, haystack: str) -> bool:
+    """The same question, against a source :func:`normalize` already folded.
+
+    ``haystack`` must be normalized already: a rung applied to one side only
+    would compare two different dialects of the same string.
+    """
+    return match_normalized(quote, haystack) is not None
+
+
+def fragments(quote: str) -> tuple[str, ...]:
+    """The verbatim pieces of ``quote``, in order, one per span it can take.
+
+    ``…`` marks a cut, however the model spelled it, and a piece that
+    normalizes to nothing is not a fragment. **The one reader of that
+    split**: :func:`match_normalized` searches these, and a support span
+    carries one of them, so a span's quote is the words its offsets hold
+    rather than the whole quote they were cut from (#961).
+    """
+    return tuple(raw.strip() for raw in _ELLIPSIS.split(quote) if keeps_text(raw))
+
+
+def match_normalized(
+    quote: str, haystack: str, *, start: int = 0
+) -> tuple[tuple[int, int], ...] | None:
+    """Where each of ``quote``'s fragments sits in ``haystack``, or ``None``.
+
+    **The one reader of "is this quote in this source", for every caller of
+    that question.** :func:`verify_normalized` asks whether the answer exists,
+    :func:`locate_quote` asks where it is, and :func:`placements` asks how many
+    answers there are, so no two of them can accept a quote a third rejects.
+
+    ``start`` is where the search opens, so :func:`placements` can ask for the
+    next placement without a matcher of its own. It defaults to the head of the
+    source, which is what the other two callers ask for.
+
+    The fifth rung: ``…`` splits the quote into fragments, each of which must
+    appear **in order, after the last**. A quote marking a cut is a *sequence*
+    of verbatim spans rather than one, so searching from a cursor is what makes
+    the marker mean something — an unmarked elision, which is the failure mode
+    both measured true rejections shared, still fails.
+
+    A quote with no fragment left after normalization matches nothing. The
+    schema requires a ``quote`` ground to carry text, so a blank one has
+    already failed validation — but ``"…"`` is non-blank and normalizes away to
+    nothing, and letting it through would make it the universal citation.
+
+    Half-open offsets into ``haystack``, one pair per fragment that survived
+    normalization, in the order the quote wrote them.
+    """
+    found_at: list[tuple[int, int]] = []
+    cursor = start
+    for raw in fragments(quote):
+        fragment = normalize(raw)
+        found = haystack.find(fragment, cursor)
+        if found < 0:
+            return None
+        cursor = found + len(fragment)
+        found_at.append((found, cursor))
+    return tuple(found_at) or None
+
+
+def placements(quote: str, haystack: str, *, limit: int = 2) -> int:
+    """How many places in ``haystack`` the whole of ``quote`` can sit, to ``limit``.
+
+    The count stops at ``limit``, so the answer is the number of placements or
+    ``limit``, whichever is smaller. Every caller asks whether there is more
+    than one, and stopping is what bounds the work at a source that repeats a
+    line a thousand times.
+
+    **A quote that fits in two places names neither of them.** The matcher
+    takes the first placement, which is an answer rather than the answer: a
+    sentence the submission repeats — a boilerplate line, a heading, a row
+    spelled the same way twice — yields offsets into the first copy and says
+    nothing about which copy the statement rests on. #926 asks that such a
+    quote keep its ambiguity rather than resolve it by position, and this is
+    the reader that sees it.
+
+    Counted through :func:`match_normalized` from a moving start rather than
+    by a search of its own, so a placement this counts is a placement that
+    function would accept. A quote marking a cut counts a placement per
+    position its **first** fragment can open at with the rest still following,
+    which is the question a span asks: where do these words begin.
+
+    Measured on 2026-09-16 over every quote this repository holds: **0 of the
+    79 signed corpus quotes and 0 of the 829 archived model-proposed quotes
+    sit in more than one place.** So the refusal built on this refuses no quote
+    today, and the silent wrong citation it prevents is the reason for it.
+    """
+    seen = 0
+    cursor = 0
+    while seen < limit:
+        matched = match_normalized(quote, haystack, start=cursor)
+        if matched is None:
+            break
+        seen += 1
+        cursor = matched[0][0] + 1
+    return seen
+
+
+#: A word of a source, for the offset table :func:`index_source` builds. Nothing
+#: outside this module reads either field; :class:`Span` is what a caller gets.
+class _Word(NamedTuple):
+    start: int
+    end: int
+    folded: str
+
+
+class Span(NamedTuple):
+    """Half-open code-point offsets into a source's exact retained text.
+
+    ``source[span.start:span.end]`` is the submitter's own words, which is the
+    property that makes a span quotable: it is never the model's spelling of
+    them.
+
+    **A span names whole words.** The ladder collapses whitespace and compares
+    word by word, so a sub-word offset would claim a precision the ladder does
+    not have. A quote that opens mid-word therefore yields a span that opens at
+    that word.
+    """
+
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
+class IndexedSource:
+    """One source folded for the ladder, with every folded word's origin kept.
+
+    ``haystack`` is what :func:`match_normalized` searches. ``words`` holds the
+    same words in the same order, each with its offsets into the original text,
+    so a match position converts back to a span of the submission.
+
+    Built by :func:`index_source`, and built once per source by a caller that
+    locates many quotes in it.
+    """
+
+    haystack: str
+    words: tuple[_Word, ...]
+    #: Where each word starts inside ``haystack``, for the reverse lookup.
+    offsets: tuple[int, ...]
+
+
+def index_source(source: str) -> IndexedSource | None:
+    """Fold ``source`` word by word, keeping each word's offsets, or ``None``.
+
+    **It answers ``None`` when the word-by-word fold disagrees with
+    :func:`normalize`.** The two are the same operation in a different order,
+    and the corpus's 13 sources agree, but ``NFKC`` is defined over a string
+    rather than over a character: a source that folds differently in one pass
+    than in many would hand back offsets that name the wrong words. Refusing is
+    the honest answer, because a quote with no span is a quote the caller can
+    still verify, while a wrong span is a citation pointing somewhere else.
+
+    A word whose fold is empty — ``**`` on its own — is dropped rather than
+    joined, because :func:`normalize` removes the markup and then collapses the
+    whitespace around it into one space.
+    """
+    words = tuple(
+        _Word(match.start(), match.end(), normalize(match.group()))
+        for match in re.finditer(r"\S+", source)
+    )
+    kept = tuple(word for word in words if word.folded)
+    haystack = " ".join(word.folded for word in kept)
+    if haystack != normalize(source):
+        return None
+    offsets: list[int] = []
+    at = 0
+    for word in kept:
+        offsets.append(at)
+        at += len(word.folded) + 1
+    return IndexedSource(haystack, kept, tuple(offsets))
+
+
+def locate_quote(quote: str, indexed: IndexedSource) -> tuple[Span, ...] | None:
+    """Where ``quote`` sits in the source ``indexed`` was built from.
+
+    One :class:`Span` per fragment the quote marks with ``…``, in the order the
+    quote wrote them, or ``None`` where the ladder refuses the quote. The
+    answer agrees with :func:`verify_quote` by construction: both read
+    :func:`match_normalized`.
+
+    **The caller never states an offset; this computes it.** A model proposes
+    words and code decides whether they are in the source and where, so a
+    support span cannot claim a position the source does not hold.
+    """
+    matches = match_normalized(quote, indexed.haystack)
+    if matches is None:
+        return None
+    return tuple(
+        Span(
+            indexed.words[_word_at(indexed, start)].start,
+            indexed.words[_word_at(indexed, end - 1)].end,
+        )
+        for start, end in matches
+    )
+
+
+def _word_at(indexed: IndexedSource, position: int) -> int:
+    """The index of the word covering ``position`` in ``indexed.haystack``.
+
+    A position on the space between two words belongs to the word before it,
+    which is what ``bisect_right`` answers.
+    """
+    return bisect.bisect_right(indexed.offsets, position) - 1
+
+
+def repair_deadline() -> float:
+    """The one deadline every repair scan in a node body shares.
+
+    An absolute :func:`time.thread_time` value, so it is right only on the
+    thread that runs the scans: the caller builds it once and passes it to each
+    scan of the same body.
+    """
+    return time.thread_time() + MAX_REPAIR_SECONDS_PER_BODY
+
+
+@dataclass(frozen=True)
+class PreparedSource:
+    """One source split into words and folded, ready for any repair scan.
+
+    The scan needs the source twice: as words, so a candidate window hands back
+    the submitter's own spelling, and as folded words, so a window's normalized
+    form is its folded words joined. Neither depends on the quote, so a body
+    that scans one source for many refused quotes builds this once.
+
+    Built by :func:`prepare_source` and never mutated. It is a value derived
+    from the source text, so two of them over one source are equal by
+    construction and nothing has to invalidate one.
+    """
+
+    words: tuple[str, ...]
+    folded: tuple[str, ...]
+
+
+def prepare_source(source: str) -> PreparedSource:
+    """Split and fold one source, once.
+
+    Each source word is normalized once rather than once per window that covers
+    it, and once per source rather than once per refused quote. Both are the
+    same comparison for a fraction of the folding: the ladder's rungs are
+    per-character and the last one collapses whitespace, so a window's folded
+    form is its folded words joined.
+    """
+    words = source.split()
+    return PreparedSource(tuple(words), tuple(normalize(word) for word in words))
+
+
+def deadline_spent(deadline: float) -> bool:
+    """Has the body's shared deadline passed?
+
+    One reader, because three sites ask it and each asks to avoid a different
+    cost: :func:`~katra.fan_in._verify_quotes` and
+    :func:`~katra.validation.repair_excerpts` ask before they prepare
+    a source, and :func:`repair_prepared` asks before it scans one.
+    """
+    return time.thread_time() > deadline
+
+
+def _needle_of(quote: str) -> str:
+    """The quote's folded form, or ``""`` where the rung will not scan it.
+
+    Three refusals, and every one of them is about the quote alone, so they are
+    decided before any source is touched. A quote marking a cut with ``…`` is a
+    sequence of spans rather than one, and one nearest window for the whole is a
+    span the quote never claimed. A quote that normalizes away has no words to
+    find. A quote past :data:`MAX_REPAIR_QUOTE_CHARS` is what bounds a single
+    comparison.
+    """
+    if _ELLIPSIS.search(quote):
+        return ""
+    needle = normalize(quote)
+    if len(needle) > MAX_REPAIR_QUOTE_CHARS:
+        return ""
+    return needle
+
+
+#: What a repair can move between the agent's words and the source's span.
+#: Closed, because a reader routes on it: a negation flips what the span
+#: asserts, and a number changes what it measures. Neither is a tidy.
+MovedKind = Literal["negation", "number"]
+
+_NEGATIONS = frozenset(
+    {"not", "no", "never", "none", "nor", "neither", "without", "cannot"}
+)
+_TOKEN_EDGE = ".,;:!?()[]{}\"'"
+
+
+class Repair(NamedTuple):
+    """One repair the rung licensed: the span, the ratio, and whether the scan ran out.
+
+    ``complete`` is ``False`` where the work budget or a deadline stopped the
+    scan before it ranked every window, so the span is the best found by then
+    and a better one may sit later. The caller records it rather than acting on
+    it: the docstring on :func:`repair_prepared` says why a truncated answer is
+    still returned, and this is what lets a reader tell the two apart.
+    """
+
+    span: str
+    similarity: float
+    complete: bool
+
+
+def meaning_moved(written: str, span: str) -> tuple[MovedKind, ...]:
+    """Which meaning-bearing tokens differ between what the agent wrote and the span.
+
+    A repair inside :data:`REPAIR_THRESHOLD` can still flip what a quote
+    asserts: "does not encrypt" and "does encrypt" are three characters apart
+    on a forty-character quote. :func:`faithful_repair` reads this to refuse
+    such a span, the fan-in writes the ``moved`` mark from it, and the load
+    check of a stored repair mark reads it again. This
+    is the minimum mechanical safeguard and not an entailment check: it
+    compares the negation tokens and the number tokens of the two texts as
+    multisets, folded through :func:`normalize`, and names each class that
+    differs. A changed principal or a changed control term is a judgement and
+    stays with the critic.
+    """
+    moved: list[MovedKind] = []
+    written_tokens = _tokens(written)
+    span_tokens = _tokens(span)
+    if sorted(_negations(written_tokens)) != sorted(_negations(span_tokens)):
+        moved.append("negation")
+    if sorted(_numbers(written_tokens)) != sorted(_numbers(span_tokens)):
+        moved.append("number")
+    return tuple(moved)
+
+
+def _tokens(text: str) -> list[str]:
+    return [token.strip(_TOKEN_EDGE) for token in normalize(text).split()]
+
+
+def _negations(tokens: list[str]) -> list[str]:
+    return [t for t in tokens if t in _NEGATIONS or t.endswith("n't")]
+
+
+def _numbers(tokens: list[str]) -> list[str]:
+    return [t for t in tokens if any(char.isdigit() for char in t)]
+
+
+def repair_prepared(
+    quote: str, source: PreparedSource, deadline: float
+) -> Repair | None:
+    """The source's own span nearest a refused quote, or ``None``.
+
+    Run only after :func:`verify_quote` said no. The answer is a span cut from
+    ``source`` as written — the submitter's words, whitespace collapsed — that
+    :func:`verify_quote` accepts by construction, plus the similarity that
+    earned it. A caller replaces the quote with it and records the replacement.
+
+    Candidates are every run of whole words whose count is the quote's, up to
+    ``_REPAIR_WIDTH_SLACK`` more, compared under :func:`normalize` on
+    both sides so the rungs the ladder already forgives lower no score here. The
+    best candidate wins if it reaches :data:`REPAIR_THRESHOLD`.
+
+    ``source`` is a :class:`PreparedSource` from :func:`prepare_source`, whose
+    docstring carries why the split and the folding sit outside this scan.
+
+    A scan that spends :data:`MAX_REPAIR_WORK`, or runs past
+    :data:`_REPAIR_DEADLINE_SECONDS`, or past the body's own ``deadline`` from
+    :func:`repair_deadline`, stops where it is and answers with the best window
+    it found by then. A scan that starts after the body's deadline answers
+    ``None`` without scanning.
+
+    **A truncated scan can return a good span where a better one sat later**,
+    and the answer says so in :attr:`Repair.complete`. Both alternatives to
+    returning it are worse: refusing the answer throws away a correct match --
+    measured, the median case finds its span at window 1,500 and is cut off at
+    window 26,445 -- and scanning to the end is what the bound exists to stop.
+    Returning nothing is right only when nothing reached the threshold. It does not discard that answer: the
+    budget exists to bound the time, and throwing away a match already above
+    :data:`REPAIR_THRESHOLD` uses the time and gains nothing. A truncated scan
+    can return a match that is merely good rather than the best one, which is
+    the limit of the bound.
+
+    Finding nothing still answers ``None``, which is what the threshold already
+    answers when no window is close enough, and the caller already handles it:
+    the quote stays unverified and the report says so.
+
+    A quote marking a cut with ``…`` is not repaired: each fragment is a span of
+    its own, and one nearest window for the whole is a span the quote never
+    claimed.
+    """
+    needle = _needle_of(quote)
+    if not needle:
+        return None
+    if deadline_spent(deadline):
+        return None
+    words = source.words
+    folded = source.folded
+    width = len(quote.split())
+    best: Repair | None = None
+    budget = MAX_REPAIR_WORK
+    matcher = SequenceMatcher(autojunk=False)
+    deadline = min(time.thread_time() + _REPAIR_DEADLINE_SECONDS, deadline)
+    matcher.set_seq2(needle)
+    for count in range(width, width + _REPAIR_WIDTH_SLACK + 1):
+        for start in range(len(words) - count + 1):
+            span = " ".join(w for w in folded[start : start + count] if w)
+            # Charged on EVERY window, before the prune decides anything. The
+            # join above and `quick_ratio` below are both linear in the span,
+            # and they run whether or not the window survives -- so a budget
+            # that charges only survivors reads zero on the input where the
+            # pruning IS the cost. An English source and a 333-word quote spent
+            # 0 of 50,000,000 and ran 8.4 seconds.
+            budget -= _PRUNE_COST * len(span)
+            if budget < 0 or time.thread_time() > deadline:
+                return _truncated(best)
+            matcher.set_seq1(span)
+            if matcher.quick_ratio() < REPAIR_THRESHOLD:
+                continue
+            budget -= _COMPARE_COST * len(span) * len(needle)
+            if budget < 0 or time.thread_time() > deadline:
+                return _truncated(best)
+            ratio = matcher.ratio()
+            if ratio >= REPAIR_THRESHOLD and (best is None or ratio > best.similarity):
+                best = Repair(" ".join(words[start : start + count]), ratio, True)
+                # Complete, though the scan stops here: no later window can
+                # rank above a certain match, so the answer cannot change.
+                if ratio >= _CERTAIN:
+                    return best
+    return best
+
+
+def faithful_repair(
+    written: str, source: PreparedSource, deadline: float
+) -> Repair | None:
+    """The span :func:`repair_prepared` finds, or ``None`` where it moves meaning.
+
+    **The one reader of whether a refused quote may take the source's span.** A
+    span that changes a negation or a number (:func:`meaning_moved`) states a
+    different fact from the one the writer cited, so the quote stays refused.
+    A guard, not proof of meaning: it compares those two token classes only,
+    and a changed principal or control term passes it.
+    """
+    repair = repair_prepared(written, source, deadline)
+    if repair is None or meaning_moved(written, repair.span):
+        return None
+    return repair
+
+
+def _truncated(best: Repair | None) -> Repair | None:
+    """The best span so far, marked as found by a scan that did not finish."""
+    return None if best is None else best._replace(complete=False)

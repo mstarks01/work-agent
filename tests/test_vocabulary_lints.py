@@ -134,11 +134,11 @@ PARTIAL: dict[tuple[str, str], str] = {
     ("evals.harness.delivery", "GRAPH_STAGES"): (
         "the stages that read a graph field, which a row that reaches none skips"
     ),
-    ("analysis_service.assertions", "_ASKED_SUBJECTS"): (
+    ("katra.assertions", "_ASKED_SUBJECTS"): (
         "the subject types of the elements an owner is asked about, which are"
         " a component and a flow and never a principal, a credential or a zone"
     ),
-    ("analysis_service.assertions", "EXTRACTED"): (
+    ("katra.assertions", "EXTRACTED"): (
         "the predicates the assertion pass extracts, which leaves out each"
         " predicate whose extraction is off (ADR 0117)"
     ),
@@ -157,27 +157,27 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the causes that name no draft and no proposal at the reference's"
         " place, which leaves out each cause that names one"
     ),
-    ("analysis_service.answer_forms", "CONTROL_SUGGESTIONS"): (
+    ("katra.answer_forms", "CONTROL_SUGGESTIONS"): (
         "the control attributes answered in free text, so an attribute with a"
         " closed set of values is absent by construction"
     ),
-    ("analysis_service.claims", "ARCHIVED_UNRECONCILED_KINDS"): (
+    ("katra.claims", "ARCHIVED_UNRECONCILED_KINDS"): (
         "the kinds only archived reports carry, which is fewer than the kinds"
         " a live review writes"
     ),
-    ("analysis_service.graph", "CATALOGUING_ENTRIES"): (
+    ("katra.graph", "CATALOGUING_ENTRIES"): (
         "the entries whose graph ends in a resolved catalog, which is fewer"
         " than the entries that exist"
     ),
-    ("analysis_service.graph", "EXTRACTING_ENTRIES"): (
+    ("katra.graph", "EXTRACTING_ENTRIES"): (
         "the entries that extract a model, which an entry starting after"
         " extraction does not"
     ),
-    ("analysis_service.graph", "READING_ENTRIES"): (
+    ("katra.graph", "READING_ENTRIES"): (
         "the entries that extract a model and pass it on, which an entry that"
         " stops at extraction or starts after it does not"
     ),
-    ("analysis_service.graph", "PREPARING_ENTRIES"): (
+    ("katra.graph", "PREPARING_ENTRIES"): (
         "the entries that reach the routing half, which an entry stopping"
         " before it does not"
     ),
@@ -189,19 +189,19 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the fault shapes that need a draft shown a row it refuses, which is"
         " fewer than the shapes that exist"
     ),
-    ("analysis_service.sources", "KIND_FORMATS"): (
+    ("katra.sources", "KIND_FORMATS"): (
         "the kinds that an upload allows, so a kind that only the page or the"
         " service writes is absent by construction"
     ),
-    ("analysis_service.jobs", "TERMINAL_STATUSES"): (
+    ("katra.jobs", "TERMINAL_STATUSES"): (
         "the statuses a job stops in, so a status it passes through is absent"
         " by construction"
     ),
-    ("analysis_service.jobs", "NON_LOCKING_STATUSES"): (
+    ("katra.jobs", "NON_LOCKING_STATUSES"): (
         "the statuses a resumed job ends in without a report, so every status"
         " that runs or ends in one is absent by construction"
     ),
-    ("analysis_service.validation", "DIAGRAM_CODES"): (
+    ("katra.validation", "DIAGRAM_CODES"): (
         "the codes the rule that reads a diagram's structure writes, which is"
         " fewer than the codes every gate rule writes"
     ),
@@ -222,55 +222,55 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the packages holding a lane no case exercises, which a package whose"
         " every lane is exercised does not appear in"
     ),
-    ("analysis_service.assertions", "ANSWER_ISSUES"): (
+    ("katra.assertions", "ANSWER_ISSUES"): (
         "the codes a submitter's answer draws when it places nothing, so a code"
         " that refuses a row, or that a row draws whatever the answers, is"
         " absent by construction"
     ),
-    ("analysis_service.assertions", "CATALOG_REFUSALS"): (
+    ("katra.assertions", "CATALOG_REFUSALS"): (
         "the codes that refuse a whole catalog, so a code that refuses one row "
         "of it is absent by construction"
     ),
-    ("analysis_service.assertions", "GATE_REFUSALS"): (
+    ("katra.assertions", "GATE_REFUSALS"): (
         "the codes that refuse a row or a whole catalog, so a code whose row"
         " stands, whose row an answer replaces, or that a submitter's answer"
         " draws, is absent by construction"
     ),
-    ("analysis_service.basis", "IN_SCOPE"): (
+    ("katra.basis", "IN_SCOPE"): (
         "the control attributes the diagnostic measures, so an attribute that"
         " is declared out of scope, or not declared, is absent by construction"
     ),
-    ("analysis_service.claims", "CONDITIONAL_GROUNDS"): (
+    ("katra.claims", "CONDITIONAL_GROUNDS"): (
         "the ground kinds that say a fact is unstated, so a ground that states "
         "a fact or its absence is absent by construction"
     ),
-    ("analysis_service.claims", "ASSERTION_GROUNDS"): (
+    ("katra.claims", "ASSERTION_GROUNDS"): (
         "the ground kinds whose reference is a row of the assertion catalog, so"
         " a ground whose reference is not a catalog row is absent by"
         " construction"
     ),
-    ("analysis_service.open_facts", "_ATTRIBUTE_QUESTIONS"): (
+    ("katra.open_facts", "_ATTRIBUTE_QUESTIONS"): (
         "the control attributes whose plain question reads badly, so an "
         "attribute whose plain question reads well is absent by construction"
     ),
-    ("analysis_service.frameworks.stride.rules", "ENTERED_ZONE_KINDS"): (
+    ("katra.frameworks.stride.rules", "ENTERED_ZONE_KINDS"): (
         "the boundary kinds that a crossing enters to transfer authority, so a"
         " kind that is no authority boundary is absent by construction"
     ),
-    ("analysis_service.frameworks.stride.rules", "LEFT_ZONE_KINDS"): (
+    ("katra.frameworks.stride.rules", "LEFT_ZONE_KINDS"): (
         "the boundary kinds that separate parties rather than authority levels,"
         " so a kind that separates authority levels within one party, or that is"
         " no authority boundary, is absent by construction"
     ),
-    ("analysis_service.sampling", "OFFERED_PARAMS"): (
+    ("katra.sampling", "OFFERED_PARAMS"): (
         "the sampling params an environment variable may override, so a "
         "reserved or a forbidden param is absent by construction"
     ),
-    ("analysis_service.validation", "CITATION_FIELDS"): (
+    ("katra.validation", "CITATION_FIELDS"): (
         "the source fields the gate checks against the job's sources, so a"
         " field that is never gated is absent by construction"
     ),
-    ("analysis_service.validation", "RENAMING_CODES"): (
+    ("katra.validation", "RENAMING_CODES"): (
         "the codes whose repair may rename an element, so a code whose repair "
         "keeps the element's ID is absent by construction"
     ),
@@ -336,31 +336,31 @@ PARTIAL: dict[tuple[str, str], str] = {
         " only a report, which a replay does not read, is absent by"
         " construction"
     ),
-    ("analysis_service.assertions", "REJECTING"): (
+    ("katra.assertions", "REJECTING"): (
         "the assessments that set a row aside, so an assessment under which a"
         " row stands is absent by construction"
     ),
-    ("analysis_service.assertions", "SETTLING_REASONS"): (
+    ("katra.assertions", "SETTLING_REASONS"): (
         "the projection reasons under which the catalog answers an attribute, so"
         " a reason that qualifies the value or leaves it is absent by construction"
     ),
-    ("analysis_service.assertions", "_QUALIFIED_BECAUSE"): (
+    ("katra.assertions", "_QUALIFIED_BECAUSE"): (
         "the projection reasons that qualify an unknown, so a reason that writes"
         " the value or leaves it is absent by construction"
     ),
-    ("analysis_service.evidence", "ASSERTION_GLOSSES"): (
+    ("katra.evidence", "ASSERTION_GLOSSES"): (
         "the ground kinds that cite a catalog row, so a ground that cites no row"
         " is absent by construction"
     ),
-    ("analysis_service.graph", "_REFUSALS"): (
+    ("katra.graph", "_REFUSALS"): (
         "the precondition results that stop a framework, so the result that"
         " lets it run is absent by construction"
     ),
-    ("analysis_service.links", "_LINK_REFUSALS"): (
+    ("katra.links", "_LINK_REFUSALS"): (
         "the issue codes raised for a link answer that places nothing, so a"
         " code raised for anything but a link answer is absent by construction"
     ),
-    ("analysis_service.system_model", "ENDPOINT_PREFIXES"): (
+    ("katra.system_model", "ENDPOINT_PREFIXES"): (
         "the element types that sit in a zone, so a type that sits in no zone"
         " is absent by construction"
     ),
@@ -376,11 +376,11 @@ PARTIAL: dict[tuple[str, str], str] = {
         "the modes whose sweep keeps an emission or a catalog a replay reads, "
         "so a mode that keeps only reports is absent by construction"
     ),
-    ("analysis_service.assertions", "GRAPH_BOUND"): (
+    ("katra.assertions", "GRAPH_BOUND"): (
         "the subject types whose ID is an element ID, so a type whose subject is"
         " this layer's own is absent by construction"
     ),
-    ("analysis_service.compact", "_ENDPOINT_GROUPS"): (
+    ("katra.compact", "_ENDPOINT_GROUPS"): (
         "the element groups a flow endpoint may name, so a group whose elements"
         " sit in no zone is absent by construction"
     ),
@@ -594,42 +594,36 @@ OPEN: dict[tuple[str, str], str] = {
         "corpus case names, which are directory names under the corpus and not a"
         " type, so a new case that has no reference set adds a member"
     ),
-    ("analysis_service.auth", "_CANONICAL_ALGORITHMS"): (
+    ("katra.auth", "_CANONICAL_ALGORITHMS"): (
         "a table of algorithm names that maps the free text of an operator's"
         " algorithm setting to the canonical spelling"
     ),
-    ("analysis_service.compact", "OMITTABLE_FIELDS"): (
+    ("katra.compact", "OMITTABLE_FIELDS"): (
         "field names read off a pydantic model at import, so the model and not"
         " a Literal states them"
     ),
-    ("analysis_service.early_questions", "_ELEMENT_TYPES"): (
+    ("katra.early_questions", "_ELEMENT_TYPES"): (
         "class names read off the element union at import, so the union of"
         " classes and not a Literal states them"
     ),
-    ("analysis_service.frameworks.asvs.applicability", "APPLICABILITY"): (
-        _CATALOG_ROW_IDS
-    ),
-    ("analysis_service.frameworks.asvs.applicability", "RATIONALES"): (
-        _CATALOG_ROW_IDS
-    ),
-    ("analysis_service.frameworks.asvs.catalog", "_LEVEL_BY_ID"): _CATALOG_ROW_IDS,
-    ("analysis_service.frameworks.asvs.catalog", "_REQUIREMENT_IDS"): (
-        _CATALOG_ROW_IDS
-    ),
-    ("analysis_service.frameworks.asvs.catalog", "_TEXT_BY_ID"): _CATALOG_ROW_IDS,
-    ("analysis_service.frameworks.asvs.catalog", "_NAME_BY_ID"): (
+    ("katra.frameworks.asvs.applicability", "APPLICABILITY"): (_CATALOG_ROW_IDS),
+    ("katra.frameworks.asvs.applicability", "RATIONALES"): (_CATALOG_ROW_IDS),
+    ("katra.frameworks.asvs.catalog", "_LEVEL_BY_ID"): _CATALOG_ROW_IDS,
+    ("katra.frameworks.asvs.catalog", "_REQUIREMENT_IDS"): (_CATALOG_ROW_IDS),
+    ("katra.frameworks.asvs.catalog", "_TEXT_BY_ID"): _CATALOG_ROW_IDS,
+    ("katra.frameworks.asvs.catalog", "_NAME_BY_ID"): (
         "chapter and section IDs read from the rows of a catalog file, which"
         " holds them as data and not as a type"
     ),
-    ("analysis_service.model_tiers", "LLM_NODES"): (
+    ("katra.model_tiers", "LLM_NODES"): (
         "node names that hold one entry for each role of each framework in the"
         " registry, so a new framework adds a member"
     ),
-    ("analysis_service.sql_store", "_ADAPTERS"): (
+    ("katra.sql_store", "_ADAPTERS"): (
         "column names read off the table schema at import, so the schema and"
         " not a Literal states them"
     ),
-    ("analysis_service.sql_store", "_JSON_FIELDS"): (
+    ("katra.sql_store", "_JSON_FIELDS"): (
         "column names read off the table schema at import, so the schema and"
         " not a Literal states them"
     ),
@@ -645,29 +639,29 @@ OPEN: dict[tuple[str, str], str] = {
         "setting keys that hold one entry for each tier in the registry, so a"
         " new tier adds a member"
     ),
-    ("analysis_service.grounding", "_NEGATIONS"): (
+    ("katra.grounding", "_NEGATIONS"): (
         "a list of words that filters the tokens of a quoted span of free text"
     ),
-    ("analysis_service.grounding", "_TYPOGRAPHIC_FOLDS"): (
+    ("katra.grounding", "_TYPOGRAPHIC_FOLDS"): (
         "a list of characters that filters each character of a model's quote"
     ),
-    ("analysis_service.retry", "_RATE_LIMIT_CLEARS_WITH_TIME"): (
+    ("katra.retry", "_RATE_LIMIT_CLEARS_WITH_TIME"): (
         "the limit dimensions a provider error names, which a provider can"
         " extend with a word the table has not met"
     ),
-    ("analysis_service.sampling", "_BOOL_LITERALS"): (
+    ("katra.sampling", "_BOOL_LITERALS"): (
         "the spellings that filter the free text of an environment variable"
     ),
-    ("analysis_service.sources", "FORMATTING_CATEGORIES"): (
+    ("katra.sources", "FORMATTING_CATEGORIES"): (
         "the Unicode categories that filter each character of free text"
     ),
-    ("analysis_service.token_caps", "JOB_VARYING_DIRS"): (
+    ("katra.token_caps", "JOB_VARYING_DIRS"): (
         "directory names that filter the file names under a framework package"
     ),
-    ("analysis_service.vendors", "_ENDPOINT_VARIANTS"): (
+    ("katra.vendors", "_ENDPOINT_VARIANTS"): (
         "words that filter the parts of a model identifier that a deployment writes"
     ),
-    ("analysis_service.vendors", "_FLOATING_WORDS"): (
+    ("katra.vendors", "_FLOATING_WORDS"): (
         "words that filter the parts of a model identifier that a deployment writes"
     ),
     ("evals.build_review_docs", "HAND_WRITTEN"): (

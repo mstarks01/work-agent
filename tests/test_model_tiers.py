@@ -9,12 +9,12 @@ from typing import ClassVar
 import pytest
 from pydantic import ValidationError
 
-from analysis_service.charges import records_reported_charge
-from analysis_service.claims import FRAMEWORK_NAMES
-from analysis_service.deployment import DEFAULT_FRAMEWORKS_DIR
-from analysis_service.frameworks import FrameworkPackageError, validate_packages
-from analysis_service.graph import FrameworkNodes, Lane
-from analysis_service.model_tiers import (
+from katra.charges import records_reported_charge
+from katra.claims import FRAMEWORK_NAMES
+from katra.deployment import DEFAULT_FRAMEWORKS_DIR
+from katra.frameworks import FrameworkPackageError, validate_packages
+from katra.graph import FrameworkNodes, Lane
+from katra.model_tiers import (
     FRAMEWORK_NODES,
     LLM_NODES,
     SUPPORTED_VERSION,
@@ -28,7 +28,7 @@ from analysis_service.model_tiers import (
     tiers_in_use,
     validate_model_string,
 )
-from analysis_service.vendors import (
+from katra.vendors import (
     VENDOR_NAMES,
     VENDORS,
     ChargeMode,
@@ -149,12 +149,12 @@ class TestRepoConfig:
     """
 
     SELECTED: ClassVar[dict[str, str]] = {
-        "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-        "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
-        "ANALYSIS_MODEL_STRONG_VENDOR": "anthropic",
-        "ANALYSIS_MODEL_STRONG_MODEL": "claude-opus-5",
-        "ANALYSIS_MODEL_REVIEW_VENDOR": "vertex",
-        "ANALYSIS_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
+        "KATRA_MODEL_BASE_VENDOR": "openai",
+        "KATRA_MODEL_BASE_MODEL": "gpt-4.1-mini",
+        "KATRA_MODEL_STRONG_VENDOR": "anthropic",
+        "KATRA_MODEL_STRONG_MODEL": "claude-opus-5",
+        "KATRA_MODEL_REVIEW_VENDOR": "vertex",
+        "KATRA_MODEL_REVIEW_MODEL": "gemini-2.5-pro",
     }
 
     def test_shipped_config_selects_no_vendor(self):
@@ -167,7 +167,7 @@ class TestRepoConfig:
         # vendor available and both places a selection can be made.
         for vendor in VENDOR_NAMES:
             assert vendor in message
-        assert "ANALYSIS_MODEL_BASE_VENDOR" in message
+        assert "KATRA_MODEL_BASE_VENDOR" in message
         assert "docs/First-Run.md" in message
 
     def test_a_tier_the_node_map_does_not_use_needs_no_selection(self):
@@ -283,13 +283,13 @@ class TestEnvOverrides:
         assert config.resolve_model("extract").route == ("anthropic/claude-opus-5")
 
     def test_the_path_variable_can_actually_be_set(self, config_path):
-        """``ANALYSIS_TIERS_FILE`` points the loader at a valid file and is read.
+        """``KATRA_TIERS_FILE`` points the loader at a valid file and is read.
 
         Named against a *valid* file on purpose: a nonexistent path fails the
         read before the override check, so it would pass for the wrong reason.
         """
         path = config_path(config_toml())
-        config = load_model_tiers(path, env={"ANALYSIS_TIERS_FILE": str(path)})
+        config = load_model_tiers(path, env={"KATRA_TIERS_FILE": str(path)})
 
         assert config.resolve_model("extract").model == BASE
 
@@ -302,11 +302,11 @@ class TestEnvOverrides:
             load_model_tiers(config_path(config_toml()), env={vendor_var: "anthropic"})
 
     def test_an_unrecognised_override_is_rejected_not_ignored(self, config_path):
-        # Any ANALYSIS_MODEL_* name outside the four the loader knows: silently
+        # Any KATRA_MODEL_* name outside the four the loader knows: silently
         # ignoring one would leave the tier quietly running the file's model.
         with pytest.raises(ModelConfigError, match="unrecognised model override"):
             load_model_tiers(
-                config_path(config_toml()), env={"ANALYSIS_MODEL_FLASH": BASE}
+                config_path(config_toml()), env={"KATRA_MODEL_FLASH": BASE}
             )
 
     def test_env_alias_rejected(self, config_path):
@@ -338,12 +338,12 @@ class TestEnvOverrides:
 
     def test_env_var_names(self):
         assert env_vars_for("base") == (
-            "ANALYSIS_MODEL_BASE_VENDOR",
-            "ANALYSIS_MODEL_BASE_MODEL",
+            "KATRA_MODEL_BASE_VENDOR",
+            "KATRA_MODEL_BASE_MODEL",
         )
         assert env_vars_for("strong") == (
-            "ANALYSIS_MODEL_STRONG_VENDOR",
-            "ANALYSIS_MODEL_STRONG_MODEL",
+            "KATRA_MODEL_STRONG_VENDOR",
+            "KATRA_MODEL_STRONG_MODEL",
         )
 
 
@@ -470,9 +470,9 @@ class TestDeclaredChargeMode:
         tiers = load_model_tiers(
             config_path(config_toml()),
             env={
-                "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
-                "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
-                "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
+                "KATRA_MODEL_BASE_VENDOR": "openrouter",
+                "KATRA_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+                "KATRA_MODEL_CHARGES_OPENROUTER": "direct",
             },
         )
         assert tiers.charge_mode("openrouter") is ChargeMode.DIRECT
@@ -481,7 +481,7 @@ class TestDeclaredChargeMode:
         with pytest.raises(ModelConfigError, match="set but empty"):
             load_model_tiers(
                 config_path(config_toml()),
-                env={"ANALYSIS_MODEL_CHARGES_OPENROUTER": "  "},
+                env={"KATRA_MODEL_CHARGES_OPENROUTER": "  "},
             )
 
     def test_an_unknown_arrangement_is_an_error(self, config_path):
@@ -563,10 +563,10 @@ class TestDeclaredUpstreams:
         tiers = load_model_tiers(
             config_path(config_toml()),
             env={
-                "ANALYSIS_MODEL_BASE_VENDOR": "openrouter",
-                "ANALYSIS_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
-                "ANALYSIS_MODEL_CHARGES_OPENROUTER": "direct",
-                "ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": "openai/flex, azure",
+                "KATRA_MODEL_BASE_VENDOR": "openrouter",
+                "KATRA_MODEL_BASE_MODEL": "anthropic/claude-sonnet-4.6",
+                "KATRA_MODEL_CHARGES_OPENROUTER": "direct",
+                "KATRA_MODEL_UPSTREAMS_OPENROUTER": "openai/flex, azure",
             },
         )
         assert tiers.upstreams_for("openrouter") == ("openai/flex", "azure")
@@ -575,7 +575,7 @@ class TestDeclaredUpstreams:
         with pytest.raises(ModelConfigError, match="set but empty"):
             load_model_tiers(
                 config_path(config_toml()),
-                env={"ANALYSIS_MODEL_UPSTREAMS_OPENROUTER": " "},
+                env={"KATRA_MODEL_UPSTREAMS_OPENROUTER": " "},
             )
 
     def test_an_empty_list_is_an_error(self, config_path):
@@ -684,7 +684,7 @@ class TestDeclaredCredentialMode:
             load_model_tiers(path, env={})
         message = str(refused.value)
         assert "selected by tiers: base)" in message
-        assert "ANALYSIS_MODEL_CREDENTIALS_BEDROCK" in message
+        assert "KATRA_MODEL_CREDENTIALS_BEDROCK" in message
         assert "input_value" not in message
 
     def test_a_multi_mode_vendor_nobody_selects_needs_no_declaration(self, config_path):
@@ -719,9 +719,9 @@ class TestDeclaredCredentialMode:
         tiers = load_model_tiers(
             config_path(config_toml()),
             env={
-                "ANALYSIS_MODEL_BASE_VENDOR": "bedrock",
-                "ANALYSIS_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
-                "ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam",
+                "KATRA_MODEL_BASE_VENDOR": "bedrock",
+                "KATRA_MODEL_BASE_MODEL": "anthropic.claude-sonnet-4-6",
+                "KATRA_MODEL_CREDENTIALS_BEDROCK": "iam",
             },
         )
         assert tiers.credential_mode("bedrock") is CredentialMode.IAM
@@ -801,9 +801,7 @@ class TestDeclaredCredentialMode:
             )
             + '\n[credentials]\nbedrock = "api_key"\n'
         )
-        tiers = load_model_tiers(
-            path, env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "iam"}
-        )
+        tiers = load_model_tiers(path, env={"KATRA_MODEL_CREDENTIALS_BEDROCK": "iam"})
         assert tiers.credential_mode("bedrock") is CredentialMode.IAM
 
     def test_an_environment_declaration_meets_the_same_rules(self, config_path):
@@ -811,14 +809,14 @@ class TestDeclaredCredentialMode:
         with pytest.raises(ModelConfigError, match="nothing to choose"):
             load_model_tiers(
                 config_path(config_toml()),
-                env={"ANALYSIS_MODEL_CREDENTIALS_VERTEX": "iam"},
+                env={"KATRA_MODEL_CREDENTIALS_VERTEX": "iam"},
             )
 
     def test_an_empty_environment_declaration_is_an_error(self, config_path):
         with pytest.raises(ModelConfigError, match="set but empty"):
             load_model_tiers(
                 config_path(config_toml()),
-                env={"ANALYSIS_MODEL_CREDENTIALS_BEDROCK": "  "},
+                env={"KATRA_MODEL_CREDENTIALS_BEDROCK": "  "},
             )
 
     def test_an_unrecognised_credentials_variable_still_raises(self, config_path):
@@ -830,7 +828,7 @@ class TestDeclaredCredentialMode:
         with pytest.raises(ModelConfigError, match="unrecognised"):
             load_model_tiers(
                 config_path(config_toml()),
-                env={"ANALYSIS_MODEL_CREDENTIALS_BEDR0CK": "iam"},
+                env={"KATRA_MODEL_CREDENTIALS_BEDR0CK": "iam"},
             )
 
 
@@ -893,7 +891,7 @@ class TestFileValidation:
             config.version = 2
 
     def test_os_environ_overrides_apply(self, config_path, monkeypatch):
-        monkeypatch.setenv("ANALYSIS_MODEL_STRONG_MODEL", "gemini-3.0-pro")
+        monkeypatch.setenv("KATRA_MODEL_STRONG_MODEL", "gemini-3.0-pro")
         config = load_model_tiers(config_path(config_toml()), env=os.environ)
         assert config.resolve_model("critic/stride").model == "gemini-3.0-pro"
 
@@ -1117,27 +1115,27 @@ def test_the_review_tier_needs_no_credentials_until_something_runs_on_it():
     would demand a second vendor's credentials from every deployment that never
     asked for an independent reviewer, and refuse to start without them.
     """
-    from analysis_service.binding import build_tier_adapters
-    from analysis_service.resilience import load_resilience
-    from analysis_service.sampling import load_sampling
+    from katra.binding import build_tier_adapters
+    from katra.resilience import load_resilience
+    from katra.sampling import load_sampling
 
     tiers = load_model_tiers(
         REPO_CONFIG,
         env={
-            "ANALYSIS_MODEL_BASE_VENDOR": "openai",
-            "ANALYSIS_MODEL_BASE_MODEL": "gpt-4.1-mini",
-            "ANALYSIS_MODEL_STRONG_VENDOR": "openai",
-            "ANALYSIS_MODEL_STRONG_MODEL": "gpt-5.6",
+            "KATRA_MODEL_BASE_VENDOR": "openai",
+            "KATRA_MODEL_BASE_MODEL": "gpt-4.1-mini",
+            "KATRA_MODEL_STRONG_VENDOR": "openai",
+            "KATRA_MODEL_STRONG_MODEL": "gpt-5.6",
             # A vendor whose key is deliberately absent from the env below.
-            "ANALYSIS_MODEL_REVIEW_VENDOR": "anthropic",
-            "ANALYSIS_MODEL_REVIEW_MODEL": "claude-opus-5",
+            "KATRA_MODEL_REVIEW_VENDOR": "anthropic",
+            "KATRA_MODEL_REVIEW_MODEL": "claude-opus-5",
         },
     )
     adapters = build_tier_adapters(
         tiers,
         load_sampling(PROJECT_ROOT / "config" / "sampling.toml", env={}),
         load_resilience(PROJECT_ROOT / "config" / "resilience.toml", env={}),
-        env=secret_env("ANALYSIS_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
+        env=secret_env("KATRA_OPENAI_API_KEY_FILE", "sk-not-a-real-key"),
     )
     assert set(adapters) == {"base", "strong"}
 

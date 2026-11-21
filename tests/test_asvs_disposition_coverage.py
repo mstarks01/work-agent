@@ -24,7 +24,6 @@ from __future__ import annotations
 
 from typing import get_args, get_type_hints
 
-from analysis_service.frameworks.asvs.record import RequirementProposal
 from evals import verify_corpus
 from evals.harness.reference import (
     DISPOSITION_FOR_EVIDENCE,
@@ -32,6 +31,7 @@ from evals.harness.reference import (
     ReferenceRequirement,
     load_corpus,
 )
+from katra.frameworks.asvs.record import RequirementProposal
 
 #: How many ASVS reference records each case carries, all of which must carry a
 #: disposition. Spelled per case for the reason ``CLAIMS_PER_CASE`` is.
@@ -165,8 +165,8 @@ def test_an_exemplar_question_names_the_kind_the_corpus_expects():
     the job cannot reach, and that answer does not move with the system. So
     only that axis is compared.
     """
-    from analysis_service.frameworks import PACKAGES
-    from analysis_service.frameworks.asvs.catalog import CHAPTER_NUMBERS
+    from katra.frameworks import PACKAGES
+    from katra.frameworks.asvs.catalog import CHAPTER_NUMBERS
     from tests.test_prompt_lints import exemplar_proposals
 
     expected = {

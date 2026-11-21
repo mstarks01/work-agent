@@ -22,9 +22,9 @@ from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from pydantic import BaseModel
 
-from analysis_service.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
-from analysis_service.ladder import Ladder
-from analysis_service.provider import (
+from katra.charges import CHARGE_METADATA_KEY, UPSTREAM_METADATA_KEY
+from katra.ladder import Ladder
+from katra.provider import (
     PER_CALL_SAMPLING,
     ExecutedLlm,
     GenerationRequest,
@@ -33,8 +33,8 @@ from analysis_service.provider import (
     ProviderCallFailed,
     ProviderExecutor,
 )
-from analysis_service.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
-from analysis_service.retry import (
+from katra.refusal_categories import REFUSAL_CATEGORY_METADATA_KEY
+from katra.retry import (
     FailureKind,
     ProviderFailure,
     RetryBudget,
@@ -42,7 +42,7 @@ from analysis_service.retry import (
     RetryRefusal,
     classify,
 )
-from analysis_service.system_model import SystemModel
+from katra.system_model import SystemModel
 
 CREDENTIAL = "sk-not-a-real-key-and-it-must-not-travel"
 

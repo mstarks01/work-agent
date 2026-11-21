@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 
-from analysis_service.assertion_use import assertion_use
-from analysis_service.assertions import (
+from evals.harness.assertion_use import command_assertion_use
+from katra.assertion_use import assertion_use
+from katra.assertions import (
     ABSENT,
     Assertion,
     AssertionCatalog,
@@ -13,11 +14,10 @@ from analysis_service.assertions import (
     Subject,
     assertion_id,
 )
-from analysis_service.candidates import Candidate, CandidateSet, catalog_leads
-from analysis_service.claims import Ground
-from analysis_service.graph import ASSERT_NODE
-from analysis_service.report import NodeRun
-from evals.harness.assertion_use import command_assertion_use
+from katra.candidates import Candidate, CandidateSet, catalog_leads
+from katra.claims import Ground
+from katra.graph import ASSERT_NODE
+from katra.report import NodeRun
 from tests.factories import sample_report, sample_threat
 
 SHOPPERS = Subject(

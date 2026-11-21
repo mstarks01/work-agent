@@ -1,0 +1,1030 @@
+"""The report: the structured JSON payload the front-end retrieves for a job.
+
+There is one envelope and many frameworks. A :class:`Report` carries the facts
+about one job — its identity, its inputs, the nodes that ran, and the single
+**Valid System Model** every framework analysed — plus one
+:class:`FrameworkAnalysis` block per framework the job selected. A field sits
+where the thing it describes sits. Nine fields describe the job or the shared
+model and stay on the envelope, and everything one framework produced rides in
+that framework's own block.
+
+The shapes inside a block — the neutral :class:`~katra.claims.Claim`,
+its grounds, the proposal and ruling wrappers, the marks and the block itself —
+live in :mod:`katra.claims`. This module holds the envelope and what
+only the envelope describes: the job, the input, the node runs, the execution
+envelope and the sampling record. It imports the framework registry and the
+evidence resolver at the top, because nothing below them imports it back.
+
+The report embeds the full validated System Model plus derived boundary
+crossings once, so it is self-contained: every element reference in every block
+resolves inside one payload.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Annotated, Any, Literal, Self
+
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SerializeAsAny,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+
+from katra.assertions import (
+    PROJECTION_VERSION,
+    REJECTING,
+    AssertionRecord,
+    CatalogCoverage,
+    catalog_coverage,
+    contradiction_issues,
+)
+from katra.charges import MAX_CALL_CHARGE_USD, UPSTREAM_MAX_CHARS
+from katra.claims import FrameworkAnalysis, FrameworkName, SharedElementName
+from katra.evidence import ground_issues
+from katra.frameworks import block_type_for
+from katra.ladder import SchemaPath, SchemaRefusal
+from katra.model_tiers import ReviewIndependence
+from katra.parsing import Sha256Hex
+from katra.sources import (
+    MAX_LABEL_CHARS,
+    Source,
+    clean_system_name,
+    text_digest,
+)
+from katra.system_model import (
+    BoundaryCrossing,
+    SystemModel,
+)
+from katra.vendors import ServedTrust, vendor_for_route
+
+# The payload schema readers key on. Consumers that ignore unknown fields
+# tolerate a minor bump; a major bump is a breaking change to a field's
+# meaning. The policy, stated once here and in docs/Report-Schema.md:
+# **additive fields are a minor bump; changing the meaning or the spelling of
+# an existing value is major.**
+#
+# What each version holds, for a reader of an archived report:
+#
+# Version 2.0: ``grounds`` is required on every threat, and ``nodes[].node``
+# carries ``analyze_<category>``. A consumer keying on ``analyst_spoofing``
+# matches nothing, silently, which is why the bump is major.
+#
+# Version 2.1: adds ``nodes[].usage``, an optional object.
+#
+# Version 2.2: adds ``unresolved_mentions``, the marks for element IDs a
+# description cites in prose that the model does not contain.
+#
+# Version 2.3: adds ``missing_mitigations``, a list of service-owned marks.
+#
+# Version 2.4: adds ``coverage``, the per-category account of what
+# deterministic analysis put in front of each agent and how much of it the
+# drafts cite.
+#
+# Version 2.5: adds ``shared_element_names``, the marks for elements of
+# different types whose names normalize to one slug. It is minor although the
+# mark is about the *model*: what a consumer must do with an unknown field does
+# not depend on what the field describes.
+#
+# Version 2.6: the ``sampling`` clear block carries every type a resolved
+# sampling param holds, including the reasoning effort's enum string. A
+# consumer that reads the block as numbers must widen.
+#
+# Version 2.7: adds ``analysis_context``: the instruction digest, the domain
+# packs this job's model earned, and the deterministic rules that fired. It
+# records what *informed* the analysis. It is not evidence, and nothing in it
+# supports a threat.
+#
+# Version 2.8: adds ``knowledge_docs`` to ``analysis_context``: the
+# local-corpus documents the fired rules retrieved for the agents. No consumer
+# may read one as support for a threat.
+#
+# Version 2.9: adds ``unresolved_evidence``: evidence references a threat cited
+# that its job's catalog did not hold. Such a reference is dropped and marked,
+# and only a threat left with no grounds at all fails (#138). A consumer reads
+# "every citation resolved" off this list, never off an absence.
+#
+# Version 2.10: ``coverage[].elements_cited`` counts only elements in the
+# model, and every ``*_cited`` half is at most the total beside it. A stored
+# row with more cited than offered does not re-validate.
+#
+# Version 3.0: the framework cutover, major on every count the rule names.
+#
+# * ``threats`` and seven other top-level fields are ``analyses[].claims`` and
+#   their per-framework siblings; the mark classes name ``claim_id``;
+#   ``coverage[].lane`` names the lane; and every claim carries the required
+#   ``(framework, framework_version)`` pair.
+# * ``GroundKind`` holds ``absent-attribute`` (#171) and ``absent-element``: a
+#   term no element of the model names, whose ``element_id`` and ``flow_id``
+#   are both empty. **A framework may need to justify a claim by the absence of
+#   a thing from the model, and every other branch can only name something
+#   present.**
+# * ``nodes[]`` carries ``attempts`` (default 1), the provider-call count the
+#   retry driver stamps; ``reasks`` (0 or 1, default 0), the schema re-ask
+#   count the adapter stamps (ADR 0058); ``schema_path`` and
+#   ``schema_fallback`` (default ``None``); and ``answer_unwrapped`` (default
+#   ``False``).
+# * ``unknown_claim_identities``: a claim naming an identifier its framework's
+#   own catalog does not hold, dropped and marked. Only a framework carrying a
+#   catalog it did not author can produce one, so the list is empty for STRIDE
+#   by construction.
+# * ``dropped_claims``: a claim that lost every ground it cited, at evidence
+#   resolution or at the quote check. A proposal that fails its own schema, or
+#   a claim that lost every ground, every element it named, or its ID to an
+#   earlier draft, is dropped and marked with its reason.
+# * ``unresolved_references``: an element ID dropped from
+#   ``affected_element_ids``, the way ``unresolved_mentions`` records one
+#   dropped from prose.
+# * ``repaired_quotes``: a quote ground the ladder refused and the service
+#   rewrote to the source's own nearest span. The ground carries the submitter's
+#   words and the mark carries the agent's, so a consumer reading a quote as
+#   "what the agent wrote" must read this list too. Each entry carries
+#   ``moved``, what the substitution changed in the claim's own terms, required
+#   and checked on load, and empty where the fan-in wrote it, because the fan-in
+#   refuses one that moves a negation or a number; and ``scan_complete``,
+#   whether the rung ranked every window, ``None`` on an archived repair (#675).
+# * ``unreconciled_rulings``: how the *first* critic pass failed to reconcile
+#   with its drafts, before the bounded re-ask. Each entry is a record — the
+#   claim, a closed ``kind``, and the sentence (#710).
+# * ``rejected_because`` on a verdict: which of the critic's checks ended a
+#   rejected draft. ``None`` is the answer for a rejection with no recorded
+#   cause. The substance check answers in two values, ``evidence`` and
+#   ``reasoning``, because only the first rules on the draft's unit (#659).
+# * A ``needs-info`` verdict names what has to be answered as an element and
+#   one of its attributes, or as a ``subject`` with both halves empty. **A
+#   framework may need a fact the system model has no slot for.**
+# * ``scope[].state`` holds ``not-raised``, where no lane raised a claim on the
+#   unit, and ``undecidable``, for a framework whose precondition cannot tell
+#   whether it applies at all (#659).
+# * ``model_repair`` on the envelope: what the repair pass may change and which
+#   elements it changed anyway and had put back (#675). ``None`` where no
+#   repair ran, and on archived runs that did.
+# * ``coverage[]`` (#675): a control is ``unknown_controls_cited`` only where a
+#   draft's attribute ground names that element *and* that attribute; a
+#   candidate is ``candidates_cited`` only where one draft cites every element
+#   it names. Archived rows written under 2.x carry larger numbers.
+# * ``immaterial_unknowns`` on a verdict: the unknown grounds a claim cites and
+#   does not rest on. It makes a ``confirmed`` reachable on a draft naming an
+#   open fact its argument never uses, and a confirmation that lists none is
+#   refused. ``UnreconciledKind`` carries ``dismissal-off-grounds``.
+# * ``recommendation`` on a STRIDE threat: what the critic made of the advice
+#   the finding carries, as ``sound`` and a ``note``. It sits beside the
+#   verdict, because a recommendation never decides a claim. ``None`` says the
+#   critic read no advice here, which is a different fact from advice it
+#   approved.
+# * ``assertion`` on an ``UnknownRef``: one open row of the job's fact catalog,
+#   so a ``confirmed`` claim on an open assertion has a
+#   dismissal to name (#1082).
+#
+# **``Report`` has no version gate.** It keeps ``extra="forbid"``, so a 2.10
+# payload carrying ``threats`` at the top level is refused by this model, and a
+# 3.0 payload carrying ``analyses`` is refused by a 2.10 model. A stored job
+# record is a different case: it states the version that created it, and
+# :func:`katra.jobs.same_schema` reads that before a route parses it.
+#
+# Version 3.1: each statement in ``system_model.capabilities`` carries the
+# required ``origin``, which names its writer: ``answer``, ``field`` or
+# ``reader``. A ``field`` statement carries a ``basis``, and a statement of
+# another origin carries none. A stored 3.0 job record gets 409
+# ``UnreadableSchema``.
+#
+# Version 3.2: each row in ``assertions.catalog.entries`` carries the required
+# ``origin``, which names its writer: ``assertion-pass`` or ``answer``. Every
+# span of an ``answer`` row quotes the answers Source, and no span of another
+# row quotes it. A stored 3.1 job record gets 409 ``UnreadableSchema``.
+#
+# Version 3.3: each STRIDE threat carries ``attacker_position``, from a closed
+# set of five, and ``None`` only on a threat a run wrote before the field. A
+# stored 3.2 job record gets 409 ``UnreadableSchema``.
+#
+# Version 3.4: ``rejected_because`` holds ``control``, a verdict carries
+# ``control_row`` and ``refused_controls``, and each block carries
+# ``returned_claims`` (ADR 0126). A stored 3.3 job record gets 409
+# ``UnreadableSchema``.
+#
+# Version 3.5: each block carries ``quotes_checked``, whether the fan-in ran
+# the quote check, and ``None`` only on a block a run wrote before the field.
+# A stored 3.4 job record gets 409 ``UnreadableSchema``.
+SCHEMA_VERSION = "3.5"
+
+# The envelope's disclaimer, which is about the *service* rather than about any
+# one framework. It does not say "threat model": that is false of a report
+# whose blocks include a framework that rules on requirement applicability
+# rather than on attacks, and a sentence that is false of half a payload is
+# worse than a general one. Each package carries its own, from
+# ``frameworks/<name>/disclaimer.md``, saying what its own claims assert.
+DEFAULT_DISCLAIMER = (
+    "AI-generated security analysis. Not reviewed by a human security analyst."
+)
+
+
+def assertion_disclosure(record: AssertionRecord) -> str:
+    """What the report must tell a reader about the facts analysis rested on.
+
+    **Required by #926's contract, and not sufficient for it** (the owner's
+    decision of 2026-09-23). An unchecked assertion informs conditional
+    analysis only, and a review can reject one afterwards; a reader who does
+    not know how many of the report's facts anybody checked cannot weigh a
+    finding that rests on one. The guarantees themselves are enforced in the
+    projection and the evidence catalog; this sentence says they applied.
+    """
+    entries = record.catalog.entries
+    checked = sum(1 for entry in entries if entry.assessment == "supported")
+    rejected = sum(1 for entry in entries if entry.assessment in REJECTING)
+    unchecked = len(entries) - checked - rejected
+    return (
+        f"Source-backed assertions: {len(entries)}; {checked} checked by a"
+        f" reviewer, {rejected} rejected by a reviewer and used for nothing,"
+        f" {unchecked} unchecked. An unchecked assertion informs conditional"
+        " findings only and never closes an open question; a quoted source is"
+        " not proof of what the deployed system does."
+    )
+
+
+def disclaimer_for(record: AssertionRecord | None) -> str:
+    """The envelope's disclaimer, with the assertion disclosure where one ran."""
+    if record is None:
+        return DEFAULT_DISCLAIMER
+    return f"{DEFAULT_DISCLAIMER} {assertion_disclosure(record)}"
+
+
+# One value in a report's per-tier sampling clear block. Wide on purpose: it is
+# every scalar type a resolved sampling param can hold, and the block is a
+# *record* of what a run resolved rather than a place a value is decided. The
+# enumeration is `TierSampling`'s field types — number, count, flag, and the
+# reasoning effort's enum string — and `tests/test_report.py` pins the two in
+# step, because a param whose type this cannot carry does not fail at load
+# time: it fails when the report is assembled, after the whole graph has been
+# paid for.
+#
+# Nothing is validated by being narrow here. The values arrive from a
+# `TierSampling` that already validated them — range, enum and reserved-param
+# rules all live there — and this module cannot import it without cycling
+# through skills. Narrowing this union would not add a check; it would only
+# decide which correctly-configured deployments can produce a report.
+SamplingValue = bool | int | float | str | None
+
+
+class TokenUsage(BaseModel):
+    """What one node execution spent, as the provider reported it.
+
+    Vendor-neutral field names, on the same principle as the model tiers: the
+    provider's own spellings (``prompt_token_count``,
+    ``candidates_token_count``, ``thoughts_token_count``,
+    ``cached_content_token_count``) are one vendor's product vocabulary, and
+    this record outlives the vendor it was read from.
+    ``katra.execution`` owns the mapping.
+
+    NOTHING HERE IS DERIVED, and that is the point. ``total_tokens`` is
+    recorded rather than summed, and no validator asserts a relationship
+    between the parts, because the parts do not agree across vendors on what
+    they contain: Gemini reports ``thoughts`` *outside* ``candidates``, while
+    an OpenAI-family reasoning model counts them *inside* completion tokens.
+    A sum check would fail honest data from one of them, and a derived total
+    would silently mean two different things depending on who answered. Same
+    rule NodeRun already applies to ``model`` and ``requested_model``: record
+    both, compute neither.
+
+    ``reasoning_tokens`` is the field this record exists for. It is spent
+    against the tier's ``max_output_tokens`` and it is invisible in the
+    output, so a node can be the run's largest consumer while looking small.
+    ``cached_prompt_tokens`` is the other one: it is the only direct evidence
+    of whether a prefix a prompt was laid out to cache actually cached.
+
+    Every field defaults to 0 rather than being required — a provider that
+    reports three of the five is common, and dropping the record for the two
+    it withheld would lose the three it gave. A node that reported *nothing*
+    carries no ``TokenUsage`` at all, so an all-zero record never stands in
+    for an absent one.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    prompt_tokens: int = Field(default=0, ge=0)
+    cached_prompt_tokens: int = Field(default=0, ge=0)
+    #: Prompt tokens the provider wrote to its cache on this call, which a
+    #: GPT-5.6-family model bills above the input rate. ADK drops the count, so
+    #: :mod:`katra.prompt_cache` carries it.
+    cache_write_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    reasoning_tokens: int = Field(default=0, ge=0)
+    total_tokens: int = Field(default=0, ge=0)
+
+
+class NodeRun(BaseModel):
+    """Per-node execution metadata: which model ran, its sampling identity, timing.
+
+    Two model fields, because they answer different questions and the report
+    **records both rather than computing either**:
+
+    * ``model`` is the **served** build, vendor-prefixed —
+      ``vertex_ai/gemini-2.5-pro-002``. What actually answered, read back from
+      the response.
+    * ``requested_model`` is the **configured** route —
+      ``vertex_ai/gemini-2.5-pro``. What the run asked for.
+
+    Their disagreement *is* the drift signal, and it needs no comparison logic
+    here: drift falls out of certification for free, because a moved build
+    yields a fingerprint no manifest blessed. A served-vs-configured comparison
+    would instead need a per-vendor served-id normalization table — a fourth
+    mirrored vendor fact, and one that fails silently.
+
+    **The served build is what the provider said, and nothing here verifies
+    it.** ``model`` is read off the provider's own event stream, so a
+    compromised translator can put any string in it. That is why the two fields
+    are both recorded and why ``execution_fingerprint`` binds both: a manifest
+    blesses the *pair*, and the requested half comes from the deployment's
+    configuration rather than from the provider. The report states the trust
+    level once, on the envelope's ``execution`` block, rather than repeating it
+    on every node.
+
+    ``execution_fingerprint`` is the identity hash a deployment's manifest
+    blesses: ``sha256`` of the versioned execution identity — both routes, the
+    resolved tier sampling, the built graph's instruction digest, and the
+    versions of the distributions that sit between the node and its provider.
+    See :mod:`katra.identity`. Computed per node *execution*, so a
+    build that moves partway through an eval sweep gives one node two hashes.
+
+    ``instruction_sha256`` is the digest of the graph this node ran in, and on a
+    report it repeats what ``analysis_context`` already says. **The repetition is
+    load-bearing.** A report holds one graph, so the two always agree there — but
+    a :class:`NodeRun` also travels alone: an eval sweep folds one flat list of
+    them across several graphs, because a case declares which frameworks it
+    carries and each distinct selection builds its own. In that list the report
+    block is gone and the node's own digest is the only thing that says which
+    instruction set produced its fingerprint. A row carrying a hash it cannot
+    account for is a row nobody can verify.
+
+    A deterministic FunctionNode carries none of these four.
+
+    ``usage`` is what the node execution cost, ``None`` for a deterministic
+    FunctionNode and for any LLM node whose provider reported nothing. It is
+    deliberately *not* coupled to ``model`` the way ``execution_fingerprint``
+    is: a fingerprint keyed on a served build is incoherent without one, but a
+    token count is a fact about the call regardless of whether the provider
+    also named the build that served it, and refusing to record it would
+    discard a real measurement to satisfy a symmetry nobody needs.
+
+    ``reported_charge_usd`` is what the provider said it charged for the call,
+    in USD, and it sits **beside** ``usage`` rather than replacing it. The two
+    answer different questions: the token counts multiplied by published rates
+    are reproducible from this record, and the reported charge is what the
+    account was charged. A row carrying one number cannot say which of the
+    two it holds. ``None`` is the common answer — most providers state token
+    counts and nothing else — and it is also the answer where a provider states
+    a figure that covers part of a call. See :mod:`katra.charges`.
+
+    ``served_upstream`` is the serving organisation the provider named — a
+    gateway's ``DeepInfra`` or ``Claude Platform on AWS``. **Evidence, and never
+    identity.** It is not in ``execution_fingerprint`` and must not be: the
+    value is a third party's own vocabulary, so a provider renaming one of its
+    strings would move every blessed hash for a cosmetic reason. It is also
+    never invented — a direct vendor names no upstream and carries ``None``
+    here rather than the vendor copied out of the route, because attribution
+    derived from the request is what this field exists to avoid. Only a route
+    that reaches more than one provider has anything to say.
+
+    ``attempts`` is how many provider calls the execution took, counted by the
+    retry driver. ``usage`` meters the one that answered; a failed attempt
+    reports nothing, so the count is the only trace the prompt bytes it sent
+    leave. A settlement charges them from it (see
+    :func:`katra.budgets.measured_tokens`).
+
+    ``reasks`` is 1 where the node's first answer failed its output schema and
+    the adapter asked once more with the validation errors. Both answering
+    calls are metered, so ``usage`` covers both and ``attempts`` counts both.
+
+    ``schema_path`` is how the node's schema travelled: ``native`` through the
+    provider's structured-output field, ``tool`` as a tool's parameters, or
+    ``prompt`` stated in the request text (ADR 0058). ``None`` for a node that
+    sent no schema.
+
+    ``schema_fallback`` names the rule in
+    :data:`~katra.ladder.SCHEMA_REFUSALS` that moved this node's tier
+    down its ladder, on the call where the provider refused the rung above.
+    It is the rule's name and never the provider's message, which can quote
+    the prompt back.
+
+    ``answer_unwrapped`` is true where the node's tool call put its whole answer
+    under a lone ``answer`` key that its schema does not have, and the executor
+    read the object under that key as the answer.
+
+    ``served_trust`` says what this row's ``model`` is worth as evidence, and it
+    is **here rather than once per report**. A deployment may select a
+    different vendor per tier, so one report can hold rows whose served builds
+    are worth different things, and a single value for the whole run has to be
+    wrong on one of them. It is *derived* from ``requested_model`` rather than
+    stored, so the report and the fingerprint read one rule through one reader
+    and cannot disagree.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    node: str = Field(min_length=1, max_length=100)
+    model: str | None = None  # served; None for deterministic FunctionNodes
+    requested_model: str | None = None  # configured
+    instruction_sha256: Sha256Hex | None = None
+    execution_fingerprint: Sha256Hex | None = None
+    duration_ms: int = Field(ge=0)
+    usage: TokenUsage | None = None
+    attempts: int = Field(default=1, ge=1)
+    reasks: int = Field(default=0, ge=0, le=1)
+    schema_path: SchemaPath | None = None
+    schema_fallback: SchemaRefusal | None = None
+    answer_unwrapped: bool = False
+    # ``allow_inf_nan`` off, because a stored figure is only as trustworthy as
+    # whatever wrote it — the reasoning ``_stored_system_name`` states below.
+    # ``katra.charges.reported_charge_of`` refuses a non-finite
+    # figure on the way in and ``evals.harness.baseline.money`` refuses one in a
+    # contributor's file, and this reader admitted what both refuse: an ``inf``
+    # validated, summed to ``inf`` through
+    # :func:`~evals.harness.instruments.charges_by_node`, and
+    # re-serialised as ``null`` — so a report read back and re-dumped moved the
+    # bytes an attestation seals.
+    reported_charge_usd: float | None = Field(
+        default=None, ge=0, le=MAX_CALL_CHARGE_USD, allow_inf_nan=False
+    )
+    served_upstream: str | None = Field(default=None, max_length=UPSTREAM_MAX_CHARS)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_derived_trust(cls, data: Any) -> Any:
+        """Ignore a ``served_trust`` on input; it is output, not state.
+
+        The field is serialized so a reader of a stored report can see it, which
+        means a round trip hands it straight back. Recomputing from
+        ``requested_model`` rather than trusting the key is what keeps one rule
+        to one reader: an edited value cannot survive, and the value inside the
+        fingerprint is derived the same way from the same route.
+        """
+        if isinstance(data, dict):
+            data = {k: v for k, v in data.items() if k != "served_trust"}
+        return data
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def served_trust(self) -> ServedTrust | None:
+        """What ``model`` is worth as evidence, for the vendor that served it.
+
+        ``None`` on a deterministic FunctionNode, which asked no provider and
+        has no served build to weigh.
+        """
+        if self.requested_model is None:
+            return None
+        return vendor_for_route(self.requested_model).served_trust
+
+    @model_validator(mode="after")
+    def _fingerprint_needs_its_inputs(self) -> Self:
+        # Every per-node input to the identity has to be here beside the hash,
+        # or the row states a fingerprint nobody can rebuild. A deterministic
+        # node has none of them and no fingerprint, which is the consistent
+        # absence.
+        if self.execution_fingerprint is None:
+            return self
+        missing = [
+            name
+            for name, value in (
+                ("a served model", self.model),
+                ("a requested model", self.requested_model),
+                ("an instruction digest", self.instruction_sha256),
+            )
+            if value is None
+        ]
+        if missing:
+            raise ValueError(
+                f"execution_fingerprint requires {' and '.join(missing)}"
+                " on the same node"
+            )
+        return self
+
+
+class ExecutionEnvelope(BaseModel):
+    """What executed this run, and how much its self-report is worth.
+
+    One block per report rather than one per node, because every node in a
+    drive ran on the same install and asked the same graph. Repeating it would
+    be the same fact ten times over, free to drift.
+
+    ``identity_version`` is the schema of the payload each node's
+    ``execution_fingerprint`` hashes. A reader recomputing a fingerprint needs
+    it, and certification refuses a manifest written for a different one rather
+    than comparing across them.
+
+    What a served build is *worth* is **not** here. Trust is per node, on
+    :attr:`NodeRun.served_trust`, where the vendor is known and one reader
+    answers for every caller. A report-wide constant would be wrong: a
+    translator that fills the served identifier from the request confirms
+    nothing, and a deployment may select a different vendor per tier, so one
+    report can hold rows with different answers.
+
+    ``build`` is the installed version of every distribution whose code sits
+    between a node and its provider — this service, the agent runtime and the
+    model translator. It is here rather than in a deployment note because it is
+    inside the fingerprint: a ``litellm`` bump moves every hash, and a reader
+    who cannot see which version ran cannot tell a sanctioned run from a
+    silently upgraded one.
+
+    ``review_independence`` is how far this deployment required each framework's
+    criticism to sit from its own analysis. It is a **statement, never a
+    warning**: a deployment that asked for an independent reviewer and could not
+    have one fails to load, so no report exists to warn on. What this answers is
+    the other direction — a reader of a ``shared`` run can see the review was
+    same-domain rather than infer it from two node rows naming one model. The
+    detail behind it is already on :class:`NodeRun`: the ``analyze/<name>`` and
+    ``critic/<name>`` rows each carry their own requested route, served build
+    and fingerprint.
+
+    Deliberately **not** in the fingerprint. The policy decides nothing at run
+    time — the loader has already enforced it — so hashing it would re-baseline
+    every blessed identity on a policy edit that moved no model.
+
+    ``extraction_format`` is which transport ``extract`` wrote in: the full
+    System Model, or the compact wire form an adapter expands into one
+    (:mod:`katra.compact`). It is recorded because a comparison
+    between the two routes is the only thing that says whether the compact one
+    is worth running, and a reader who infers the route from the report's own
+    System Model would find the two identical by construction. ``None`` means
+    the run extracted nothing — the analysis and assertion eval entries are
+    seeded a model instead. It is outside the fingerprint because the two routes
+    read different composed instructions, so ``instruction_sha256`` already
+    tells them apart.
+
+    ``extraction_strategy`` is the order that node read in. ``graph-first`` is
+    the one order: ``extract`` emits a System Model in one pass. It is outside
+    the fingerprint for the reason the transport is. ``None`` means the run
+    extracted nothing.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    identity_version: int = Field(ge=1)
+    build: dict[str, str] = Field(default_factory=dict)
+    review_independence: ReviewIndependence = "shared"
+    extraction_format: Literal["full", "compact-v4"] | None = "full"
+    extraction_strategy: Literal["graph-first"] | None = "graph-first"
+
+
+class ModelRepair(BaseModel):
+    """What the one repair pass was allowed to change, and what it changed anyway.
+
+    Recorded by the revalidate gate. ``scope`` is ``elements`` when every
+    issue named an element, and then ``implicated`` is those elements together
+    with the flows through them: the repair may change them, add elements, and
+    nothing else, and every other element is put back as it was. The flows are
+    there because a flow ID is derived from its endpoints, so renaming a named
+    element renames every flow through it (#1040). ``restored`` names the ones that had to be,
+    because the repair changed or dropped an element the issues never cited.
+    ``scope`` is ``whole`` when an issue named no element — a fault over the
+    whole object — and then nothing is put back, because no narrower patch
+    could answer it; ``implicated`` and ``restored`` are empty.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    scope: Literal["elements", "whole"]
+    implicated: list[str] = Field(default_factory=list)
+    restored: list[str] = Field(default_factory=list)
+
+
+class AnalysisContext(BaseModel):
+    """What informed the analysis, as distinct from what proves a finding.
+
+    The report already records the two ends of a run: the served build and
+    sampling each node ran on (:class:`NodeRun`), and the facts each finding
+    rests on (``grounds``). Between them sits everything the service *put in
+    front of* the lane agents — the instruction text they were given and the
+    reference packs this model earned. This block records it. Two runs of the
+    same model on the same input can differ because a pack selection flipped or
+    a skill was edited.
+
+    **This is context, never evidence, and the separation is the whole design.**
+    A pack named here did not ground anything; a rule named here did not find
+    anything. What grounds a finding is its ``grounds``, unchanged. This block
+    answers a different question — *what was on the desk* — and a reader who
+    treated an entry here as support for a threat would be reading it exactly
+    backwards.
+
+    ``instruction_sha256`` digests the *composed instruction* of every LLM node
+    in the built graph, with the job-varying placeholders still unexpanded. So
+    it identifies the repo-authored text — the shared prompts and every carried
+    package's lane skills, exemplars, critic text and rubric — and carries no
+    submitter bytes at all, which is what makes it
+    publishable beside a report. The digest is also one of the seven parts of
+    the **Execution Identity**, so two runs told different things cannot share
+    a fingerprint, and this field is what lets a reader recompute one and see
+    which instruction set stood behind it.
+
+    ``domain_packs`` is a fact about *this job's* model rather than the
+    deployment: selection is per-job (:mod:`katra.domains`), so the
+    same service gives two submissions different reference material, and the
+    names are the only record of which.
+
+    **``fired_rules`` and ``knowledge_docs`` are not here**, because a field
+    sits where the thing it describes sits. A candidate rule belongs to the
+    package that declared it and a retrieved document to the package that
+    selected it, so both name *one framework's* material and both sit on
+    :class:`FrameworkAnalysis`. The two here describe the built graph and the
+    shared model, of which a report has one each.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    instruction_sha256: Sha256Hex
+    domain_packs: list[str] = Field(default_factory=list)
+
+
+class FrameworkSelection(BaseModel):
+    """One framework a job asked for, and the options it asked for it with.
+
+    ``options`` defaults to ``{}`` **on the envelope only**. The package's own
+    options model then rejects a submission that left out a value it needs, and
+    names the field it wants. No package field carries a default, so no
+    submission means two different things on two installs.
+
+    Recorded on the :class:`Job` exactly as the input ladder resolved it,
+    because a report that omits the options does not say what was analysed — a
+    framework whose options select which requirements apply produces a different
+    answer under different ones.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: FrameworkName
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+class Job(BaseModel):
+    """Identity and timing of the run that produced this report.
+
+    A report only exists for a completed job, so ``status`` admits exactly the
+    ``completed`` state from the job-lifecycle contract.
+
+    ``frameworks`` is what was *asked for*, in the order of
+    ``config/frameworks.toml`` (ADR 0102). The envelope's own check reads it:
+    the analysis blocks must answer exactly this list, in this order, so a
+    framework that produced nothing cannot be dropped quietly.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=100)
+    status: Literal["completed"] = "completed"
+    created_at: datetime
+    completed_at: datetime
+    #: How many times a critic was asked again, summed across the job's
+    #: frameworks. The graph re-asks a critic whose rulings do not reconcile
+    #: with the drafts, once and bounded, so zero is the ordinary answer and a
+    #: rate that climbs after a prompt edit says the edit made the ruling harder
+    #: to give. Computed by :func:`~katra.graph.revise_rounds`.
+    revise_rounds: int = Field(default=0, ge=0)
+    frameworks: list[FrameworkSelection] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_timeline(self) -> Self:
+        if self.completed_at < self.created_at:
+            raise ValueError("completed_at precedes created_at")
+        return self
+
+
+class SourceRef(BaseModel):
+    """One submitted source, identified without carrying its text.
+
+    The label is the same key an element's ``source_label`` cites, so a reader
+    holding only the report can tell which source a quote came from and verify
+    that source's bytes against a digest — without the service ever storing the
+    untrusted text.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str = Field(min_length=1, max_length=50)
+    label: str = Field(min_length=1, max_length=MAX_LABEL_CHARS)
+    sha256: Sha256Hex
+
+
+def _stored_system_name(value: str) -> str:
+    """One stored system name, checked against the rule that wrote it.
+
+    :func:`~katra.sources.clean_system_name` is that rule and this
+    is its fourth caller, beside the HTTP route, the in-process engine and the
+    web app's form route. A
+    stored name has to be a name that rule *produces*, so the check is equality
+    with its answer rather than a repeat of the checks inside it.
+
+    **It refuses and never repairs.** Returning the cleaned value would make a
+    report validate into a model whose ``system_name`` is not the one on disk,
+    and :mod:`katra.attestation` digests the report — so a read,
+    a re-dump and a re-digest would move a sealed value. A record the writer
+    could not have produced is malformed, and saying so is the whole job here.
+    """
+    cleaned = clean_system_name(value)
+    if cleaned is None:
+        raise ValueError("names no system, so no report can carry it as a name")
+    if cleaned != value:
+        raise ValueError(
+            "is not the name clean_system_name writes: it carries leading or"
+            f" trailing whitespace, and the stored name would be {cleaned!r}"
+        )
+    return value
+
+
+class InputRef(BaseModel):
+    """Ties the report back to the exact submitted sources."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Already clean by the time a report is built — every entry point runs
+    #: :func:`~katra.sources.clean_system_name` before a job exists.
+    #: Checked again here because a report is also *read back*: an artifact or
+    #: a saved report is deserialized into this model, and a stored name is
+    #: only as trustworthy as whatever wrote it.
+    #:
+    #: It reads **the writer's own rule**, not a restatement of two of its
+    #: three checks. Stating the bound and the character rule here left the
+    #: trim rule behind, so this accepted ``"   "`` and ``"  Pay  "`` where the
+    #: writer answers "no system named" and ``"Pay"`` — a second reader of the
+    #: one rule #794 exists to give a system name.
+    system_name: Annotated[str, AfterValidator(_stored_system_name)]
+    sources: list[SourceRef] = Field(min_length=1)
+    # Taken **over the refs**, not over the concatenated text: the refs are in
+    # the report, so this stays recomputable from the report alone — which a
+    # digest of bytes nobody kept would not be.
+    source_sha256: Sha256Hex
+
+    @staticmethod
+    def aggregate_digest(refs: Sequence[SourceRef]) -> str:
+        """The one way the aggregate is computed, wherever a report is built.
+
+        Order-sensitive and separator-delimited, so two jobs whose labels and
+        digests merely concatenate to the same string do not collide.
+        """
+        joined = "\n".join(f"{ref.kind}\x1f{ref.label}\x1f{ref.sha256}" for ref in refs)
+        return text_digest(joined)
+
+    @classmethod
+    def of(cls, *, system_name: str, sources: Sequence[Source]) -> Self:
+        """Build the reference for one job's sources, digests and all."""
+        refs = [
+            SourceRef(
+                kind=source.kind,
+                label=source.label,
+                sha256=text_digest(source.text),
+            )
+            for source in sources
+        ]
+        return cls(
+            system_name=system_name,
+            sources=refs,
+            source_sha256=cls.aggregate_digest(refs),
+        )
+
+
+class Report(BaseModel):
+    """The complete payload the front-end retrieves for a finished job.
+
+    One job's facts, one **Valid System Model**, and one
+    :class:`FrameworkAnalysis` per framework the job selected.
+
+    Self-containment is enforced, not assumed. On the envelope: the boundary
+    crossings are exactly the ones derived from the embedded model,
+    ``elements_analyzed`` is that model's own element count, and the blocks are
+    the frameworks the job asked for — in order, with none dropped and none
+    repeated. Inside each block, :meth:`FrameworkAnalysis.block_issues` runs the
+    neutral claim checks against the shared model.
+
+    **A list, not a map.** ``analyses`` is ordered by the job's own selection
+    order. A map keyed by name gives uniqueness free, but then the key and the
+    block's own ``framework`` field can disagree, and a dropped framework is
+    invisible. A list plus one check catches both, and silently dropping a
+    framework the caller paid for is the failure this rules out.
+
+    **The blocks are not merged, and nothing here merges them.** The relation an
+    analyst wants between two frameworks' output is *these findings touch one
+    element*, and the **Element ID** is the join key both blocks already cite --
+    so a reader joins on it with no model pass, which is what *deterministic
+    code, models for judgement* asks for. That is why no cross-framework critic
+    node exists to merge them instead.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = SCHEMA_VERSION
+    disclaimer: str = DEFAULT_DISCLAIMER
+    job: Job
+    input: InputRef
+    nodes: list[NodeRun]
+    # The resolved per-tier decoding params this run used, in the clear, once
+    # per tier: tier name -> the tier's resolved sampling values (the
+    # serialized ``TierSampling``). Recorded as plain scalars, not the
+    # ``TierSampling`` model, so this low-level schema module stays free of the
+    # sampling/model_tiers import (which cycles back through skills). Each
+    # node's execution_fingerprint is recomputable from its two routes and its
+    # tier's entry here, together with ``analysis_context`` and ``execution``. Empty only on reports with no LLM provenance at all —
+    # the stub runner's. An eval report carries this block like any other: a
+    # sweep's fingerprints are evidence, and evidence nobody can recompute from
+    # the artifact is an assertion.
+    sampling: dict[str, dict[str, SamplingValue]] = Field(default_factory=dict)
+    system_model: SystemModel
+    boundary_crossings: list[BoundaryCrossing]
+    # Elements of different types sharing one name slug — a suspicion about the
+    # model rather than a fault in it, which is why it rides here and not in
+    # the validity gate. The one mark that stays on the envelope: it annotates
+    # the shared model rather than any framework's claims. Recomputable from
+    # ``system_model`` by design.
+    shared_element_names: list[SharedElementName] = Field(default_factory=list)
+    # A fact about the shared model, so it is a scalar here rather than a field
+    # each block copies: N copies would be N chances to disagree about one
+    # number. So ``Summary`` does not carry it.
+    elements_analyzed: int = Field(default=0, ge=0)
+    # How the model was repaired, where it was. ``None`` where no repair pass
+    # ran; a report whose ``nodes`` name the repair node and carry ``None``
+    # here holds no record of the repair. Envelope-level because it is about the shared
+    # model, like ``shared_element_names``.
+    model_repair: ModelRepair | None = None
+    # What the job's assertion pass produced, where the deployment ran one:
+    # the catalog every lane selected from, and the rows the resolver refused.
+    # ``None`` is a job that ran no pass. Envelope-level because the catalog
+    # is about the shared model, like the crossings — and, like them, what
+    # every block's assertion grounds resolve against on load.
+    assertions: AssertionRecord | None = None
+    # What was in front of the agents that is *not* one framework's: the
+    # instruction digest of the built graph, and the domain packs this job's
+    # model earned. Context, not evidence — see :class:`AnalysisContext`. The
+    # per-framework halves live in each block. ``None`` on a report built
+    # without it (the stub runner's), which is the same absence an empty
+    # ``coverage`` records rather than a claim that nothing informed the run.
+    analysis_context: AnalysisContext | None = None
+    # What ran the graph, as distinct from what was in front of it: the identity
+    # schema version, how far the served builds can be trusted, and the versions
+    # of the distributions between a node and its provider. Every value here is
+    # inside each node's ``execution_fingerprint``, so this block is what makes
+    # a fingerprint recomputable from the artifact rather than from the machine
+    # that happens to be reading it. ``None`` on a report built without LLM
+    # provenance at all — the stub runner's — which is the same absence an empty
+    # ``sampling`` records.
+    execution: ExecutionEnvelope | None = None
+    # **Declared as the base and serialized as itself.** The declaration is what
+    # lets this module carry an envelope a framework it has never heard of fits
+    # into; ``SerializeAsAny`` is what stops that generality from *costing* the
+    # narrowing on the way out. Pydantic serializes a field by its declared
+    # type, so without this a ``StrideAnalysis`` in this list would come back
+    # out as a ``FrameworkAnalysis``: every severity, every category and both
+    # summary breakdowns dropped, with nothing raised and nothing logged — on
+    # the report route, which is the only path a caller ever sees.
+    #
+    # It is the exact mirror of :meth:`_dispatch_blocks`. That validator makes
+    # the narrowing survive the way in; this makes it survive the way out. A
+    # round trip through JSON is the property both exist for, and it is a
+    # property only the pair has.
+    analyses: list[SerializeAsAny[FrameworkAnalysis]] = Field(default_factory=list)
+
+    @field_validator("analyses", mode="before")
+    @classmethod
+    def _dispatch_blocks(cls, value: Any) -> Any:
+        """Validate each block as the type its own framework registered.
+
+        The field is declared as the neutral base, because the envelope is what
+        a second framework has to fit into without this module knowing its
+        name. What makes the *narrowing* survive a round trip is this: a block
+        naming ``stride`` is validated as STRIDE's own block type, so its
+        severities, its categories and its two breakdowns come back typed rather
+        than being refused as extra fields on the base.
+
+        A build with no packages registered reads every block as the base.
+        A block naming a framework this build does not carry also reads as the
+        base, which is the honest outcome rather than a refusal: the neutral
+        fields are exactly what such a reader can still be held to.
+        """
+        if not isinstance(value, list):
+            return value
+        dispatched = []
+        for item in value:
+            if isinstance(item, FrameworkAnalysis) or not isinstance(item, dict):
+                dispatched.append(item)
+                continue
+            block_type = block_type_for(item.get("framework", ""))
+            dispatched.append(block_type.model_validate(item) if block_type else item)
+        return dispatched
+
+    @model_validator(mode="after")
+    def _check_self_contained(self) -> Self:
+        issues = self._envelope_issues()
+        known_ids = [element.id for element in self.system_model.elements()]
+        for block in self.analyses:
+            issues += block.block_issues(known_ids)
+        issues += self._model_issues()
+        if issues:
+            raise ValueError("; ".join(issues))
+        return self
+
+    def _model_issues(self) -> list[str]:
+        """Every ground resolves in the embedded model's own evidence catalog.
+
+        Asked here rather than per block because the reader needs the model
+        and not its ID set, and one model serves every block. The reader is
+        the one the fan-in already runs
+        (:func:`~katra.evidence.ground_issues`), so a loaded report
+        is held to what the service that wrote it was held to — an unknown on
+        an attribute the model states, or a crossing the model never derives,
+        does not ride in through a file.
+        """
+        claims = [claim for block in self.analyses for claim in block.all_claims()]
+        return (
+            ground_issues(
+                claims,
+                self.system_model,
+                None if self.assertions is None else self.assertions.catalog,
+            )
+            + self._contradiction_issues()
+        )
+
+    @property
+    def assertion_coverage(self) -> CatalogCoverage | None:
+        """How much of this model the job's assertion pass reached, or ``None``.
+
+        ``None`` on a job that ran no pass, which is every job on a deployment
+        that sets ``KATRA_ASSERTIONS`` off. A reader that sees a number
+        here can tell a system with few stated facts from a pass that asked
+        few questions, and those look identical without it.
+
+        Derived on demand rather than stored beside the rows, on ADR 0034's
+        rule against a second reader of one fact.
+        """
+        if self.assertions is None:
+            return None
+        return catalog_coverage(self.assertions.catalog, self.system_model)
+
+    def _contradiction_issues(self) -> list[str]:
+        """A loaded report still names every graph contradiction it carries.
+
+        The same rule ``_model_issues`` applies to grounds: the service that
+        wrote the report recorded these, and re-deriving them here is what
+        stops a report whose ``authentication`` says one thing and whose rows
+        say the opposite from riding in through a file with the finding
+        stripped out.
+
+        **``projection_version`` is what makes this safe to re-derive.**
+        :func:`~katra.assertions.contradictions` recomputes the
+        projection with *this* service's rules, so a record written under
+        another version would be re-read under rules it never ran, and every
+        difference that caused would be reported as a contradiction the writer
+        hid. So this check declines for a foreign record: its own issues
+        stand as written. The ground check on load is not version-gated; it
+        reads every record's grounds against today's evidence catalog.
+        """
+        if self.assertions is None:
+            return []
+        if self.assertions.projection_version != PROJECTION_VERSION:
+            return []
+        found = {
+            issue.message
+            for issue in contradiction_issues(
+                self.assertions.catalog, self.system_model
+            )
+        }
+        recorded = {
+            issue.message
+            for issue in self.assertions.issues
+            if issue.code == "graph-contradiction"
+        }
+        return [
+            f"the embedded assertions do not name a contradiction this service"
+            f" derives: {message}"
+            for message in sorted(found - recorded)
+        ]
+
+    def _envelope_issues(self) -> list[str]:
+        issues = []
+        if self.boundary_crossings != self.system_model.boundary_crossings():
+            issues.append(
+                "boundary_crossings do not match the crossings derived from"
+                " the embedded system model"
+            )
+        element_count = len(self.system_model.elements())
+        if self.elements_analyzed != element_count:
+            issues.append(
+                f"elements_analyzed={self.elements_analyzed} does not match the"
+                f" embedded system model's {element_count} elements"
+            )
+        return issues + self._selection_issues()
+
+    def _selection_issues(self) -> list[str]:
+        """The blocks are the job's frameworks, in order, once each.
+
+        This is the envelope's version of "no partial report": a framework that
+        produced nothing cannot be dropped quietly, because a caller who named
+        two and reads one has no field that says which half is missing. Order is
+        checked as well as membership, since ``analyses`` is a list precisely so
+        that a dropped entry is visible.
+        """
+        asked = [selection.name for selection in self.job.frameworks]
+        answered = [block.framework for block in self.analyses]
+        if answered == asked:
+            return []
+        return [f"analyses answer {answered!r}, but the job selected {asked!r}"]

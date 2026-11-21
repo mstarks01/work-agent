@@ -17,30 +17,30 @@ from typing import get_args
 
 import pytest
 
-from analysis_service import sampling
-from analysis_service.deployment import (
+from katra import sampling
+from katra.deployment import (
     BLESSED_FINGERPRINTS_VAR,
     CONFIG_PATHS,
     ConfigPathName,
     ConfigPaths,
 )
-from analysis_service.model_tiers import TIER_NAMES, load_model_tiers
-from analysis_service.objects import GCS_KEY_FILE_VAR, S3_KEY_FILES
-from analysis_service.resilience import load_resilience
-from analysis_service.sampling import SamplingConfigError
-from analysis_service.settings_variables import deployment_variables, secret_vars
-from analysis_service.sql_store import DATABASE_CREDENTIALS, DATABASES
-from analysis_service.store_backends import (
+from katra.model_tiers import TIER_NAMES, load_model_tiers
+from katra.objects import GCS_KEY_FILE_VAR, S3_KEY_FILES
+from katra.resilience import load_resilience
+from katra.sampling import SamplingConfigError
+from katra.settings_variables import deployment_variables, secret_vars
+from katra.sql_store import DATABASE_CREDENTIALS, DATABASES
+from katra.store_backends import (
     RETENTION_DAYS_VAR,
     build_store,
     retention_days,
 )
-from analysis_service.store_settings import (
+from katra.store_settings import (
     DATABASE_PASSWORD_FILE_VAR,
     DATABASE_VARIABLES,
     StoreConfigError,
 )
-from analysis_service.vendors import REGION, VENDORS, CredentialMode, vendor_for
+from katra.vendors import REGION, VENDORS, CredentialMode, vendor_for
 from tests.factories import PROJECT_ROOT, TEST_TIER_ENV, declared_env, secret_env
 from tests.source_tree import PYTHON, module_name, parse, source_files
 from webapp import settings_page
@@ -79,11 +79,11 @@ class TestSecretVars:
     @pytest.mark.parametrize(
         "var",
         [
-            "ANALYSIS_TIERS_FILE",
-            "ANALYSIS_FRAMEWORKS_FILE",
-            "ANALYSIS_DATABASE_CA_FILE",
-            "ANALYSIS_VERTEX_PROJECT",
-            "ANALYSIS_BEDROCK_REGION",
+            "KATRA_TIERS_FILE",
+            "KATRA_FRAMEWORKS_FILE",
+            "KATRA_DATABASE_CA_FILE",
+            "KATRA_VERTEX_PROJECT",
+            "KATRA_BEDROCK_REGION",
         ],
     )
     def test_a_file_or_an_address_is_not_a_secret(self, var):
@@ -210,7 +210,7 @@ class TestThePageModule:
 
 def _closed_settings() -> list[tuple[str, list[str]]]:
     """Each Deployment Setting variable that a loader reads with
-    :func:`~analysis_service.store_settings.closed_setting`, and the set that the loader passes it.
+    :func:`~katra.store_settings.closed_setting`, and the set that the loader passes it.
 
     The scan reads each call in the Python the project runs, and evaluates its
     setting and its table in the namespace of the module of the call. A call
@@ -241,9 +241,9 @@ def _closed_settings() -> list[tuple[str, list[str]]]:
 class TestTheChoices:
     def test_the_scan_finds_each_closed_store_setting(self):
         assert {variable for variable, _ in _closed_settings()} >= {
-            "ANALYSIS_JOB_STORE",
-            "ANALYSIS_OBJECT_STORE",
-            "ANALYSIS_DATABASE_CREDENTIALS",
+            "KATRA_JOB_STORE",
+            "KATRA_OBJECT_STORE",
+            "KATRA_DATABASE_CREDENTIALS",
         }
 
     @pytest.mark.parametrize(
@@ -259,22 +259,22 @@ class TestTheChoices:
 #: The settings of a PostgreSQL job store with a filesystem object store, from
 #: the examples. Each store example is checked over this base.
 STORE_BASE = {
-    "ANALYSIS_JOB_STORE": "sql",
-    "ANALYSIS_DATABASE_URL": EXAMPLES["store.database_url"],
-    "ANALYSIS_DATABASE_CREDENTIALS": "password",
+    "KATRA_JOB_STORE": "sql",
+    "KATRA_DATABASE_URL": EXAMPLES["store.database_url"],
+    "KATRA_DATABASE_CREDENTIALS": "password",
     **secret_env(DATABASE_PASSWORD_FILE_VAR, "not-a-real-password"),
-    "ANALYSIS_OBJECT_STORE": "filesystem",
-    "ANALYSIS_OBJECT_ROOT": EXAMPLES["store.object_root"],
+    "KATRA_OBJECT_STORE": "filesystem",
+    "KATRA_OBJECT_ROOT": EXAMPLES["store.object_root"],
 }
 
 #: The settings over :data:`STORE_BASE` of an ``s3`` object store with the key
 #: pair, which reads the other object settings.
 S3_STORE = {
-    "ANALYSIS_OBJECT_STORE": "s3",
-    "ANALYSIS_OBJECT_ROOT": "",
-    "ANALYSIS_OBJECT_BUCKET": EXAMPLES["store.object_bucket"],
-    "ANALYSIS_OBJECT_REGION": EXAMPLES["store.object_region"],
-    "ANALYSIS_OBJECT_CREDENTIALS": "api_key",
+    "KATRA_OBJECT_STORE": "s3",
+    "KATRA_OBJECT_ROOT": "",
+    "KATRA_OBJECT_BUCKET": EXAMPLES["store.object_bucket"],
+    "KATRA_OBJECT_REGION": EXAMPLES["store.object_region"],
+    "KATRA_OBJECT_CREDENTIALS": "api_key",
     **{
         var: secret_env(var, f"not-a-real-{var.lower()}")[var]
         for var in S3_KEY_FILES.values()
@@ -310,7 +310,7 @@ def _passes_its_loader(key: str, example: str) -> None:
     else:
         s3 = (
             S3_STORE
-            if var.startswith("ANALYSIS_OBJECT_") and key != "store.object_root"
+            if var.startswith("KATRA_OBJECT_") and key != "store.object_root"
             else {}
         )
         env = STORE_BASE | s3 | {var: example}
