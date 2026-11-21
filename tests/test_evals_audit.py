@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import json
+import subprocess
 from pathlib import Path
 from typing import get_args
 
@@ -472,6 +473,28 @@ class TestStaleness:
 
         found = audit.lookup(directory=tmp_path, root=tmp_path, signature="")
         assert [one.staleness.state for one in found] == ["undecidable"]
+
+    def test_changed_since_names_both_ends_of_a_moved_file(self, tmp_path: Path):
+        def git(*args: str) -> None:
+            subprocess.run(
+                ["git", "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                cwd=tmp_path,
+                check=True,
+                capture_output=True,
+            )
+
+        git("init", "-q")
+        (tmp_path / "old").mkdir()
+        (tmp_path / "old" / "rule.py").write_text("RULE = 1\n")
+        git("add", "-A")
+        git("commit", "-q", "-m", "one")
+        git("mv", "old", "new")
+        git("commit", "-q", "-m", "two")
+
+        assert set(audit.changed_since("HEAD~1", tmp_path) or ()) == {
+            "old/rule.py",
+            "new/rule.py",
+        }
 
     def test_changed_since_returns_nothing_where_git_cannot_answer(
         self, tmp_path: Path

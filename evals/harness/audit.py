@@ -976,7 +976,9 @@ def changed_since(revision: str, root: Path | None) -> tuple[str, ...] | None:
     cwd = str(root if root is not None else REPO_ROOT)
     try:
         done = subprocess.run(
-            ["git", "diff", "--name-only", current_commit(revision)],
+            # Without renames, a moved file names both ends rather than only
+            # the new one, so a row that reads either path is stale.
+            ["git", "diff", "--name-only", "--no-renames", current_commit(revision)],
             cwd=cwd,
             capture_output=True,
             text=True,

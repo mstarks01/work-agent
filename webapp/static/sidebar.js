@@ -40,7 +40,7 @@
   showTheme();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", showTheme);
   themeButtons.forEach((button) => button.addEventListener("click", () => {
-    window.workAgentTheme.choose(button.dataset.themeChoice);
+    window.katraTheme.choose(button.dataset.themeChoice);
     showTheme();
   }));
 

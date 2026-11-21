@@ -811,7 +811,7 @@ def create_app(
     # No schema routes: the schema states the bounds and the source kinds a
     # caller may not send, and the three webapps close them too.
     app = FastAPI(
-        title="Security Analysis Service",
+        title="Katra",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,

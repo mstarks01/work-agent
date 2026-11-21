@@ -3,7 +3,7 @@ name: verify
 description: Launch and drive the katra /v1 job API locally to verify changes at the HTTP surface.
 ---
 
-# Verifying katra
+# Verifying Katra
 
 The runtime surface is the FastAPI app from `katra.api.create_app()`.
 Production auth needs `KATRA_AUTH_PROVIDER=oidc` plus `KATRA_OIDC_ISSUER`,

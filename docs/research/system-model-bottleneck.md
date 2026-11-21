@@ -113,7 +113,7 @@ required facts than every representational loss measured here put together.
 
 | | graph-first (the default) | facts-first (#1003 arms B and E) |
 | --- | --- | --- |
-| Selected by | nothing; it is the default | `KATRA_FACTS_FIRST_EXTRACTION`, `KATRA_FACTS_SPLIT_EXTRACTION` |
+| Selected by | nothing; it is the default | `ANALYSIS_FACTS_FIRST_EXTRACTION`, `ANALYSIS_FACTS_SPLIT_EXTRACTION` |
 | The model emits | a **System Model** | a **Source Fact Bundle** in local handles |
 | Identity decided by | the model, then rewritten from the name | code, from the mention's text |
 | Placement decided by | the model | a placement row a reviewer supported, through the projection; otherwise nothing |
