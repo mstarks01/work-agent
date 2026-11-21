@@ -612,7 +612,7 @@ class TestTheDeltaCache:
         assert submit._DELTA == {}
 
     def test_a_moved_file_names_both_ends(self, repo):
-        """A file moved into an allowed path still shows where it came from."""
+        """A moved file names its source path as well as its new one."""
         git(repo, "fetch", "origin")
         git(repo, "mv", "evals/review/voters.toml", "evals/review/moved.toml")
 

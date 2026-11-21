@@ -15,7 +15,7 @@ arithmetic that priced the run has no rate to multiply by either.
 OpenRouter reports what it charged. Two claims stood between that figure and
 this repository's record, and neither could be settled offline: whether the
 figure arrives at all, and whether litellm files it where
-`katra.charges` looks.
+`analysis_service.charges` looks.
 
 ## The answer: it arrives, and the record keeps it
 

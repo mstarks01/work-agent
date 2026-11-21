@@ -117,7 +117,7 @@ required facts than every representational loss measured here put together.
 | The model emits | a **System Model** | a **Source Fact Bundle** in local handles |
 | Identity decided by | the model, then rewritten from the name | code, from the mention's text |
 | Placement decided by | the model | a placement row a reviewer supported, through the projection; otherwise nothing |
-| Assertion rows | a second `assert` call, under `KATRA_ASSERTIONS` | composed from the bundle by `resolve_bundle` |
+| Assertion rows | a second `assert` call, under `ANALYSIS_ASSERTIONS` | composed from the bundle by `resolve_bundle` |
 | Prose fields | written by the model | never written: a mention carries a name and no description |
 
 The last row is a fact about the experiment rather than about the schema. It
@@ -139,7 +139,7 @@ see that loss. An end-to-end comparison would.
 | A transport or storage control | the interaction or component | a control string, and a catalog row | structurally | `control_state`, 11 readers |
 | A stated absence | the same | `none` in the graph, `absent` in the catalog | structurally | `control_state` |
 | An unknown with a reason | the same | `unknown` in the graph, a reason in the catalog | structurally, reason dropped | `control_state` |
-| A scoped permission | a principal, a resource, an operation | a catalog row, no graph field | catalog only | the **Evidence Catalog**, under `KATRA_ASSERTIONS` |
+| A scoped permission | a principal, a resource, an operation | a catalog row, no graph field | catalog only | the **Evidence Catalog**, under `ANALYSIS_ASSERTIONS` |
 | A credential fact | a credential subject | a catalog row, no graph field | catalog only | the same |
 | Two sources disagreeing | nothing | two rows; `conflicts()` derives it | catalog only | the same |
 | An account distinct from its owner | nothing | two principal subjects | catalog only | the same |
@@ -172,7 +172,7 @@ What this investigation adds is the count on the other side. The predicate
 registry holds 18 predicates and **11 of them project into no graph attribute**.
 Over the five signed cases, **13 of the 45 required rows (29%) carry one of those
 11**. Their only reader is the **Evidence Catalog**'s `assertion:` reference
-(ADR 0036), and `KATRA_ASSERTIONS` is off by default, so a deployment that
+(ADR 0036), and `ANALYSIS_ASSERTIONS` is off by default, so a deployment that
 sets nothing never offers one.
 
 So a scoped grant, an absent second factor, a shared credential and a rotation
@@ -532,7 +532,7 @@ one mechanism that reaches the band, at no cost.** It belongs to #1015.
 
 **3. Decide whether an unprojected predicate may reach a rule at all.** 13 of
 the 45 required rows carry one. Today those rows reach a reader only where a
-deployment sets `KATRA_ASSERTIONS`. **Benefit: it is larger than every
+deployment sets `ANALYSIS_ASSERTIONS`. **Benefit: it is larger than every
 representational loss measured here.** It is a product decision rather than a
 defect, and it belongs to #926 Phase 4 and to #741.
 

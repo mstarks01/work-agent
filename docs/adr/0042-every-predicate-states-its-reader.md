@@ -53,7 +53,7 @@ than one principal holds. ASVS gains none, because its rules select
 requirements by what the graph shows is present, and a stated fact bears on how
 a lane rules a requirement.
 
-With `KATRA_ASSERTIONS` off, no catalog exists and no new rule fires, so a
+With `ANALYSIS_ASSERTIONS` off, no catalog exists and no new rule fires, so a
 default install runs as before. The corpus carries no catalog, so the five
 rules fire on no blessed case, and `tests/test_predicate_readers.py` fires each
 one directly.
