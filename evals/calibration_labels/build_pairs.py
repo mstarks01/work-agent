@@ -32,7 +32,7 @@ Every scored tuple carries the elements its candidate claim is about. The nine
 unassignable candidates carry ``None`` because they name no model element or no
 attacker action, and their primary dispositions keep them outside the identity
 score. The field exists for
-`#201 <https://github.com/mstarks01/work-agent/issues/201>`_, which proposes
+`#201 <https://github.com/mstarks01/katra/issues/201>`_, which proposes
 comparing two claims on the fields that decide their identity rather than on a
 model call. Without it, the pair set can say nothing about mechanical identity
 at all, because a bare claim string has no elements to compare.
