@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-21
-- **Relates to**: [ADR 0021](0021-no-credential-bearing-job-runs-pr-head-code.md),
-  whose attribute condition also pins the ref.
+- **Amends**: [ADR 0021](0021-no-credential-bearing-job-runs-pr-head-code.md),
+  whose attribute condition named the repository and also pins the ref.
 
 ## Context
 
