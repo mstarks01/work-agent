@@ -439,7 +439,7 @@ artifact:
 whether a deterministic rule fired in a claim's lane on an element it names.
 ASVS sits at 32% against STRIDE's 80%, and eleven of its seventeen chapters draw
 no lead on any reference claim at all
-([#218](https://github.com/mstarks01/work-agent/issues/218)). A missed
+([#218](https://github.com/mstarks01/katra/issues/218)). A missed
 requirement in one of those chapters is not a prompt problem — the agent was
 never handed the lead. **This costs no provider call**, so read it before
 spending a sweep.

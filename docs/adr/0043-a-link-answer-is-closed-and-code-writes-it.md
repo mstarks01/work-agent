@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-27
-- **Effort**: [#1225](https://github.com/mstarks01/work-agent/issues/1225),
+- **Effort**: [#1225](https://github.com/mstarks01/katra/issues/1225),
   its second question type
 - **Relates to**:
   [ADR 0013](0013-asvs-rules-applicability-and-never-a-pass.md), under which

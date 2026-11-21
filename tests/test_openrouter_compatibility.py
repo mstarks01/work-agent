@@ -8,7 +8,7 @@ than asserting a remembered fact. A ``litellm`` bump that moves any of it shows
 up here rather than on node one of a paid-for job.
 
 The four questions are the ones named on
-[#174](https://github.com/mstarks01/work-agent/issues/174): streaming, tool-call
+[#174](https://github.com/mstarks01/katra/issues/174): streaming, tool-call
 deltas, non-200 error bodies, and whether the wrapped shapes reach the retry
 ladder as the ladder expects. Two of them turn out to be about a path this
 service does not take, and that is recorded rather than hidden — a test that

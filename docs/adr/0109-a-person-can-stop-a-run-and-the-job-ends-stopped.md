@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-30
-- **Effort**: [#2025](https://github.com/mstarks01/work-agent/issues/2025)
+- **Effort**: [#2025](https://github.com/mstarks01/katra/issues/2025)
 - **Relates to**: [ADR 0044](0044-a-resumed-job-starts-at-prepare.md),
   [ADR 0107](0107-a-delete-keeps-a-job-whose-child-is-in-flight.md)
 

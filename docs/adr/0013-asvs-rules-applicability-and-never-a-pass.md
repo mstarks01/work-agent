@@ -3,9 +3,9 @@
 - **Status**: accepted
 - **Date**: 2026-08-14
 - **Effort**: [#176 — ASVS 5.0 as the second framework
-  package](https://github.com/mstarks01/work-agent/issues/176), on the map
-  [#158](https://github.com/mstarks01/work-agent/issues/158) settled
-- **Amended by**: [#659](https://github.com/mstarks01/work-agent/issues/659), which
+  package](https://github.com/mstarks01/katra/issues/176), on the map
+  [#158](https://github.com/mstarks01/katra/issues/158) settled
+- **Amended by**: [#659](https://github.com/mstarks01/katra/issues/659), which
   splits the critic's first check into two rejection causes; see the note under
   the decision.
 - **Relates to**: [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md)
@@ -60,7 +60,7 @@ No fourth state is added to reach for a pass, and no field carries one. A draft
 arguing that a requirement is met is rejected, and the reason given is that the
 input cannot carry that answer.
 
-> **Amended by [#659](https://github.com/mstarks01/work-agent/issues/659).** A
+> **Amended by [#659](https://github.com/mstarks01/katra/issues/659).** A
 > `rejected` verdict rules that the requirement does not apply only when its
 > `rejected_because` is `evidence`. The audit found that the critic's first
 > check had one outcome for two different failures: the model's facts settle

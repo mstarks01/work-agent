@@ -2,8 +2,8 @@
 
 **Question.** What does ASVS 5.0 require of a system representation before it can rule a
 requirement applicable? This file records facts. It rules nothing. The taxonomy ruling is
-[#162](https://github.com/mstarks01/work-agent/issues/162) and the package contract is
-[#164](https://github.com/mstarks01/work-agent/issues/164).
+[#162](https://github.com/mstarks01/katra/issues/162) and the package contract is
+[#164](https://github.com/mstarks01/katra/issues/164).
 
 **Method.** Two kinds of evidence, kept apart:
 

@@ -6,7 +6,7 @@
   whose carried answers this reuses;
   [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md), whose
   durable store will keep the earlier jobs this reads
-- **Amended by**: [#1672](https://github.com/mstarks01/work-agent/issues/1672),
+- **Amended by**: [#1672](https://github.com/mstarks01/katra/issues/1672),
   under which the carried answers survive a restart where
   `KATRA_JOB_STORE` is `sql`
 - **Amended by**: [ADR 0116](0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md),
@@ -61,7 +61,7 @@ Jobs are held in memory, so an owner can carry only from a job of the same
 server session. A durable job store (ADR 0065) extends this to every job the
 store keeps, with no change to the rule.
 
-> **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
+> **Amended by [#1672](https://github.com/mstarks01/katra/issues/1672).**
 > The job store holds the jobs. Where `KATRA_JOB_STORE` is `sql`, an owner
 > can carry from every job the store keeps, and the carried answers survive a
 > restart.

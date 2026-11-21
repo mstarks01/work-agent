@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-01
-- **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Effort**: [#1289](https://github.com/mstarks01/katra/issues/1289)
 - **Amends**: the order of [ADR 0046](0046-every-open-fact-is-asked-and-code-writes-the-answer.md) and [ADR 0055](0055-a-follow-up-asks-first-what-the-most-important-findings-wait-on.md)
 - **Amended by**: [ADR 0094](0094-a-dismissed-ground-is-not-a-fact-a-finding-waits-on.md),
   under which a ground the critic dismissed is not a fact a finding waits on

@@ -102,7 +102,7 @@ distinct reference pairs.
 
 The 288 calibration fixtures retain their original order and reference claims.
 The candidate merge column arrived with
-[#511](https://github.com/mstarks01/work-agent/issues/511), which assigned the
+[#511](https://github.com/mstarks01/katra/issues/511), which assigned the
 negative half the elements and verbs the rule reads. Before it every candidate
 merge count was structurally zero. A further 27 fixtures are set aside before
 identity scoring: 24 `unsupported`, 2 `unclear`, and 1 `invalid-claim`. The
@@ -651,7 +651,7 @@ the next sitting, and only the rate over it is a score.
   finding in the right place about the right thing. Whether the finding argues
   it correctly is a separate question the critic and the vote ledger answer.
   Rewrite every finding to say "no security problem exists" and this number
-  does not move ([#890](https://github.com/mstarks01/work-agent/issues/890)).
+  does not move ([#890](https://github.com/mstarks01/katra/issues/890)).
 
   Where a sweep-wide mean *is* taken — the comparison table — it is a mean over
   the cases that finished. A case whose graph refused its model produces no

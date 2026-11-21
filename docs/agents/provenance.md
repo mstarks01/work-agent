@@ -8,7 +8,7 @@ A required field, such as `bootstrap` on `CaseMetadata`, stays true because
 nobody can add a case without answering it. A paragraph that describes what
 *should* happen stays true only while somebody remembers it. A claim retracted
 in one paragraph stays alive in every noun that assumes it, so only a grep for
-the *vocabulary* finds those. [#206](https://github.com/mstarks01/work-agent/pull/206)
+the *vocabulary* finds those. [#206](https://github.com/mstarks01/katra/pull/206)
 records the case behind this rule.
 
 ## The rule

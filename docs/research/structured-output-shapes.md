@@ -1,6 +1,6 @@
 # Structured-output schema shapes one route refuses
 
-**Ticket:** [#942](https://github.com/mstarks01/work-agent/issues/942).
+**Ticket:** [#942](https://github.com/mstarks01/katra/issues/942).
 **Date:** 2026-09-14. **Probed against:** repo `bf5fc4d`, `litellm==1.97.0`,
 `openrouter/google/gemini-3.5-flash-lite` served by Google AI Studio.
 **Probe:** `probe_structured_output_shapes.py`.

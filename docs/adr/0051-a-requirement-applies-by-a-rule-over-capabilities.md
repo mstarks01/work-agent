@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-29
-- **Effort**: [#1291](https://github.com/mstarks01/work-agent/issues/1291)
+- **Effort**: [#1291](https://github.com/mstarks01/katra/issues/1291)
 - **Amended by**: [ADR 0063](0063-a-conjunction-names-one-party-through-its-parent.md),
   on conjunctions, [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),
   on the order of the early capability questions, under which one list

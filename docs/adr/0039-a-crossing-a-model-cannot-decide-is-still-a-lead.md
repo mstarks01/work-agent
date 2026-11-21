@@ -8,7 +8,7 @@
   ruling's own wording. What a lane agent *does* with an undecidable lead
   still needs the execution comparison named below
 - **Date**: 2026-09-18
-- **Effort**: [#1052](https://github.com/mstarks01/work-agent/issues/1052),
+- **Effort**: [#1052](https://github.com/mstarks01/katra/issues/1052),
   which reopened [ADR 0038](0038-a-component-reaches-the-graph-only-in-a-zone.md)
   on two of the three numbers that ADR named.
 - **Relates to**:

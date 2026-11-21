@@ -2,8 +2,8 @@
 
 - **Status**: accepted.
 - **Date**: 2026-09-09; amended 2026-09-25
-- **Effort**: [#739 — a bounded coverage pass that recovers what a lane omitted](https://github.com/mstarks01/work-agent/issues/739),
-  finding 4 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
+- **Effort**: [#739 — a bounded coverage pass that recovers what a lane omitted](https://github.com/mstarks01/katra/issues/739),
+  finding 4 of the audit on [#732](https://github.com/mstarks01/katra/issues/732)
 - **Builds on**: [ADR 0026](0026-coverage-is-per-framework.md), which counts
   what a lane cited; [ADR 0028](0028-a-draft-states-its-direction.md), which
   gives an ASVS draft a direction

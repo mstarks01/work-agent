@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-16
 - **Effort**: finding 5 of
-  [#961 — the extraction audit](https://github.com/mstarks01/work-agent/issues/961).
+  [#961 — the extraction audit](https://github.com/mstarks01/katra/issues/961).
   The implementation is its own issue; this records the identity and the
   migration contract it must meet.
 - **Relates to**: [ADR 0031](0031-a-claim-identity-carries-no-direction.md),

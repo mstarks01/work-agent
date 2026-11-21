@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-28
-- **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Effort**: [#1289](https://github.com/mstarks01/katra/issues/1289)
 - **Relates to**: [ADR 0046](0046-every-open-fact-is-asked-and-code-writes-the-answer.md),
   whose order and count this changes, and
   [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),

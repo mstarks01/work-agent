@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-23
-- **Effort**: [#926](https://github.com/mstarks01/work-agent/issues/926), the
+- **Effort**: [#926](https://github.com/mstarks01/katra/issues/926), the
   owner's decision on the support gate: option (iii), with corrections
 - **Amends**: [ADR 0034](0034-an-assertion-is-a-scoped-fact-with-a-support-span.md)
   (projection version 5) and

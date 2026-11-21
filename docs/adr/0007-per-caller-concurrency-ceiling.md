@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-09
 - **Effort**: [#113 — POST /v1/jobs has no per-subject rate or concurrency
-  limit](https://github.com/mstarks01/work-agent/issues/113)
+  limit](https://github.com/mstarks01/katra/issues/113)
 
 ## Context
 
@@ -19,7 +19,7 @@ out in parallel on the `strong` tier. Ten concurrent submissions is sixty
 concurrent `strong`-tier requests against one shared per-minute quota — from one
 valid token, without breaking a single documented bound.
 
-> **Amended by [#286](https://github.com/mstarks01/work-agent/issues/286).** Six
+> **Amended by [#286](https://github.com/mstarks01/katra/issues/286).** Six
 > was the whole fan-out when this was written. It is now one `strong`-tier
 > request per lane of every framework a job names —
 > `katra.frameworks.widest_fan_out`, 23 today — so the burst this ADR
@@ -72,7 +72,7 @@ requirement by never awaiting inside `reserve`, so asyncio cannot interleave a
 second reservation with it; a networked backend needs the count and the insert
 in one transaction or one conditional write.
 
-> **Amended by [#505](https://github.com/mstarks01/work-agent/issues/505).**
+> **Amended by [#505](https://github.com/mstarks01/katra/issues/505).**
 > The pair above was `active_for` then `create`, with the atomicity stated in
 > prose and nothing enforcing it. A backend author could satisfy the type and
 > miss the paragraph. One method cannot be used non-atomically.
@@ -132,7 +132,7 @@ caller's reaching a terminal state, not the passage of time.
   inside the ceiling while spending without limit over time. The unbounded-
   consumption half of OWASP LLM10 is therefore **not** closed here.
 
-  > **Closed by [#503](https://github.com/mstarks01/work-agent/issues/503).**
+  > **Closed by [#503](https://github.com/mstarks01/katra/issues/503).**
   > It was left to the integrator, with a per-caller rate limit at the edge. It
   > is now enforced by the service: `katra.budgets` adds a per-subject
   > job rate, a per-subject token budget and a deployment-wide token budget over

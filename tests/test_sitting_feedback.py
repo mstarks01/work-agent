@@ -287,7 +287,7 @@ def test_direct_contribution_opens_one_json_pr_and_cleans_local_record(
     def open_pr(root, envelope):
         captured["root"] = root
         captured["envelope"] = envelope
-        return "https://github.com/mstarks01/work-agent/pull/999"
+        return "https://github.com/mstarks01/katra/pull/999"
 
     monkeypatch.setattr(sitting.review_submissions, "open_pull_request", open_pr)
     response = client.post("/api/contribute", json={"reviewer": "anonymous"})

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-29
-- **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Effort**: [#1289](https://github.com/mstarks01/katra/issues/1289)
 - **Relates to**: [ADR 0046](0046-every-open-fact-is-asked-and-code-writes-the-answer.md),
   whose rule that code writes every answer this keeps, and
   [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),

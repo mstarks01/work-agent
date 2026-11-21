@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-30
-- **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Effort**: [#1289](https://github.com/mstarks01/katra/issues/1289)
 - **Supersedes**: the limit of three rounds in
   [ADR 0052](0052-the-answer-rounds-end.md). Its rule that a fact answered
   once is not asked again stands.

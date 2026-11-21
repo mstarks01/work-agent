@@ -4,7 +4,7 @@ Zero provider calls. The property under test is a round trip: a sweep observes
 which build answered for each tier, writes it down, and a later ``promote``
 blesses *that* — with no step where an operator retypes a model string from
 memory, and no step where the requested route stands in for the served build
-([#117](https://github.com/mstarks01/work-agent/issues/117)).
+([#117](https://github.com/mstarks01/katra/issues/117)).
 
 The fingerprint is the thing being protected. It is recomputed from the served
 build and the tier's sampling every time it is used, so the hashes in an

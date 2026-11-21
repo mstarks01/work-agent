@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2060](https://github.com/mstarks01/work-agent/issues/2060), on the
-  Owner File map [#2057](https://github.com/mstarks01/work-agent/issues/2057)
+- **Effort**: [#2060](https://github.com/mstarks01/katra/issues/2060), on the
+  Owner File map [#2057](https://github.com/mstarks01/katra/issues/2057)
 - **Relates to**: [ADR 0001](0001-sources-replace-description.md), which sets
   the Source; [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md), which
   sets the store of an **Owner File**

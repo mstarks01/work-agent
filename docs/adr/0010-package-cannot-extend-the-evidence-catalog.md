@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-08-13
 - **Effort**: [#165 — the evidence catalog stays the service's and a package
-  selects from it](https://github.com/mstarks01/work-agent/issues/165), part
-  of map [#158](https://github.com/mstarks01/work-agent/issues/158)
+  selects from it](https://github.com/mstarks01/katra/issues/165), part
+  of map [#158](https://github.com/mstarks01/katra/issues/158)
 - **Amends**: [ADR 0004](0004-evidence-references.md) by addition. ADR 0004
   is not edited in place — it created the closed catalog and named no
   owner for it; this ADR names the owner now that a second framework
@@ -88,7 +88,7 @@ close that gap; it just settles that a quote, not a new catalog entry, is
 the answer when the gap is crossed.
 
 **A related but separate gap surfaced while ruling on this, and is filed
-off-ADR as [#171](https://github.com/mstarks01/work-agent/issues/171),
+off-ADR as [#171](https://github.com/mstarks01/katra/issues/171),
 open.** `evidence_catalog()` tests exact equality against the literal
 string `unknown`, while `control_state` reads a leading token and
 distinguishes `unverified` / `absent` / `stated`. A control the input says

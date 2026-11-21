@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-05
 - **Effort**: [#498 — Whether the runtime image takes on
-  boto3](https://github.com/mstarks01/work-agent/issues/498), on the Bedrock map
-  [#491](https://github.com/mstarks01/work-agent/issues/491)
+  boto3](https://github.com/mstarks01/katra/issues/498), on the Bedrock map
+  [#491](https://github.com/mstarks01/katra/issues/491)
 
 ## Context
 
@@ -78,7 +78,7 @@ This reverses what this ADR first said, on a fact the first version missed. The
 offline conformance suite builds an adapter for **every** vendor, because that
 is how it establishes that the application treats them alike. Without the SDK,
 the vendor that needs one is the single vendor that suite cannot cover — which
-is the imbalance [#116](https://github.com/mstarks01/work-agent/issues/116)
+is the imbalance [#116](https://github.com/mstarks01/katra/issues/116)
 existed to remove, reappearing in the suite built to remove it.
 
 So the `dev` dependency group names the project's own extra, and one place still

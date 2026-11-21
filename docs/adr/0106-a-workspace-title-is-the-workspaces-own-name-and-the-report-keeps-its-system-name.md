@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-30
-- **Ticket**: [#2008](https://github.com/mstarks01/work-agent/issues/2008)
+- **Ticket**: [#2008](https://github.com/mstarks01/katra/issues/2008)
 - **Relates to**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md)
 
 ## Context

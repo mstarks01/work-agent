@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-08
 - **Effort**: [#126 — replace LLM-constructed Ground objects with deterministic
-  evidence references](https://github.com/mstarks01/work-agent/issues/126)
+  evidence references](https://github.com/mstarks01/katra/issues/126)
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), whose flat
   `Ground` this keeps and whose stated cost it removes.
 - **Amended by**: [ADR 0009](0009-a-bad-reference-costs-its-entry.md),

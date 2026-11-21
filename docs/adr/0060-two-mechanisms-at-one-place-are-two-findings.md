@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-04
-- **Effort**: [#1438](https://github.com/mstarks01/work-agent/issues/1438)
+- **Effort**: [#1438](https://github.com/mstarks01/katra/issues/1438)
 - **Relates to**: [ADR 0031](0031-a-claim-identity-carries-no-direction.md),
   whose key this keeps, and
   [ADR 0059](0059-the-critic-rules-each-draft-and-rejects-no-duplicate.md),

@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-28
-- **Map**: [#1991](https://github.com/mstarks01/work-agent/issues/1991), ticket
-  [#1995](https://github.com/mstarks01/work-agent/issues/1995)
+- **Map**: [#1991](https://github.com/mstarks01/katra/issues/1991), ticket
+  [#1995](https://github.com/mstarks01/katra/issues/1995)
 - **Relates to**: [ADR 0103](0103-gcs-uses-its-own-row-on-the-native-client.md)
 - **Amended by**: [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md),
   which gives the row an `api_key` mode

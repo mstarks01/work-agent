@@ -2,9 +2,9 @@
 
 - **Status**: accepted
 - **Date**: 2026-08-01
-- **Effort**: [#49 — accept call transcripts as job input](https://github.com/mstarks01/work-agent/issues/49)
+- **Effort**: [#49 — accept call transcripts as job input](https://github.com/mstarks01/katra/issues/49)
   (ten resolution comments), implemented per
-  [#61](https://github.com/mstarks01/work-agent/issues/61)
+  [#61](https://github.com/mstarks01/katra/issues/61)
 
 ## Context
 
@@ -94,5 +94,5 @@ their content too.
 - `notes` and `source_excerpt` ship raw caller words in the report JSON. No
   viewer renders them today; whether that residue is the integrator's problem or
   the service's is
-  [left open](https://github.com/mstarks01/work-agent/issues/49) rather than
+  [left open](https://github.com/mstarks01/katra/issues/49) rather than
   answered here.

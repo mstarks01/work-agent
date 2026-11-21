@@ -2,14 +2,14 @@
 
 - **Status**: accepted, amended 2026-09-13
 - **Date**: 2026-09-09
-- **Amendment**: [#889](https://github.com/mstarks01/work-agent/issues/889)
+- **Amendment**: [#889](https://github.com/mstarks01/katra/issues/889)
   moved who settles a `question`. An unknown ground still makes a claim
   conditional and code still supplies the pairs it hangs on; what code no
   longer does is rule the draft and route it past the critic. The two passages
   below state the current mechanism, and the rest of this record is unchanged.
-- **Effort**: [#713 — a typed applicability state on the proposal](https://github.com/mstarks01/work-agent/issues/713),
+- **Effort**: [#713 — a typed applicability state on the proposal](https://github.com/mstarks01/katra/issues/713),
   with the three contract contradictions recorded on it from the audit on
-  [#732](https://github.com/mstarks01/work-agent/issues/732)
+  [#732](https://github.com/mstarks01/katra/issues/732)
 - **Builds on**: [ADR 0027](0027-vocabulary-raises-a-lead-and-rules-nothing-out.md),
   which named a typed fact as the next candidate after the word tables went;
   [ADR 0013](0013-asvs-rules-applicability-and-never-a-pass.md), which this

@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-11
 - **Closes**:
-  [issue #468](https://github.com/mstarks01/work-agent/issues/468), split out of
-  [#465](https://github.com/mstarks01/work-agent/issues/465), which settled every
+  [issue #468](https://github.com/mstarks01/katra/issues/468), split out of
+  [#465](https://github.com/mstarks01/katra/issues/465), which settled every
   other decision it held.
 - **Relates to**:
   [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md), whose three

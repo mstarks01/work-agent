@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F2, F5)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F2, F5)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose floors and limits this keeps and whose `nothing-left` reason it
   narrows, and [ADR 0067](0067-a-paused-job-asks-what-decides-a-framework-first.md)

@@ -1,10 +1,10 @@
 # Is `reasoning_effort` a uniform reasoning surface across vendors?
 
-Evidence for wayfinder ticket [#15](https://github.com/mstarks01/work-agent/issues/15),
+Evidence for wayfinder ticket [#15](https://github.com/mstarks01/katra/issues/15),
 question 3: what replaces `THINKING_RANGE` (`sampling.py:62`), the per-tier
 integer budget range whose limits are Gemini's and whose keys are tier names.
 
-Ticket [#13](https://github.com/mstarks01/work-agent/issues/13) established that
+Ticket [#13](https://github.com/mstarks01/katra/issues/13) established that
 the three vendors' reasoning surfaces differ in *shape* — OpenAI has no
 integer-budget form, Gemini derives its budget from an enum, Anthropic takes a
 `thinking` dict and injects a `max_tokens`. It did **not** ask whether Anthropic

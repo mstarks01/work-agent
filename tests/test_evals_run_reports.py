@@ -4,7 +4,7 @@ A harness that built a full :class:`~katra.report.Report` per
 case, read four things off it and dropped it would leave a plain question — show
 me one of the reports — unanswerable on a sweep the provider billed, and
 nothing about a sweep is deterministic enough for a re-run to answer it
-([#180](https://github.com/mstarks01/work-agent/issues/180)).
+([#180](https://github.com/mstarks01/katra/issues/180)).
 
 Driven offline against the scripted sweep in
 :mod:`tests.test_evals_run_grounds`, which produces real reports through the

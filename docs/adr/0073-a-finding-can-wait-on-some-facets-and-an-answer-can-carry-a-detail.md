@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-08
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F6)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F6)
 - **Relates to**: [ADR 0050](0050-a-compound-question-kind-is-answered-in-facets.md),
   whose facets this lets a finding name, and
   [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),

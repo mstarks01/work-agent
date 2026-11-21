@@ -220,7 +220,7 @@ def write_reports(
     reasoning, and what the ``scope`` list carried. The artifact holds the
     measurements somebody thought of in advance, so without this file every
     other question about a finished sweep costs a second sweep
-    ([#180](https://github.com/mstarks01/work-agent/issues/180)).
+    ([#180](https://github.com/mstarks01/katra/issues/180)).
 
     Beside the artifact rather than inside it. A report embeds the whole
     **Valid System Model** and every claim's grounds, so folding a corpus of

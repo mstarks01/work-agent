@@ -3,15 +3,15 @@
 - **Status**: accepted
 - **Date**: 2026-09-06
 - **Effort**: [#634 — the canonical review format and the CI gate disagree about
-  whether a case is read](https://github.com/mstarks01/work-agent/issues/634)
+  whether a case is read](https://github.com/mstarks01/katra/issues/634)
 - **Amends**: [ADR 20](0020-a-sitting-pull-request-carries-n-cases.md) by
   replacement of its subject. ADR 20 settled how many cases one sitting pull
   request may carry, over a record that lived under each case directory. There
   is no such record now, and a submission carries every case a reader read in
   one file, so the count ADR 20 removed cannot come back.
-- **Relates to**: [issue #327](https://github.com/mstarks01/work-agent/issues/327),
+- **Relates to**: [issue #327](https://github.com/mstarks01/katra/issues/327),
   which established the act and is unchanged, and
-  [issue #226](https://github.com/mstarks01/work-agent/issues/226), the thirteen
+  [issue #226](https://github.com/mstarks01/katra/issues/226), the thirteen
   unread cases this decides the shape of the answer for.
 
 ## Context

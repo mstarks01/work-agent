@@ -295,7 +295,7 @@ class CaseScore:
         question, answered by a person through the vote ledger and by the
         critic on the way into the report. Reading this number as "the share of
         real threats found" over-claims in the direction nothing here can
-        check. See https://github.com/mstarks01/work-agent/issues/890.
+        check. See https://github.com/mstarks01/katra/issues/890.
         """
         return ratio(len(self.matched), self.reference_count)
 

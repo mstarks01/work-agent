@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-28
-- **Map**: [#1991](https://github.com/mstarks01/work-agent/issues/1991), ticket
-  [#1993](https://github.com/mstarks01/work-agent/issues/1993)
+- **Map**: [#1991](https://github.com/mstarks01/katra/issues/1991), ticket
+  [#1993](https://github.com/mstarks01/katra/issues/1993)
 
 ## Context
 

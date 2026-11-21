@@ -38,7 +38,7 @@ analysis, and that a question the owner is not sure of stays blank or takes
 "I don't know".
 
 **This sets aside one rule of
-[#1632](https://github.com/mstarks01/work-agent/issues/1632)**: that the page
+[#1632](https://github.com/mstarks01/katra/issues/1632)**: that the page
 does not favour an answer because the answer makes the interview shorter. The
 button favours "no" for that reason. The list's ranking stays neutral between
 the answers (ADR 0078).

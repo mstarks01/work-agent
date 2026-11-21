@@ -1,8 +1,8 @@
 # The build-time supported-param gate, verified empirically (wayfinder #13)
 
-**Question.** [#6](https://github.com/mstarks01/work-agent/issues/6) decision 3
+**Question.** [#6](https://github.com/mstarks01/katra/issues/6) decision 3
 fails the *build* when a tier's resolved sampling names a param its vendor
-cannot take. [#12](https://github.com/mstarks01/work-agent/issues/12) falsified
+cannot take. [#12](https://github.com/mstarks01/katra/issues/12) falsified
 the mechanism #6 assumed (`Vendor.supported: frozenset[str]`) but could not test
 its replacement, because `litellm` was not installed. This resolves that: what
 is the source of truth for the check, and does it cover value constraints?
@@ -47,7 +47,7 @@ only **`model`** and `**kwargs` are required. `custom_llm_provider`,
 against the installed library rather than against upstream source.
 
 `litellm.drop_params` is `False` by default, confirming the fail-closed premise
-[#8](https://github.com/mstarks01/work-agent/issues/8) relies on.
+[#8](https://github.com/mstarks01/katra/issues/8) relies on.
 
 ## 2. It catches name violations, per `(vendor, model)`
 
@@ -81,7 +81,7 @@ the gate needs no separate value-predicate mechanism — it runs the real one.
 **This repo pins `temperature = 0.0` on both tiers today** (`config/sampling.toml`),
 so an o-series model is not merely a hypothetical failure: it is an immediate,
 build-time-detectable one under greedy decoding. It is also why
-[#10](https://github.com/mstarks01/work-agent/issues/10) decision 3's
+[#10](https://github.com/mstarks01/katra/issues/10) decision 3's
 greedy-decoding requirement means **o-series cannot judge** — that now fails
 closed here rather than at request time.
 
@@ -95,7 +95,7 @@ closed here rather than at request time.
 
 An unrecognised model string resolves to its provider's **base** config rather
 than erroring, so a valid-but-unreleased model is not rejected. This is
-consistent with [#7](https://github.com/mstarks01/work-agent/issues/7)
+consistent with [#7](https://github.com/mstarks01/katra/issues/7)
 decision 6 (no build-time existence check), and it is what makes the gate safe
 to run against a model catalog that lags vendor releases.
 
@@ -130,7 +130,7 @@ does not have to be a deploy-time environment variable someone can forget.
 ## 6. Reasoning surfaces differ in shape, not just availability
 
 Not #13's question, but it falls out of the probe and
-[#15](https://github.com/mstarks01/work-agent/issues/15) owns the slot
+[#15](https://github.com/mstarks01/katra/issues/15) owns the slot
 ("per-tier thinking legality"):
 
 | vendor | accepted form | what the gate returns |

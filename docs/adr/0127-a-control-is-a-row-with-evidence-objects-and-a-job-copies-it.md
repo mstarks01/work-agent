@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-03
-- **Effort**: [#2119](https://github.com/mstarks01/work-agent/issues/2119), on the
-  Controls map [#2111](https://github.com/mstarks01/work-agent/issues/2111)
+- **Effort**: [#2119](https://github.com/mstarks01/katra/issues/2119), on the
+  Controls map [#2111](https://github.com/mstarks01/katra/issues/2111)
 - **Relates to**: [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md),
   which splits a job into rows and objects;
   [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md) and

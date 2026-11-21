@@ -3,7 +3,7 @@
 What this suite is for, stated plainly because the distinction is the whole
 point of it. There are two different questions a multi-vendor service has to
 answer, and running them together is what produced the imbalance
-[#116](https://github.com/mstarks01/work-agent/issues/116) is about:
+[#116](https://github.com/mstarks01/katra/issues/116) is about:
 
 * **Application conformance** — does the *application* behave the same way on
   this provider? Deterministic, and answered here, for every vendor, on
@@ -794,7 +794,7 @@ class TestTheLiveLanesSweepWhatWasProfiled:
         at all; this one file carries every vendor, so a vendor missing from
         it is a vendor with no live coverage at all — which is the
         imbalance
-        [#116](https://github.com/mstarks01/work-agent/issues/116) asked to
+        [#116](https://github.com/mstarks01/katra/issues/116) asked to
         remove, reappearing in the lane built to remove it.
         """
         smoke = self.SMOKE_LANE.read_text(encoding="utf-8")
@@ -1229,7 +1229,7 @@ def test_every_bedrock_reference_model_names_an_inference_profile():
     and the profile keys alike, so nothing offline separates them and the whole
     pair would have died on a ValidationException at the first live request —
     which is the answer
-    [#626](https://github.com/mstarks01/work-agent/issues/626) asked for and
+    [#626](https://github.com/mstarks01/katra/issues/626) asked for and
     could not get, because nobody has provisioned ``KATRA_BEDROCK_API_KEY``.
 
     Named for one vendor because the fact is one vendor's, and the property is
@@ -1240,7 +1240,7 @@ def test_every_bedrock_reference_model_names_an_inference_profile():
     priced identifier needs none, which is why the other five have none.
 
     ``global.`` rather than ``us.``: it is the one profile spelling that names
-    no geography, so [#496](https://github.com/mstarks01/work-agent/issues/496)
+    no geography, so [#496](https://github.com/mstarks01/katra/issues/496)
     still holds and no region enters an Execution Identity.
     """
     scopes = {

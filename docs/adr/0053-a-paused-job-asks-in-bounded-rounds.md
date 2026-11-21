@@ -6,7 +6,7 @@
   save that runs no model, the skips, the revision check, the floors, the
   limits and the framework turns
 - **Date**: 2026-09-29
-- **Effort**: [#1289](https://github.com/mstarks01/work-agent/issues/1289)
+- **Effort**: [#1289](https://github.com/mstarks01/katra/issues/1289)
 - **Relates to**: [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),
   whose ranking the rounds keep, and
   [ADR 0052](0052-the-answer-rounds-end.md), whose limit of three rounds a
@@ -18,7 +18,7 @@
   under which the floor exception reads the bands of each framework apart;
   by [ADR 0088](0088-field-questions-have-no-limit.md), under which field
   questions have no limit; and by
-  [#1672](https://github.com/mstarks01/work-agent/issues/1672), under which a
+  [#1672](https://github.com/mstarks01/katra/issues/1672), under which a
   paused job survives a restart where `KATRA_JOB_STORE` is `sql`
 
 ## Context
@@ -174,7 +174,7 @@ A saved round is kept on the waiting job, through `JobStore.save_answers`, which
 writes the answers and nothing else. A first-run app restart still loses a
 paused run (#1282).
 
-> **Amended by [#1672](https://github.com/mstarks01/work-agent/issues/1672).**
+> **Amended by [#1672](https://github.com/mstarks01/katra/issues/1672).**
 > A paused job survives a restart where `KATRA_JOB_STORE` is `sql`.
 
 **A capability and an attribute can ask about related facts, and neither

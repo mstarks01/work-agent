@@ -92,8 +92,8 @@ Bedrock, the Gemini Developer API or OpenRouter.
 <!-- /every-vendor -->
 
 ```sh
-git clone https://github.com/mstarks01/work-agent.git
-cd work-agent
+git clone https://github.com/mstarks01/katra.git
+cd katra
 uv sync
 ```
 

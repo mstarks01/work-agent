@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1530](https://github.com/mstarks01/work-agent/issues/1530), on the
-  persistent storage map [#1522](https://github.com/mstarks01/work-agent/issues/1522)
+- **Effort**: [#1530](https://github.com/mstarks01/katra/issues/1530), on the
+  persistent storage map [#1522](https://github.com/mstarks01/katra/issues/1522)
 - **Relates to**: [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md),
   which sets the order of the writes this ADR reverses
 
@@ -26,7 +26,7 @@ the parent job ID. No route reads a usage row, and the job reads as 404. The
 service removes the usage row when the budget window has passed and no parent
 job still exists.
 
-> **Amended by [#1698](https://github.com/mstarks01/work-agent/pull/1698).**
+> **Amended by [#1698](https://github.com/mstarks01/katra/pull/1698).**
 > The service keeps each usage row. A usage row also reserves its job ID:
 > admission refuses that ID as a duplicate, so one ID never names both a job
 > and a usage row, and the budgets never count one job twice.
@@ -35,7 +35,7 @@ The service turns the row into a usage row in one transaction, then deletes the
 objects. A sweep removes an object whose delete failed. Only a job in a
 terminal status can be deleted.
 
-> **Amended by [#1816](https://github.com/mstarks01/work-agent/issues/1816).**
+> **Amended by [#1816](https://github.com/mstarks01/katra/issues/1816).**
 > A delete in an S3 bucket that keeps versions removes no content. So the `s3`
 > object store refuses, at the startup, a bucket whose versioning is `Enabled`
 > or `Suspended`. It does not delete versions, because Cloudflare R2 documents

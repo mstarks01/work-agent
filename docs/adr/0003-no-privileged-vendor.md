@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-08
 - **Effort**: [#116 — remove remaining Vertex/Gemini/Ping bias and establish
-  vendor-neutral conformance](https://github.com/mstarks01/work-agent/issues/116)
+  vendor-neutral conformance](https://github.com/mstarks01/katra/issues/116)
 
 ## Context
 

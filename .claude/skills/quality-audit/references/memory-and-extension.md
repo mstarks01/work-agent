@@ -119,7 +119,7 @@ Examples of each:
 | inconsistent semantic judgements | evaluation calibration |
 | a spend limit nothing enforces | executable budget controls |
 
-File it as a GitHub issue on `mstarks01/work-agent` — see
+File it as a GitHub issue on `mstarks01/katra` — see
 `docs/agents/issue-tracker.md` — and label it per
 `docs/agents/triage-labels.md`. Apply `needs-sweep` only when its next
 necessary step needs fresh paid model output.

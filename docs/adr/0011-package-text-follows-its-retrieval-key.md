@@ -3,15 +3,15 @@
 - **Status**: accepted
 - **Date**: 2026-08-13
 - **Effort**: [#169 — the retrieval key decides where knowledge
-  lives](https://github.com/mstarks01/work-agent/issues/169), part of map
-  [#158](https://github.com/mstarks01/work-agent/issues/158)
+  lives](https://github.com/mstarks01/katra/issues/169), part of map
+  [#158](https://github.com/mstarks01/katra/issues/158)
 - **Amends**: [ADR 0008](0008-retrieval-by-fired-rule.md) by addition. ADR
   0008 is not edited in place — it records a decision taken on 2026-08-11
   under different premises, and nothing here changes what it decided.
 - **Relates to**: [ADR 0004](0004-evidence-references.md) /
   [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md), whose rule
   that a package selects rather than extends applies here too; and
-  [#164](https://github.com/mstarks01/work-agent/issues/164), which made
+  [#164](https://github.com/mstarks01/katra/issues/164), which made
   `rules` a `FrameworkPackage` member.
 
 ## Context

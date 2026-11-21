@@ -720,7 +720,7 @@ def widest_fan_out() -> int:
     lane of every framework a job selects, all fired together at the barrier.
 
     Derived from ``PACKAGES``, because a written count goes stale
-    ([#199](https://github.com/mstarks01/work-agent/issues/199)). A package
+    ([#199](https://github.com/mstarks01/katra/issues/199)). A package
     registered tomorrow moves it with no edit anywhere.
 
     Every framework, not the widest single one, because a job may name them all

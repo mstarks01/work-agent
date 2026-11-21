@@ -223,7 +223,7 @@ class TestSigningAlgorithms:
 
     The algorithm set is deploy-time configuration, so a standards-compliant
     IdP that signs ES256 can use this service
-    ([#116](https://github.com/mstarks01/work-agent/issues/116)). The allowlist
+    ([#116](https://github.com/mstarks01/katra/issues/116)). The allowlist
     keeps "configurable" from meaning "whatever the operator or the IdP says".
     """
 

@@ -6,7 +6,7 @@
 wrong afterwards.** ``tests/test_framework_neutrality.py`` states the same rule
 for frameworks. A vendor defect does not raise: it reports a smaller, plausible
 answer instead. The defects that
-[#607](https://github.com/mstarks01/work-agent/issues/607) records are of this
+[#607](https://github.com/mstarks01/katra/issues/607) records are of this
 kind.
 
 * **A table keyed by vendor is correct by construction.** A missing key raises

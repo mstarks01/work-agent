@@ -3,7 +3,7 @@
 A **Claim**'s identity is a value code computes from the fields the claim
 carries. Nothing here reads prose, and nothing here calls a model.
 
-This is the design [#201](https://github.com/mstarks01/work-agent/issues/201)
+This is the design [#201](https://github.com/mstarks01/katra/issues/201)
 asks for, plus the thing it makes affordable: a human vote that stays valid
 across runs, models and prompt edits.
 
@@ -85,7 +85,7 @@ paraphrases a live run actually emits it merges **69 of 92** — it is barely a
 rule. The verb takes that to 2, and the splits it adds are its cost — 12 becomes 15,
 which is the whole price in the first column. The candidate column rests on
 the element and verb assignments that
-[#511](https://github.com/mstarks01/work-agent/issues/511) gives the negative
+[#511](https://github.com/mstarks01/katra/issues/511) gives the negative
 half.
 
 ### What each column is measured over, and what none of them is
@@ -145,7 +145,7 @@ than forcing it to move either the rule or the score.
 
 Nothing in the tuple says which way the attacker moves across a boundary. Two
 escalations in opposite directions therefore fingerprint the same, which
-[#652](https://github.com/mstarks01/work-agent/issues/652) raised. The frontier
+[#652](https://github.com/mstarks01/katra/issues/652) raised. The frontier
 answered it: a direction is not available, and it would not pay if it were.
 
 **A direction is not a field.** `affected_element_ids` is a list whose order no

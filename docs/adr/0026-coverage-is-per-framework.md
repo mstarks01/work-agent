@@ -6,7 +6,7 @@
   settled what a **Case Sitting** merges as. This settles what one covers.
 - **Relates to**: [ADR 25](0025-unsure-is-a-mark.md), the other half of making a
   bar answerable, and
-  [issue #226](https://github.com/mstarks01/work-agent/issues/226), the thirteen
+  [issue #226](https://github.com/mstarks01/katra/issues/226), the thirteen
   unread cases this protects the work on.
 
 ## Context

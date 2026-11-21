@@ -43,7 +43,7 @@ because SSH defines a "none" client method. A protocol the model inferred
 states nothing, and neither does a field that also names a plain sibling
 ("HTTP and HTTPS", HTTP/2, which has a cleartext form) or negates ("HTTP
 without TLS"). The extraction prompt's rule for encrypted protocols
-([#1659](https://github.com/mstarks01/work-agent/pull/1659)) is a second
+([#1659](https://github.com/mstarks01/katra/pull/1659)) is a second
 reader of these rows, and a test holds the two to the same protocols.
 
 **Defaults that can be turned off are not in it,** however common: RDS and

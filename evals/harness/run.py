@@ -16,7 +16,7 @@ movement with them, and never quote them as absolutes.
 Everything the run produced lands beside it, as one whole report per case, in
 the directory :func:`~evals.harness.bundle.reports_dir` names. The artifact answers the questions the
 metric set anticipated. The reports answer the rest, offline and for free
-([#180](https://github.com/mstarks01/work-agent/issues/180)).
+([#180](https://github.com/mstarks01/katra/issues/180)).
 
 ``run`` is the one command here that needs live provider credentials, so it does
 not run on a pull request. Every other command reads finished artifacts, the
@@ -30,7 +30,7 @@ finished artifact, whose ``provenance`` block records what each node execution
 ran on. That is the point of recording it: the served builds are observations,
 made once during the sweep, and rediscovering them afterwards is not something
 an operator should have to do
-([#117](https://github.com/mstarks01/work-agent/issues/117)).
+([#117](https://github.com/mstarks01/katra/issues/117)).
 """
 
 from __future__ import annotations
@@ -1350,7 +1350,7 @@ def command_promote(args: argparse.Namespace) -> int:
     The whole point is that nothing is reconstructed by hand: the served builds
     were observed during the sweep and recorded, so promotion reads them rather
     than asking the operator to rediscover what answered
-    ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+    ([#117](https://github.com/mstarks01/katra/issues/117)).
 
     A preview by default, because promotion rewrites two config files this
     deployment then runs on. ``--yes`` is the second step, and it is the same

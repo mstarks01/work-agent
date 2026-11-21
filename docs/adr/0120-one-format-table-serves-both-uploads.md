@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2061](https://github.com/mstarks01/work-agent/issues/2061), on the
-  Owner File map [#2057](https://github.com/mstarks01/work-agent/issues/2057)
+- **Effort**: [#2061](https://github.com/mstarks01/katra/issues/2061), on the
+  Owner File map [#2057](https://github.com/mstarks01/katra/issues/2057)
 - **Relates to**: [ADR 0118](0118-an-owner-file-is-an-object-and-a-row.md), whose
   **Owner File** takes its format from its kind; [ADR 0119](0119-a-source-names-the-owner-file-it-copies.md),
   which gives a **Source** no format field;

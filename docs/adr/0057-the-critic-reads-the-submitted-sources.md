@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-01
-- **Effort**: [#1295](https://github.com/mstarks01/work-agent/issues/1295), finding 2
+- **Effort**: [#1295](https://github.com/mstarks01/katra/issues/1295), finding 2
 - **Supersedes**: the critic half of [ADR 0002](0002-finding-level-attribution.md),
   section "Neither the critic nor the eval judge receives submitter text". The
   eval judge half stands.

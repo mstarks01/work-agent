@@ -5,12 +5,12 @@
   replaces the record this one counts. A sitting merges as one file carrying
   every case a reader read, so there is no per-case directory to count.
 - **Date**: 2026-08-28
-- **Amends**: [issue #327](https://github.com/mstarks01/work-agent/issues/327), which put
+- **Amends**: [issue #327](https://github.com/mstarks01/katra/issues/327), which put
   one **Case Sitting** and the claim edits it justifies in one pull request. That rule
   stands. This record removes the count that the check read into it.
-- **Relates to**: [issue #369](https://github.com/mstarks01/work-agent/issues/369), the map
+- **Relates to**: [issue #369](https://github.com/mstarks01/katra/issues/369), the map
   that settled the spec for a walk across many cases in one session, and
-  [issue #371](https://github.com/mstarks01/work-agent/issues/371), which holds the detail
+  [issue #371](https://github.com/mstarks01/katra/issues/371), which holds the detail
   of the checks.
 
 ## Context
@@ -69,7 +69,7 @@ signs it destroys the evidence the method rests on. So a **Draft Sitting** lives
 `$XDG_STATE_HOME/katra/sittings/<login>/<case-id>.json` (`~/.local/state` where
 `XDG_STATE_HOME` is unset), it is never committed, and it
 cannot reach a pull request.
-[Issue #370](https://github.com/mstarks01/work-agent/issues/370) holds its shape.
+[Issue #370](https://github.com/mstarks01/katra/issues/370) holds its shape.
 
 **A new guard replaces the cardinality gate.** The allowlist builds itself from the changed
 paths under every touched case prefix, so `_check_scope` no longer refuses a second case's
@@ -77,7 +77,7 @@ files. `_new_sittings` carries the replacement, because it already returns the p
 "appends no sitting entry": a case directory in the diff with no new `reviews` entry that
 names the author refuses the submission. A reader cannot carry a case they did not sit.
 
-> **Amended by [#388](https://github.com/mstarks01/work-agent/issues/388).** The allowlist
+> **Amended by [#388](https://github.com/mstarks01/katra/issues/388).** The allowlist
 > no longer builds itself from the changed paths. Under each touched case it names the case
 > metadata, the reader's own `REVIEW-<login>.md`, and one claim file per framework the case
 > declares. A sitting may change an answer, never the question it answers, so an edit to the

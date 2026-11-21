@@ -11,7 +11,7 @@ The three-way answer is the part most worth pinning. ``unknown`` must not fail a
 lane and ``passed`` must not absorb a question the provider never answered; a
 suite that let either slide would leave the smoke reporting assurance it does
 not have, which is the specific dishonesty
-[#116](https://github.com/mstarks01/work-agent/issues/116) asked to remove.
+[#116](https://github.com/mstarks01/katra/issues/116) asked to remove.
 """
 
 from __future__ import annotations

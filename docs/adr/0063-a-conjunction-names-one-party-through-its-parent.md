@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-05
-- **Effort**: [#1468](https://github.com/mstarks01/work-agent/issues/1468)
+- **Effort**: [#1468](https://github.com/mstarks01/katra/issues/1468)
 - **Relates to**: [ADR 0051](0051-a-requirement-applies-by-a-rule-over-capabilities.md),
   whose rule about conjunctions this replaces
 

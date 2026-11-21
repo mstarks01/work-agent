@@ -3,10 +3,10 @@
 - **Status**: accepted
 - **Date**: 2026-09-14
 - **Effort**: Phase 1 of
-  [#926 — implement a source-backed assertion layer](https://github.com/mstarks01/work-agent/issues/926),
-  which elaborates [#741](https://github.com/mstarks01/work-agent/issues/741) and
+  [#926 — implement a source-backed assertion layer](https://github.com/mstarks01/katra/issues/926),
+  which elaborates [#741](https://github.com/mstarks01/katra/issues/741) and
   answers the root-cause audit in
-  [#925](https://github.com/mstarks01/work-agent/issues/925).
+  [#925](https://github.com/mstarks01/katra/issues/925).
 - **Evidence**:
   [`docs/research/assertion-readers.md`](../research/assertion-readers.md), the
   reader inventory and the corpus measurement this decision rests on.

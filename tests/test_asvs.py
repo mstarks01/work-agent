@@ -542,7 +542,7 @@ def test_the_precondition_answers_the_corpus_as_measured(case_id, expected):
 
     The split moved when the precondition stopped answering "is this a web
     application?" from a **Data Flow**'s ``protocol``
-    ([#219](https://github.com/mstarks01/work-agent/issues/219)). Four cases
+    ([#219](https://github.com/mstarks01/katra/issues/219)). Four cases
     whose prose names a web application would be refused for saying nothing
     about transport, which is the wrong question asked of the wrong field.
     """

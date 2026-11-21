@@ -96,7 +96,7 @@ service handles what the text *doesn't* say (unstated facts become `unknown`).
 A case with no unknowns can't exercise that.
 
 **Writing a transcript source.** Match the form real exports have, which was
-measured rather than guessed ([#51](https://github.com/mstarks01/work-agent/issues/51)):
+measured rather than guessed ([#51](https://github.com/mstarks01/katra/issues/51)):
 attribution names the *participant* and never their role, there are **no**
 uncertainty markers like `[inaudible]` (the real failure mode is fluent
 fabrication, not visible garbling), and merged turns run around 220 characters.
@@ -225,7 +225,7 @@ Skip this if the case does not declare ASVS. Its **Precondition** answers
 `undecidable` when nothing in the model says what a flow carries, and six cases
 sit there today for a reason that may be a thin model rather than a system out
 of scope — see
-[#219](https://github.com/mstarks01/work-agent/issues/219).
+[#219](https://github.com/mstarks01/katra/issues/219).
 
 Write one entry per requirement you expect a ruling on: `chapter`,
 `requirement`, `affected_element_ids`, `claim`, `tier`, `disposition`, `notes`.
@@ -278,7 +278,7 @@ is the point.** `V6.1.1` is `needs-more-prose` where the source is merely silent
 about rate limiting, and `gap-from-prose` in a case whose source states that
 nobody wrote the sign-in down. Write the disposition against *this* source, never
 against the requirement in general — a value that depended only on the
-requirement would be the table [#418](https://github.com/mstarks01/work-agent/issues/418)
+requirement would be the table [#418](https://github.com/mstarks01/katra/issues/418)
 removed.
 
 There is no `pass`. If the text settles the requirement as *satisfied*, the entry
@@ -312,7 +312,7 @@ Nothing but a labelled pair can say whether two spellings name one attacker
 action, so STRIDE needs them. A package whose claim names a catalog requirement
 is identified by that requirement, so a prose pair adds nothing a comparison of
 identifiers does not already settle, and it contributes none — settled design
-([#167](https://github.com/mstarks01/work-agent/issues/167)), not an omission.
+([#167](https://github.com/mstarks01/katra/issues/167)), not an omission.
 `IDENTITY_VALIDATION` in `evals/harness/calibration.py` is that table, and it
 answers for every package in `PACKAGES`.
 
@@ -712,7 +712,7 @@ the page again and ask for that case to be re-read. One bad case writes none of
 them, so you never have to work out which half applied.
 
 Two limits worth knowing. The recorded sets are in the page's own source, so
-the gate rests on the reader rather than on a server — [#373](https://github.com/mstarks01/work-agent/issues/373)
+the gate rests on the reader rather than on a server — [#373](https://github.com/mstarks01/katra/issues/373)
 already ruled that the gate protects the evidence in the document, not the
 reader. And a reader in a browser cannot edit a reference set, so a correction
 arrives as prose in their notes and you make the change.

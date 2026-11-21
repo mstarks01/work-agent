@@ -1,6 +1,6 @@
 # Issue tracker: GitHub
 
-Issues and PRDs for this repo live as GitHub issues on **`mstarks01/work-agent`**. Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live as GitHub issues on **`mstarks01/katra`**. Use the `gh` CLI for all operations.
 
 ## Conventions
 
@@ -47,15 +47,15 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 Both `sub_issues` and `dependencies` are `gh api` calls, not `gh issue` subcommands:
 
 ```bash
-BLOCKER_ID=$(gh api repos/mstarks01/work-agent/issues/<blocker> --jq .id)   # database id, not #number
-CHILD_ID=$(gh api repos/mstarks01/work-agent/issues/<child> --jq .id)
-gh api --method POST repos/mstarks01/work-agent/issues/<map>/sub_issues -F sub_issue_id=$CHILD_ID
-gh api --method POST repos/mstarks01/work-agent/issues/<child>/dependencies/blocked_by -F issue_id=$BLOCKER_ID
+BLOCKER_ID=$(gh api repos/mstarks01/katra/issues/<blocker> --jq .id)   # database id, not #number
+CHILD_ID=$(gh api repos/mstarks01/katra/issues/<child> --jq .id)
+gh api --method POST repos/mstarks01/katra/issues/<map>/sub_issues -F sub_issue_id=$CHILD_ID
+gh api --method POST repos/mstarks01/katra/issues/<child>/dependencies/blocked_by -F issue_id=$BLOCKER_ID
 ```
 
 ### The live map
 
-**None.** The last map, [#2111](https://github.com/mstarks01/work-agent/issues/2111), is under
+**None.** The last map, [#2111](https://github.com/mstarks01/katra/issues/2111), is under
 Completed maps. Chart a new one only against the bar at the end of this file.
 
 ### Completed maps
@@ -64,9 +64,9 @@ A completed map lives as a closed GitHub issue. Its tickets' resolution comments
 and the code holds the current state, so read the code first. Each map below settles the rules named
 beside it.
 
-- [#2111](https://github.com/mstarks01/work-agent/issues/2111) — **Controls**: an owner's durable
+- [#2111](https://github.com/mstarks01/katra/issues/2111) — **Controls**: an owner's durable
   record of a protection the system has, such as a firewall at the edge or a rate limit on an API.
-  The spec [#2148](https://github.com/mstarks01/work-agent/issues/2148) holds the build.
+  The spec [#2148](https://github.com/mstarks01/katra/issues/2148) holds the build.
   - A Control writes facts before the lanes, in the `FactAnswer` shape, and names framework units
     in a table keyed by framework. The critic is the one judge of a row; the service holds no
     "mitigated" state. Each package declares `units` and `control_unit_of` (ADR 0123).
@@ -82,9 +82,9 @@ beside it.
   - A Control on a flow, a suggested Control, an authoring-time warning, who classifies a document,
     and a corpus disposition for a settled row stay in the fog.
 
-- [#2057](https://github.com/mstarks01/work-agent/issues/2057) — a Files section in the web app,
+- [#2057](https://github.com/mstarks01/katra/issues/2057) — a Files section in the web app,
   where an owner keeps **Owner File**s, such as call transcripts and Mermaid diagrams. The spec
-  [#2073](https://github.com/mstarks01/work-agent/issues/2073) holds the build, as the tickets
+  [#2073](https://github.com/mstarks01/katra/issues/2073) holds the build, as the tickets
   #2074 to #2077.
   - Files belongs to the owner and is in the web app only. `/v1` refuses a Source that carries
     `owner_file_id`.
@@ -99,8 +99,8 @@ beside it.
   - Image formats, a route for bytes, Files on `/v1`, an edit of a name or a kind, sharing and
     retention are out of scope.
 
-- [#1991](https://github.com/mstarks01/work-agent/issues/1991) — Google Cloud Storage as an
-  object store. The spec [#1998](https://github.com/mstarks01/work-agent/issues/1998) holds the
+- [#1991](https://github.com/mstarks01/katra/issues/1991) — Google Cloud Storage as an
+  object store. The spec [#1998](https://github.com/mstarks01/katra/issues/1998) holds the
   build, as the tickets #1999 to #2002.
   - GCS is its own row, `gcs`, on the native `google-cloud-storage` client in a `gcs` extra. A put
     is create-only through `if_generation_match=0`. The row always uses the GCS endpoint and reads
@@ -119,8 +119,8 @@ beside it.
   - HMAC keys, Workload Identity Federation, an S3-interop route, a Vertex identity
     check, Cloud SQL IAM authentication and Azure Blob Storage are out of scope.
 
-- [#1760](https://github.com/mstarks01/work-agent/issues/1760) — a Settings page in the
-  first-run app. The spec [#1767](https://github.com/mstarks01/work-agent/issues/1767) holds the
+- [#1760](https://github.com/mstarks01/katra/issues/1760) — a Settings page in the
+  first-run app. The spec [#1767](https://github.com/mstarks01/katra/issues/1767) holds the
   build, as the tickets #1768 to #1777.
   - The loaders stay the only source of each type, closed set and bound. One page module holds
     the group, the label and the mark of each **Deployment Setting** (ADR 0091).
@@ -128,7 +128,7 @@ beside it.
     `$XDG_CONFIG_HOME/katra/`. It writes no TOML file. `settings.env` is strict `KEY=value`
     with no quotes and no comments (ADR 0092).
   - A save names its keys from an allow list, and the loaders hold each positive value rule
-    ([#1766](https://github.com/mstarks01/work-agent/issues/1766)).
+    ([#1766](https://github.com/mstarks01/katra/issues/1766)).
   - A save that passes replaces the Deployment in one cell, with no restart. A job in flight keeps
     its runner, and job storage changes only on a restart (ADR 0093).
   - Both drivers refuse a settings file or a secret file that the group or other users can write,
@@ -136,7 +136,7 @@ beside it.
   - A remote admin page for `/v1`, **Owner Preferences** and a `key_file` credential mode are out
     of scope.
   - The prototype is the tag `archive/prototype/settings-page-1762`.
-- [#1522](https://github.com/mstarks01/work-agent/issues/1522) — persistent storage for jobs,
+- [#1522](https://github.com/mstarks01/katra/issues/1522) — persistent storage for jobs,
   reports and sources. The build is in the tree: `katra.sql_store`,
   `katra.objects` and `katra.store_backends` hold it.
   - PostgreSQL, or SQLite on one host, holds the job records and principals. `boto3` over the S3 API,
@@ -150,54 +150,54 @@ beside it.
   - A startup scan fails each `queued` or `running` job. It is valid for one instance only.
   - Secrets arrive through `*_FILE` settings only, and database TLS is always `verify-full`.
   - Sharing, multi-instance work, per-owner encryption and tenants are out of scope.
-- [#491](https://github.com/mstarks01/work-agent/issues/491) — Amazon Bedrock as a vendor row.
+- [#491](https://github.com/mstarks01/katra/issues/491) — Amazon Bedrock as a vendor row.
   - A deployment declares the credential mechanism, and the vendor's SDK may then discover the
     material. An `IAM` mode passes no credential material at all
-    ([#493](https://github.com/mstarks01/work-agent/issues/493)).
+    ([#493](https://github.com/mstarks01/katra/issues/493)).
   - `boto3` is an optional extra named `bedrock`, because litellm reaches a bare `import boto3` in
-    both credential modes ([#498](https://github.com/mstarks01/work-agent/issues/498), ADR 0023).
+    both credential modes ([#498](https://github.com/mstarks01/katra/issues/498), ADR 0023).
   - A Bedrock model identifier matches one regex,
     `[<scope>.]anthropic.claude-<name>-<major>[-<minor>]` with an optional date and build tail. An
     ARN is refused, because it hides which model ran and carries an account id into a fingerprint
-    ([#494](https://github.com/mstarks01/work-agent/issues/494)).
+    ([#494](https://github.com/mstarks01/katra/issues/494)).
   - The Claude generation parse is vendor-blind: every Claude pattern composes from shared atoms
-    ([#495](https://github.com/mstarks01/work-agent/issues/495)).
+    ([#495](https://github.com/mstarks01/katra/issues/495)).
   - No region enters the fingerprint, on any vendor. A region field would be wrong exactly when a
-    cross-region profile is in use ([#496](https://github.com/mstarks01/work-agent/issues/496)).
+    cross-region profile is in use ([#496](https://github.com/mstarks01/katra/issues/496)).
   - **The Bedrock conformance pair is `global.anthropic.claude-sonnet-4-6` and
-    `global.anthropic.claude-opus-5-5`** ([#497](https://github.com/mstarks01/work-agent/issues/497),
-    [#626](https://github.com/mstarks01/work-agent/issues/626)). The pair must profile both schema
+    `global.anthropic.claude-opus-5-5`** ([#497](https://github.com/mstarks01/katra/issues/497),
+    [#626](https://github.com/mstarks01/katra/issues/626)). The pair must profile both schema
     paths, and only Claude can: Nova and Llama take only the forced tool path (ADR 0058). The pinned
     litellm sends Sonnet 4.6 on the native path and Opus 5.5 on the tool path. The `global.` prefix
     names a cross-Region inference profile and no geography, so #496 holds.
   - **A floating marker is a whole word, never a fragment of one.** One table of `word -> message`
-    is the single reader of the rule ([#605](https://github.com/mstarks01/work-agent/issues/605)).
+    is the single reader of the rule ([#605](https://github.com/mstarks01/katra/issues/605)).
   - A Google API key is a separate vendor row, `gemini`, not a second mode on `vertex`
-    ([#600](https://github.com/mstarks01/work-agent/issues/600)).
-- [#369](https://github.com/mstarks01/work-agent/issues/369) — the sitting app walks many cases in
+    ([#600](https://github.com/mstarks01/katra/issues/600)).
+- [#369](https://github.com/mstarks01/katra/issues/369) — the sitting app walks many cases in
   one session. A part-finished sitting is a **Draft Sitting** outside the repository, and one
   sitting pull request carries every finished case (ADR 0020). A case's recorded sets open only once
   the reader's own list for that case exists.
-- [#319](https://github.com/mstarks01/work-agent/issues/319) — contributions arrive as pull
+- [#319](https://github.com/mstarks01/katra/issues/319) — contributions arrive as pull
   requests. A vote binds to the GitHub account that submits it, and the ledger has one file per
   voter. CI proves an artifact agrees with itself and with the repository, never that a model ran.
   There is no spend ceiling: every amount carries a label (`recorded`, `estimated` or `unpriced`),
   and a person accepts it by typing it back.
-- [#158](https://github.com/mstarks01/work-agent/issues/158) — one validated system
+- [#158](https://github.com/mstarks01/katra/issues/158) — one validated system
   representation, many security frameworks. One extraction serves every **Framework Package**. A
   package selects from the service's evidence catalog and never adds to it. Each package carries
   its own critic. The retrieval key decides where knowledge lives. The cutover plan is
-  [#172](https://github.com/mstarks01/work-agent/issues/172).
-- [#76](https://github.com/mstarks01/work-agent/issues/76) — every finding ties back to the input
+  [#172](https://github.com/mstarks01/katra/issues/172).
+- [#76](https://github.com/mstarks01/katra/issues/76) — every finding ties back to the input
   that justifies it. A claim carries a non-empty `grounds` list. The critic reviews grounds and
   cannot change them. Untrusted text never reaches `innerHTML`.
-- [#49](https://github.com/mstarks01/work-agent/issues/49) — call transcripts as job input. A job
+- [#49](https://github.com/mstarks01/katra/issues/49) — call transcripts as job input. A job
   carries a `sources` list, and its budget is in bytes, not tokens (ADR 0001). Every source carries
   equal weight, so extraction records a disagreement and does not settle it.
-- [#24](https://github.com/mstarks01/work-agent/issues/24) — a first-run path for the integrator.
+- [#24](https://github.com/mstarks01/katra/issues/24) — a first-run path for the integrator.
   `docs/First-Run.md` is the route. No application code reads a documentation file, and `docs/`
   holds no sample report.
-- [#3](https://github.com/mstarks01/work-agent/issues/3) — a pluggable model provider. `LiteLlm` is
+- [#3](https://github.com/mstarks01/katra/issues/3) — a pluggable model provider. `LiteLlm` is
   the sole adapter, and the tiers, vendor-derived auth, served-build fingerprints and the
   certification bar follow from it.
 

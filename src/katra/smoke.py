@@ -9,7 +9,7 @@ served a request.
 This module is the other half. It is deliberately the cheapest thing that can
 produce that evidence: one small system, once, through the shipped graph, on
 whichever pair this deployment selects. Eight answers come back, and they are
-the eight [#116](https://github.com/mstarks01/work-agent/issues/116) names as
+the eight [#116](https://github.com/mstarks01/katra/issues/116) names as
 the minimum a provider must satisfy before its coverage counts as exercised::
 
     model binding                    the routes each node asked for

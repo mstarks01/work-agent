@@ -2,10 +2,10 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-03
-- **Effort**: [#2112](https://github.com/mstarks01/work-agent/issues/2112),
-  [#2113](https://github.com/mstarks01/work-agent/issues/2113) and
-  [#2114](https://github.com/mstarks01/work-agent/issues/2114), on the Controls
-  map [#2111](https://github.com/mstarks01/work-agent/issues/2111)
+- **Effort**: [#2112](https://github.com/mstarks01/katra/issues/2112),
+  [#2113](https://github.com/mstarks01/katra/issues/2113) and
+  [#2114](https://github.com/mstarks01/katra/issues/2114), on the Controls
+  map [#2111](https://github.com/mstarks01/katra/issues/2111)
 - **Relates to**: [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md),
   which keeps the Evidence Catalog neutral;
   [ADR 0013](0013-asvs-rules-applicability-and-never-a-pass.md), which rules

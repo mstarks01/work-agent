@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-22
 - **Effort**: [#276 — the 6-8K prompt envelope is circular, and two packages'
-  text is unlinted](https://github.com/mstarks01/work-agent/issues/276)
+  text is unlinted](https://github.com/mstarks01/katra/issues/276)
 - **Amends**: ticket 006 of the original service design map, which set the
   first caps and named the envelope. Git history keeps it:
   `git show fb62cb14:.wayfinder/tickets/006-skills-sme-design.md`. The ticket's
@@ -147,14 +147,14 @@ findings look alike to the sweep. Until an instrument measures it, a cap states
 how far the text has moved and claims nothing about how well it works.
 
 > **The instrument now exists** — `evals/harness/instruction.py`, added by
-> [#278](https://github.com/mstarks01/work-agent/issues/278). It records each
+> [#278](https://github.com/mstarks01/katra/issues/278). It records each
 > node's built instruction size and digest beside the scores in the same
 > artifact, so two sweeps either side of a cap raise answer *which node moved,
 > by how much, and what the numbers did*. Reading a trend out of that still
 > needs sweeps on both sides; the reading is now possible, which it was not.
 >
 > **The comparison is now a command**, added by
-> [#288](https://github.com/mstarks01/work-agent/issues/288):
+> [#288](https://github.com/mstarks01/katra/issues/288):
 > `harness compare <before> <after>` prints which node's instruction moved and
 > by how much, then every instrument number that moved beside it. It is
 > credential-free — both artifacts already hold what their nodes were told —

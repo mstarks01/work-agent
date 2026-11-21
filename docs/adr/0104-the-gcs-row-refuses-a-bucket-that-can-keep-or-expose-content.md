@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-28
-- **Map**: [#1991](https://github.com/mstarks01/work-agent/issues/1991), ticket
-  [#1994](https://github.com/mstarks01/work-agent/issues/1994)
+- **Map**: [#1991](https://github.com/mstarks01/katra/issues/1991), ticket
+  [#1994](https://github.com/mstarks01/katra/issues/1994)
 - **Relates to**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md), whose
   delete removes all content, and
   [ADR 0103](0103-gcs-uses-its-own-row-on-the-native-client.md)
