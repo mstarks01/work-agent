@@ -15,7 +15,7 @@
 Map #1760 ruled that the Settings page shows the sampling settings and does
 not change them, because a change makes each run uncertified until a sweep
 measures it. So the person who starts the app could set a tier's thinking level only with
-`KATRA_SAMPLING_<TIER>_THINKING` in the command that starts the app.
+`ANALYSIS_SAMPLING_<TIER>_THINKING` in the command that starts the app.
 
 The thinking level decides whether a job finishes and what it finds. On
 2026-10-20, Sonnet 5 at its default level wrote STRIDE lanes of up to 341 s
