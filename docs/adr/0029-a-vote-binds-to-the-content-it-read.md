@@ -1,9 +1,9 @@
 # 29. A vote binds to the content it read
 
-- **Status**: accepted, built in [#743](https://github.com/mstarks01/work-agent/issues/743)
+- **Status**: accepted, built in [#743](https://github.com/mstarks01/katra/issues/743)
 - **Date**: 2026-09-09
-- **Effort**: [#743 — bind substantive and writing review to a content version](https://github.com/mstarks01/work-agent/issues/743),
-  finding 11 of the audit on [#732](https://github.com/mstarks01/work-agent/issues/732)
+- **Effort**: [#743 — bind substantive and writing review to a content version](https://github.com/mstarks01/katra/issues/743),
+  finding 11 of the audit on [#732](https://github.com/mstarks01/katra/issues/732)
 - **Builds on**: `docs/agents/claim-identity.md`, which this keeps whole
 
 ## Context

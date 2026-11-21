@@ -116,13 +116,13 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # always invoke.** AWS serves recent Claude generations through cross-Region
     # inference profiles, and a profile ID is a model identifier rather than a
     # region field — so this names which build is addressed and leaves
-    # [#496](https://github.com/mstarks01/work-agent/issues/496) intact. A
+    # [#496](https://github.com/mstarks01/katra/issues/496) intact. A
     # ``global.`` profile is the one spelling that carries no geography at all:
     # ``us.``, ``eu.``, ``au.`` and ``jp.`` each pin a destination set.
     #
     # Read from the AWS model cards on 2026-09-12, which is documentation and
     # not a call — nobody has provisioned ``KATRA_BEDROCK_API_KEY``, and
-    # [#626](https://github.com/mstarks01/work-agent/issues/626) asked for the
+    # [#626](https://github.com/mstarks01/katra/issues/626) asked for the
     # live answer this substitutes for. Both cards carry an "Availability using
     # the ``bedrock-runtime`` endpoint" table with an In-Region column:
     #
@@ -183,14 +183,14 @@ REFERENCE_MODELS: dict[str, tuple[str, ...]] = {
     # The same identifiers as the ``gemini`` row, behind a location the
     # operator supplies. On Vertex the endpoint is a location and never a
     # segment of the model name, so nothing about the endpoint reaches this
-    # pair, and [#496](https://github.com/mstarks01/work-agent/issues/496)
+    # pair, and [#496](https://github.com/mstarks01/katra/issues/496)
     # keeps every region out of the Execution Identity whatever the operator
     # sets.
     #
     # **The two tiers do not serve the same set of locations.** Read from
     # Google's model endpoint locations table on 2026-09-12, which is
     # documentation and not a call — nobody has provisioned a Vertex project,
-    # and [#843](https://github.com/mstarks01/work-agent/issues/843) asked
+    # and [#843](https://github.com/mstarks01/katra/issues/843) asked
     # whether the global endpoint is required:
     #
     #     both tiers  global, us-central1, us-east1, us-east4, us-east5,

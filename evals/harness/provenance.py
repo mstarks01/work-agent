@@ -8,7 +8,7 @@ build map is what was installed. None of them is recoverable from the configured
 tier strings, so an artifact that recorded only what the run asked for cannot
 support a promotion: the operator would have to rediscover the served builds by
 hand, and blessing the requested model instead would certify a route rather than
-a build ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+a build ([#117](https://github.com/mstarks01/katra/issues/117)).
 
 The artifact records the identity's non-sampling halves too (#504). The build
 map is a per-sweep fact, because there is one process and one install, so it

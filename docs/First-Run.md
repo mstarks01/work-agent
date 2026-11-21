@@ -8,8 +8,8 @@ mode: the local app calls the models you configure.
 You need Python 3.11 or newer, [uv](https://docs.astral.sh/uv/) and Node 22.12 or newer.
 
 ```sh
-git clone https://github.com/mstarks01/work-agent.git
-cd work-agent
+git clone https://github.com/mstarks01/katra.git
+cd katra
 uv sync
 ```
 

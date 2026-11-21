@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 2, first step)
+- **Effort**: [#2029](https://github.com/mstarks01/katra/issues/2029) (package 2, first step)
 - **Amends**: [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md),
   whose shared answer covered every element its box listed
 

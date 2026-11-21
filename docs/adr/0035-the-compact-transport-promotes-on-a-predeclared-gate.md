@@ -49,7 +49,7 @@
   *is*. A fourth version could clear `duplicate-ref` with one sentence about flow
   refs; nothing in reach touches case 11. #938's definition of done covers this
   case: retain the benchmark findings and do not promote the route.
-- **Effort**: [#938 — stage compact extraction output behind a SystemModel adapter](https://github.com/mstarks01/work-agent/issues/938),
+- **Effort**: [#938 — stage compact extraction output behind a SystemModel adapter](https://github.com/mstarks01/katra/issues/938),
   stage 4
 - **Builds on**: [ADR 0016](0016-token-caps-are-drift-alarms.md), which says a
   cap here alarms rather than rations; `evals/TUNING.md` steps 3 and 5, which

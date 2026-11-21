@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-27
-- **Effort**: [#1225](https://github.com/mstarks01/work-agent/issues/1225),
+- **Effort**: [#1225](https://github.com/mstarks01/katra/issues/1225),
   its first question type
 - **Relates to**: [ADR 0043](0043-a-link-answer-is-closed-and-code-writes-it.md)
   and [ADR 0044](0044-a-resumed-job-starts-at-prepare.md)

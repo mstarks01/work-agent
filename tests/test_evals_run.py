@@ -105,7 +105,7 @@ class TestWhatAnExtractionSweepPrints:
     leave its numbers to whoever opened the JSON. These pin the two
     properties that make the measurement useful at the terminal: the split by
     attribute is there, and nothing on the line reads as a gate
-    ([#195](https://github.com/mstarks01/work-agent/issues/195)).
+    ([#195](https://github.com/mstarks01/katra/issues/195)).
     """
 
     def score(self, *, agreeing: bool) -> ExtractionScore:

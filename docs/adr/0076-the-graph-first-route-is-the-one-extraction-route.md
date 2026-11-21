@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-11
-- **Effort**: [#1003](https://github.com/mstarks01/work-agent/issues/1003)
+- **Effort**: [#1003](https://github.com/mstarks01/katra/issues/1003)
 - **Relates to**: [ADR 0034](0034-an-assertion-is-a-scoped-fact-with-a-support-span.md),
   which states what an assertion row is, and
   [ADR 0038](0038-a-component-reaches-the-graph-only-in-a-zone.md), whose

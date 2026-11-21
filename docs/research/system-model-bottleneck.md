@@ -10,9 +10,9 @@ loss they account for.
 > eight, taking it to **13 cases and 119 rows**, and every figure below
 > recomputes differently on it. The recomputed stage table and what it
 > changes are on
-> [#1033](https://github.com/mstarks01/work-agent/issues/1033), and the placement
+> [#1033](https://github.com/mstarks01/katra/issues/1033), and the placement
 > finding it reopens is
-> [#1052](https://github.com/mstarks01/work-agent/issues/1052). Read this file as
+> [#1052](https://github.com/mstarks01/katra/issues/1052). Read this file as
 > the record of what was measured at `756b065`.
 
 **This file records facts and a recommendation. It rules nothing.** The ruling

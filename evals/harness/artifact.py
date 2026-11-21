@@ -522,7 +522,7 @@ def build(
     the sweep did. ``provenance`` is what actually generated, per node
     execution: the record ``promote`` reads back. It carries the served builds
     beside their hashes, so a promotion can be driven from a finished sweep
-    ([#117](https://github.com/mstarks01/work-agent/issues/117)).
+    ([#117](https://github.com/mstarks01/katra/issues/117)).
 
     ``trusted`` rides beside the aggregates so nothing downstream folds an
     uncertified run into a trusted number unaware.

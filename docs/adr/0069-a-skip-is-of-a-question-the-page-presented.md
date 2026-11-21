@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F4)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F4)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   which introduced the skip and the part that waits on its parent
 - **Amended by**: [ADR 0078](0078-a-paused-job-asks-one-adaptive-list.md),

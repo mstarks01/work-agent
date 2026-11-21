@@ -4,7 +4,7 @@
   to compare against, and it ships measured or not at all.
 - **Date**: 2026-09-12
 - **Effort**: [#484 — research GitHub-backed code and configuration evidence
-  for ASVS analysis](https://github.com/mstarks01/work-agent/issues/484), whose
+  for ASVS analysis](https://github.com/mstarks01/katra/issues/484), whose
   research note is `docs/research/repository-evidence.md`, frozen at `a7553a1`,
   and whose review comment of 2026-09-08 lists the ten corrections this ADR
   adopts.

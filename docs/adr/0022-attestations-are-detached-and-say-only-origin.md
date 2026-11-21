@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-01
 - **Effort**: [#501 — Add signed report attestations for portable artifact
-  authenticity](https://github.com/mstarks01/work-agent/issues/501)
+  authenticity](https://github.com/mstarks01/katra/issues/501)
 
 ## Context
 

@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2059](https://github.com/mstarks01/work-agent/issues/2059), on the
-  Owner File map [#2057](https://github.com/mstarks01/work-agent/issues/2057)
+- **Effort**: [#2059](https://github.com/mstarks01/katra/issues/2059), on the
+  Owner File map [#2057](https://github.com/mstarks01/katra/issues/2057)
 - **Relates to**: [ADR 0065](0065-a-job-record-splits-into-rows-and-two-objects.md),
   which sets the same split for a job;
   [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md), whose usage row an

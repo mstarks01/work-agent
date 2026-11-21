@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-09-06
 - **Amends**: the ruling in
-  [#488](https://github.com/mstarks01/work-agent/pull/488), *A mark is agree,
+  [#488](https://github.com/mstarks01/katra/pull/488), *A mark is agree,
   reject or duplicate*, which considered `unsure` and refused it. That ruling
   was right under its own premises. This record states which premise stopped
   holding, and why the answer changes with it.

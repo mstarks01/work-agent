@@ -65,7 +65,7 @@ DeepInfra`. The two fields agree, which is what makes the free one usable: the
 body's `provider` names the same organisation the generation record does, so a
 reader that takes the cheap one loses nothing but the dated build — and the
 dated build is not something this repository binds. See
-[#815](https://github.com/mstarks01/work-agent/issues/815).
+[#815](https://github.com/mstarks01/katra/issues/815).
 
 ## The figure is the whole charge, under this arrangement
 

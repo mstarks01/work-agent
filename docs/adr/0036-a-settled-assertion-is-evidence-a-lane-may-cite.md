@@ -3,9 +3,9 @@
 - **Status**: accepted
 - **Date**: 2026-09-16
 - **Effort**: step 5 of
-  [#961 — the extraction audit](https://github.com/mstarks01/work-agent/issues/961),
+  [#961 — the extraction audit](https://github.com/mstarks01/katra/issues/961),
   which is Phase 4 of
-  [#926 — implement a source-backed assertion layer](https://github.com/mstarks01/work-agent/issues/926).
+  [#926 — implement a source-backed assertion layer](https://github.com/mstarks01/katra/issues/926).
 - **Amends**: [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md)
   by widening its first test. [ADR 0034](0034-an-assertion-is-a-scoped-fact-with-a-support-span.md)
   left the consumer migration open, and this settles the first consumer.

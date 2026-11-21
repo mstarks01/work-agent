@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-08-14
 - **Effort**: [#171 — the evidence catalog enumerates one of the three control
-  states](https://github.com/mstarks01/work-agent/issues/171), filed off-map
-  while resolving [#165](https://github.com/mstarks01/work-agent/issues/165)
+  states](https://github.com/mstarks01/katra/issues/171), filed off-map
+  while resolving [#165](https://github.com/mstarks01/katra/issues/165)
 - **Amends**: [ADR 0004](0004-evidence-references.md) by addition — its closed
   catalog and its "the agent selects, the service constructs" property are
   unchanged; what changes is which facts the enumeration reaches.

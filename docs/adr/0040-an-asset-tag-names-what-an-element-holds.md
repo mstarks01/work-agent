@@ -3,7 +3,7 @@
 - **Status**: accepted. The vocabulary drops `availability-critical` and
   `reputation`, and every consumer moves with it
 - **Date**: 2026-09-19
-- **Effort**: [#877](https://github.com/mstarks01/work-agent/issues/877), whose
+- **Effort**: [#877](https://github.com/mstarks01/katra/issues/877), whose
   three steps this completes. Step 1 shipped in #878 and step 2 in #1077
 - **Relates to**:
   [ADR 0027](0027-vocabulary-raises-a-lead-and-rules-nothing-out.md), whose rule

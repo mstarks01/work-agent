@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-02
-- **Effort**: [#1408](https://github.com/mstarks01/work-agent/issues/1408)
+- **Effort**: [#1408](https://github.com/mstarks01/katra/issues/1408)
 - **Supersedes**: the build-time refusal of the forced tool call in
   `binding._check_native_structured_output`, which no earlier ADR recorded.
 - **Relates to**: [ADR 0002](0002-finding-level-attribution.md), which records

@@ -2,11 +2,11 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-07
-- **Effort**: [#659 — the ASVS audit](https://github.com/mstarks01/work-agent/issues/659),
+- **Effort**: [#659 — the ASVS audit](https://github.com/mstarks01/katra/issues/659),
   finding F04
-- **Amends**: [#443](https://github.com/mstarks01/work-agent/issues/443), which
+- **Amends**: [#443](https://github.com/mstarks01/katra/issues/443), which
   added the chapter-wide exclusion, and
-  [#455](https://github.com/mstarks01/work-agent/issues/455), which added the
+  [#455](https://github.com/mstarks01/katra/issues/455), which added the
   per-requirement one. Both are reverted by this.
 
 ## Context

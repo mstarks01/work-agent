@@ -13,7 +13,7 @@ uv run python -m evals.harness.run experiments --ticket <experiment-id>
 ```
 
 The first line it prints is the issue title, and the rest is the body. File it
-on `mstarks01/work-agent` with `gh issue create`. See
+on `mstarks01/katra` with `gh issue create`. See
 `docs/agents/issue-tracker.md` for the `gh` commands and
 `docs/agents/triage-labels.md` for the label.
 

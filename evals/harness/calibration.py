@@ -575,7 +575,7 @@ IDENTITY_VALIDATION: dict[FrameworkName, IdentityValidation] = {
 class DirectionResult:
     """What a direction across the boundary is worth, if the identity read one.
 
-    [#652](https://github.com/mstarks01/work-agent/issues/652) asks whether two
+    [#652](https://github.com/mstarks01/katra/issues/652) asks whether two
     escalations the opposite way round should stay two findings. Nothing in the
     identity tuple carries a direction, so answering it needs one derived from
     the **Data Flow**s a claim cites — and the first two fields say how often

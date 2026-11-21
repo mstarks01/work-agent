@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-03
-- **Effort**: [#2115](https://github.com/mstarks01/work-agent/issues/2115), on the
-  Controls map [#2111](https://github.com/mstarks01/work-agent/issues/2111)
+- **Effort**: [#2115](https://github.com/mstarks01/katra/issues/2115), on the
+  Controls map [#2111](https://github.com/mstarks01/katra/issues/2111)
 - **Relates to**: [ADR 0116](0116-an-owner-maps-a-carried-answer-s-element-to-a-new-one.md),
   whose match rule and choice list this decision reuses;
   [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md), whose

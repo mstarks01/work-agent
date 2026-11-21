@@ -73,7 +73,7 @@ ROSTER_FILE = "evals/review/voters.toml"
 #: fallback rather than the answer: a fork's clone names its own remote, and a
 #: contributor who reads a case in a fork should still be sent to the upstream
 #: this constant names.
-DEFAULT_REPO = "mstarks01/work-agent"
+DEFAULT_REPO = "mstarks01/katra"
 
 #: The branch a contribution branches from, read off :data:`BASE_REF` so the
 #: two cannot name different branches.

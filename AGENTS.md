@@ -13,7 +13,7 @@ and the evidence. Read that doc before you work in its area.
 
 ### Issue tracker
 
-Issues live as GitHub issues on `mstarks01/work-agent`, driven through the `gh` CLI;
+Issues live as GitHub issues on `mstarks01/katra`, driven through the `gh` CLI;
 wayfinder maps use native sub-issues and issue dependencies. See `docs/agents/issue-tracker.md`.
 
 ### Code review checkpoints

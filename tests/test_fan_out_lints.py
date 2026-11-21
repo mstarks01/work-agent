@@ -5,7 +5,7 @@ job names: :func:`~katra.frameworks.widest_fan_out`, 23 today. No
 bound in the package is *computed* from a fixed count, so a stale count in prose
 fails nothing. But a maintainer reads that prose before turning a knob such as
 the retry budget, the jitter policy or the admission cap.
-[#286](https://github.com/mstarks01/work-agent/issues/286) records the case.
+[#286](https://github.com/mstarks01/katra/issues/286) records the case.
 
 ## Why a lint rather than care
 

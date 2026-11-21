@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-12
-- **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029)
-- **Would supersede**: [#1347](https://github.com/mstarks01/work-agent/issues/1347),
+- **Effort**: [#2029](https://github.com/mstarks01/katra/issues/2029)
+- **Would supersede**: [#1347](https://github.com/mstarks01/katra/issues/1347),
   whose binding of a stated fact to its facet this makes general
 - **Relates to**: [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),
   whose question kinds this regroups;

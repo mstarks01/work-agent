@@ -1,6 +1,6 @@
 """Claim identity decided by the fields a claim carries, with no model call.
 
-[#201](https://github.com/mstarks01/work-agent/issues/201) proposed resolving a
+[#201](https://github.com/mstarks01/katra/issues/201) proposed resolving a
 **Claim** to the parts that decide its identity, so two spellings of one threat
 compare equal without a model. This is that rule. It is the only decider of
 claim equivalence in the harness: the scorer
@@ -186,7 +186,7 @@ def flow_directions(
     Measured, never matched on, in the same way :func:`endpoint_form` is
     measured by the frontier and is not what :class:`MechanicalIdentity`
     answers with. It exists so that
-    [#652](https://github.com/mstarks01/work-agent/issues/652) — two escalations
+    [#652](https://github.com/mstarks01/katra/issues/652) — two escalations
     in opposite directions fingerprint the same — is a number rather than an
     opinion, and the number said no direction enters the identity.
     """

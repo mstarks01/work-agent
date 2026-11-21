@@ -1,8 +1,8 @@
 # What extraction places a component on
 
-Frozen evidence for [#1052](https://github.com/mstarks01/work-agent/issues/1052)
-and PRs [#1067](https://github.com/mstarks01/work-agent/pull/1067) and
-[#1068](https://github.com/mstarks01/work-agent/pull/1068), measured 2026-09-18.
+Frozen evidence for [#1052](https://github.com/mstarks01/katra/issues/1052)
+and PRs [#1067](https://github.com/mstarks01/katra/pull/1067) and
+[#1068](https://github.com/mstarks01/katra/pull/1068), measured 2026-09-18.
 
 Read it with `docs/research/probe_placements.py` over
 `evals/emissions/20260918T-placement-rule/`. Both sides replay through today's

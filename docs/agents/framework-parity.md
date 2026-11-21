@@ -10,7 +10,7 @@ one. What is not legitimate is silence.
 
 The set is `PACKAGES` in `src/katra/frameworks/__init__.py`, whatever is
 in it at the time you read this — two today, and
-[#170](https://github.com/mstarks01/work-agent/issues/170) files LINDDUN as a
+[#170](https://github.com/mstarks01/katra/issues/170) files LINDDUN as a
 candidate. **Read this document as N frameworks, never as a pair.** Every rule
 below is written that way on purpose: a note that said "the other framework"
 would be wrong the day a third one lands, and would have to be rewritten by
@@ -32,9 +32,9 @@ The two shapes behave differently when a package lands:
 
 **So: prefer a table keyed by framework over a constant or a branch.** The table
 is self-completing; the branch needs somebody to remember. The framework cutover
-([#172](https://github.com/mstarks01/work-agent/issues/172)), the ASVS package
-([#176](https://github.com/mstarks01/work-agent/issues/176)) and the first
-scoring of its records ([#214](https://github.com/mstarks01/work-agent/pull/214))
+([#172](https://github.com/mstarks01/katra/issues/172)), the ASVS package
+([#176](https://github.com/mstarks01/katra/issues/176)) and the first
+scoring of its records ([#214](https://github.com/mstarks01/katra/pull/214))
 record the cases behind this rule.
 
 `tests/test_framework_neutrality.py` enforces the decidable half: every framework
@@ -92,8 +92,8 @@ all.
 
 The repo name, the service name and the package root say STRIDE, so STRIDE is
 the default the eye falls on. A package that lands later is easy to miss.
-[#199](https://github.com/mstarks01/work-agent/issues/199) and
-[#200](https://github.com/mstarks01/work-agent/issues/200) record two defects of
+[#199](https://github.com/mstarks01/katra/issues/199) and
+[#200](https://github.com/mstarks01/katra/issues/200) record two defects of
 this shape: **a number, a code path or a check that is correct with one package
 and silently wrong with two.** A third package moves the fan-out arithmetic of
 #199 again.
@@ -109,11 +109,11 @@ output is usually a check that should read every package's output.
 
 **"It applies to some, by design."** State the design reason and cite where it
 was settled. Real example: claim-identity deduplication
-([#201](https://github.com/mstarks01/work-agent/issues/201)) is STRIDE's alone,
+([#201](https://github.com/mstarks01/katra/issues/201)) is STRIDE's alone,
 because ASVS matches by requirement ID with no composed identity — one requirement sits in
 one chapter, which is one **Lane**, which is one **Lane Agent**, so two ASVS
 claims about one requirement cannot arise.
-[#167](https://github.com/mstarks01/work-agent/issues/167) settled that.
+[#167](https://github.com/mstarks01/katra/issues/167) settled that.
 
 Write the reason as a **property of the framework**, never as its name. "ASVS is
 exempt" tells the next reader nothing about LINDDUN. "A framework whose claims

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-26
-- **Effort**: [#1242](https://github.com/mstarks01/work-agent/issues/1242)
+- **Effort**: [#1242](https://github.com/mstarks01/katra/issues/1242)
 - **Relates to**:
   [ADR 0010](0010-package-cannot-extend-the-evidence-catalog.md), which keeps
   the predicate registry the service's, and

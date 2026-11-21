@@ -5,9 +5,9 @@
   which gives the critic the submitted sources. The eval judge half of
   "Neither the critic nor the eval judge receives submitter text" stands.
 - **Date**: 2026-08-04
-- **Effort**: [#76 — tie every finding back to the input text that justifies it](https://github.com/mstarks01/work-agent/issues/76)
+- **Effort**: [#76 — tie every finding back to the input text that justifies it](https://github.com/mstarks01/katra/issues/76)
   (nine resolution comments), cutover planned in
-  [#85](https://github.com/mstarks01/work-agent/issues/85)
+  [#85](https://github.com/mstarks01/katra/issues/85)
 - **Amended by**: [ADR 0017](0017-a-groundless-claim-costs-its-entry.md),
   under which a groundless claim costs its entry, not the job;
   [ADR 0018](0018-the-repair-rung.md), which adds a repair rung after the
@@ -159,5 +159,5 @@ text.
   ([ADR 0001](0001-sources-replace-description.md)).
 - Quote grounds put more submitted prose, and more speaker names, onto a screen.
   Whether that residue needs a redaction policy is
-  [out of scope](https://github.com/mstarks01/work-agent/issues/76) here rather
+  [out of scope](https://github.com/mstarks01/katra/issues/76) here rather
   than answered.

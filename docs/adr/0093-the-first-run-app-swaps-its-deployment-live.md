@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-16
-- **Relates to**: map [#1760](https://github.com/mstarks01/work-agent/issues/1760),
-  ticket [#1765](https://github.com/mstarks01/work-agent/issues/1765),
+- **Relates to**: map [#1760](https://github.com/mstarks01/katra/issues/1760),
+  ticket [#1765](https://github.com/mstarks01/katra/issues/1765),
   [ADR 0092](0092-the-settings-directory-and-its-strict-env-file.md)
 
 ## Context

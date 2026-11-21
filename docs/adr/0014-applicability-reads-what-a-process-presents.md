@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Date**: 2026-08-19
 - **Effort**: [#219 — Should a source that says 'web app' reach the ASVS
-  precondition?](https://github.com/mstarks01/work-agent/issues/219)
+  precondition?](https://github.com/mstarks01/katra/issues/219)
 - **Relates to**: [ADR 0013](0013-asvs-rules-applicability-and-never-a-pass.md),
   which settled what an ASVS claim may assert. This one settles what decides
   whether the package runs at all, and amends neither of 0013's rulings.

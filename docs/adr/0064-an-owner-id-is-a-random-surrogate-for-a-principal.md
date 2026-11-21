@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1527](https://github.com/mstarks01/work-agent/issues/1527), on the
-  persistent storage map [#1522](https://github.com/mstarks01/work-agent/issues/1522)
+- **Effort**: [#1527](https://github.com/mstarks01/katra/issues/1527), on the
+  persistent storage map [#1522](https://github.com/mstarks01/katra/issues/1522)
 
 ## Context
 

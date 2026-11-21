@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-27
-- **Effort**: [#1252](https://github.com/mstarks01/work-agent/issues/1252),
+- **Effort**: [#1252](https://github.com/mstarks01/katra/issues/1252),
   step 3
 - **Relates to**: [ADR 0044](0044-a-resumed-job-starts-at-prepare.md), whose
   resumed job continues a paused one

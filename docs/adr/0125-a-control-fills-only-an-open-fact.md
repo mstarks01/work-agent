@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-03
-- **Effort**: [#2116](https://github.com/mstarks01/work-agent/issues/2116), on the
-  Controls map [#2111](https://github.com/mstarks01/work-agent/issues/2111)
+- **Effort**: [#2116](https://github.com/mstarks01/katra/issues/2116), on the
+  Controls map [#2111](https://github.com/mstarks01/katra/issues/2111)
 - **Relates to**: [ADR 0079](0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md),
   which lays carried answers under own answers;
   [ADR 0082](0082-a-platform-default-that-cannot-be-disabled-is-recorded.md) and

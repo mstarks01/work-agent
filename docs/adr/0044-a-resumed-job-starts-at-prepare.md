@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-27
-- **Effort**: [#1252](https://github.com/mstarks01/work-agent/issues/1252),
+- **Effort**: [#1252](https://github.com/mstarks01/katra/issues/1252),
   step 1
 - **Relates to**: [ADR 0043](0043-a-link-answer-is-closed-and-code-writes-it.md),
   whose answers this carries into the analysis

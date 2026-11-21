@@ -59,7 +59,7 @@ fingerprint, and a direct route records none rather than its own vendor.
 
 `ServedTrust` stays two-valued. The generation record stays here, in this probe,
 rather than on the job path. The reasoning is on
-[#815](https://github.com/mstarks01/work-agent/issues/815).
+[#815](https://github.com/mstarks01/katra/issues/815).
 
 ## One slug spans many upstreams
 

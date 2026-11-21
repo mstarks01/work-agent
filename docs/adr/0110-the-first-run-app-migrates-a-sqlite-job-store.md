@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-30
-- **Effort**: [#2027](https://github.com/mstarks01/work-agent/issues/2027)
+- **Effort**: [#2027](https://github.com/mstarks01/katra/issues/2027)
 - **Relates to**: [ADR 0077](0077-the-first-run-app-holds-job-records-in-the-job-store.md)
 
 ## Context

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 2, second step)
+- **Effort**: [#2029](https://github.com/mstarks01/katra/issues/2029) (package 2, second step)
 - **Relates to**: [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md),
   [ADR 0113](0113-a-shared-answer-covers-the-elements-a-person-ticks.md), whose
   ticked elements this stores, and

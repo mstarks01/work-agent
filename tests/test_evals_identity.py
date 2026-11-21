@@ -1,6 +1,6 @@
 """Mechanical claim identity, scored against the recorded labels.
 
-The measurement [#201](https://github.com/mstarks01/work-agent/issues/201) asks
+The measurement [#201](https://github.com/mstarks01/katra/issues/201) asks
 for. `tests/test_claim_identity.py` answers the false-merge direction over the
 blessed reference sets: the lane and the element set separate 243 of 244 claims.
 The calibration set's candidate side carries element IDs, so this module
@@ -72,7 +72,7 @@ MEASURED = {
 }
 
 #: What a **direction** across the boundary is worth, which
-#: [#652](https://github.com/mstarks01/work-agent/issues/652) asks. Nothing in
+#: [#652](https://github.com/mstarks01/katra/issues/652) asks. Nothing in
 #: the identity tuple carries one, so two escalations the opposite way round
 #: fingerprint the same. The question is whether that loses anything.
 #:

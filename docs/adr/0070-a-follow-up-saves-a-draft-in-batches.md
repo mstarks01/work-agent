@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F3)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F3)
 - **Relates to**: [ADR 0054](0054-a-report-offers-one-follow-up.md), whose one
   follow-up this keeps, and [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose revision check a draft save reuses

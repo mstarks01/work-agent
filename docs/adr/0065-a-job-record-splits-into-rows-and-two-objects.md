@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1528](https://github.com/mstarks01/work-agent/issues/1528), on the
-  persistent storage map [#1522](https://github.com/mstarks01/work-agent/issues/1522)
+- **Effort**: [#1528](https://github.com/mstarks01/katra/issues/1528), on the
+  persistent storage map [#1522](https://github.com/mstarks01/katra/issues/1522)
 - **Relates to**: [ADR 0064](0064-an-owner-id-is-a-random-surrogate-for-a-principal.md),
   which defines the owner ID in each key
 - **Amended by**: [ADR 0066](0066-a-deleted-job-leaves-a-usage-row.md),
@@ -36,7 +36,7 @@ provider.
 - Each job row stores the `SCHEMA_VERSION` that wrote the record. One
   function, `same_schema`, accepts only the exact current version, because a
   record of any other version can hold a shape that this service cannot
-  parse ([#1708](https://github.com/mstarks01/work-agent/pull/1708)). A route
+  parse ([#1708](https://github.com/mstarks01/katra/pull/1708)). A route
   that must parse a record of another version refuses it. A read of the job
   row parses no part that the version covers until the function accepts the
   version. These parts are the objects, the checkpoint, the resumption, the
@@ -48,7 +48,7 @@ provider.
   for a record of any version. A read of a stored answer keeps the value
   that the service wrote when it admitted the answer, so a change to the
   wording of a question never makes a record unreadable. No migration rewrites a stored report, checkpoint or sources
-  object ([#1532](https://github.com/mstarks01/work-agent/issues/1532)).
+  object ([#1532](https://github.com/mstarks01/katra/issues/1532)).
 - The row holds the SHA-256 of each object. A read checks it and fails closed
   on a mismatch.
 - The service writes the object first and the row second. It deletes the

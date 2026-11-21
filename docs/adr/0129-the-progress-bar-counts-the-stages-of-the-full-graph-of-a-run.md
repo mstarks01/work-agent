@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-11
-- **Relates to**: [#2243](https://github.com/mstarks01/work-agent/issues/2243);
+- **Relates to**: [#2243](https://github.com/mstarks01/katra/issues/2243);
   [ADR 0125](0125-a-control-fills-only-an-open-fact.md), whose continue at the
   pause splits one run into two jobs
 

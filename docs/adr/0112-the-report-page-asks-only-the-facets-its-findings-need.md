@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-30
-- **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 1)
+- **Effort**: [#2029](https://github.com/mstarks01/katra/issues/2029) (package 1)
 - **Relates to**: [ADR 0073](0073-a-finding-can-wait-on-some-facets-and-an-answer-can-carry-a-detail.md),
   whose `needs` this reads, and
   [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md), whose

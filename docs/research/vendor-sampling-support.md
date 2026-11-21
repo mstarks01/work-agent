@@ -5,9 +5,9 @@
 **through LiteLLM**, in *genai* names: `temperature`, `top_p`, `top_k`, `seed`,
 `max_output_tokens`, `presence_penalty`, `frequency_penalty`, `thinking_budget`?
 
-The consumer is [#6](https://github.com/mstarks01/work-agent/issues/6)
+The consumer is [#6](https://github.com/mstarks01/katra/issues/6)
 decision 3: an unsupported param must fail the **build**, not the first request,
-because `drop_params` stays fail-closed ([#8](https://github.com/mstarks01/work-agent/issues/8))
+because `drop_params` stays fail-closed ([#8](https://github.com/mstarks01/katra/issues/8))
 and a mid-job raise happens after earlier pipeline nodes are already paid for.
 The check is only as good as the sets behind it — too strict refuses a working
 config, too loose makes the check decorative.

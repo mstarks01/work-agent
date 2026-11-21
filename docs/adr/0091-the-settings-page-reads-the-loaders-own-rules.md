@@ -3,8 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-10-16
 - **Amended by**: [ADR 0108](0108-the-gcs-row-reads-a-service-account-key-in-its-api-key-mode.md)
-- **Relates to**: map [#1760](https://github.com/mstarks01/work-agent/issues/1760),
-  ticket [#1761](https://github.com/mstarks01/work-agent/issues/1761)
+- **Relates to**: map [#1760](https://github.com/mstarks01/katra/issues/1760),
+  ticket [#1761](https://github.com/mstarks01/katra/issues/1761)
 
 ## Context
 

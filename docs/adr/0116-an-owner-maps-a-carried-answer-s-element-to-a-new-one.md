@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-31
-- **Effort**: [#2029](https://github.com/mstarks01/work-agent/issues/2029) (package 7, first step)
+- **Effort**: [#2029](https://github.com/mstarks01/katra/issues/2029) (package 7, first step)
 - **Amends**: [ADR 0079](0079-a-new-analysis-can-carry-an-earlier-job-s-answers.md),
   whose carried answer carried only where the new description gave its
   element the same name

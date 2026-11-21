@@ -3,11 +3,11 @@
 - **Status**: accepted
 - **Date**: 2026-09-10
 - **Closes**:
-  [issue #652](https://github.com/mstarks01/work-agent/issues/652), split out of
-  [#534](https://github.com/mstarks01/work-agent/issues/534) by the boundary
+  [issue #652](https://github.com/mstarks01/katra/issues/652), split out of
+  [#534](https://github.com/mstarks01/katra/issues/534) by the boundary
   review.
 - **Relates to**:
-  [issue #201](https://github.com/mstarks01/work-agent/issues/201), which
+  [issue #201](https://github.com/mstarks01/katra/issues/201), which
   designed the identity rule, and
   [`docs/agents/claim-identity.md`](../agents/claim-identity.md), which holds
   the rule and now holds these numbers.

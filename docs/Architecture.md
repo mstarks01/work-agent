@@ -491,7 +491,7 @@ this repository contains that, because containment is deployment work and this
 repository ships no deployment packaging: no image, no container definition, no
 egress policy. An operator running this service in production owns that
 boundary. What it should look like is set out in
-[#502](https://github.com/mstarks01/work-agent/issues/502).
+[#502](https://github.com/mstarks01/katra/issues/502).
 
 What the repository *does* bound is the seam — the set of values this service
 hands the translator, and where each comes from:

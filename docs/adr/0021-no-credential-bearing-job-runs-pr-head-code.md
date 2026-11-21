@@ -6,7 +6,7 @@
   which names the repository by its ID in the condition, the mapping and the
   binding.
 - **Effort**: [#508 — Prevent PR-head code from receiving live provider
-  credentials](https://github.com/mstarks01/work-agent/issues/508)
+  credentials](https://github.com/mstarks01/katra/issues/508)
 
 ## Context
 

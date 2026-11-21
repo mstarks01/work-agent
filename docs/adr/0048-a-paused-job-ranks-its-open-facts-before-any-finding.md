@@ -2,8 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-09-27
-- **Effort**: [#1225](https://github.com/mstarks01/work-agent/issues/1225),
-  [#1252](https://github.com/mstarks01/work-agent/issues/1252)
+- **Effort**: [#1225](https://github.com/mstarks01/katra/issues/1225),
+  [#1252](https://github.com/mstarks01/katra/issues/1252)
 - **Relates to**: [ADR 0045](0045-a-job-that-asks-pauses-after-the-assertion-pass.md),
   whose pause this adds to; [ADR 0047](0047-the-critic-asks-a-kind-of-question-about-an-element.md),
   whose kinds it asks early
@@ -70,7 +70,7 @@ counted. A framework whose row counted no run asks nothing early.
 **Each question gives its reasons.** They are the questions of the rules that
 fire on the element, because no finding exists to cite.
 
-> **Note ([#2050](https://github.com/mstarks01/work-agent/pull/2050)).** Each
+> **Note ([#2050](https://github.com/mstarks01/katra/pull/2050)).** Each
 > reason holds the effect sentence of its rule, not the rule's analyst question.
 
 **An early answer takes the answer path that already exists.** The answers

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-08
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F2, F)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F2, F)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose floors and highest-band exception this narrows, and
   [ADR 0068](0068-a-pause-says-what-it-leaves-open.md), which left the

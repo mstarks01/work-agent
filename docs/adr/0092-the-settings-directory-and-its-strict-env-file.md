@@ -2,9 +2,9 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-16
-- **Relates to**: map [#1760](https://github.com/mstarks01/work-agent/issues/1760),
-  tickets [#1763](https://github.com/mstarks01/work-agent/issues/1763) and
-  [#1764](https://github.com/mstarks01/work-agent/issues/1764)
+- **Relates to**: map [#1760](https://github.com/mstarks01/katra/issues/1760),
+  tickets [#1763](https://github.com/mstarks01/katra/issues/1763) and
+  [#1764](https://github.com/mstarks01/katra/issues/1764)
 
 ## Context
 

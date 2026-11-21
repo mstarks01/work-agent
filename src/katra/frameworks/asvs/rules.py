@@ -1002,7 +1002,7 @@ def asvs_precondition(model: SystemModel) -> PreconditionResult:
     **The read is what the processes say they present**, not what the flows say
     they carry. Those are different facts. An unstated protocol must not make a
     web interface undecidable
-    ([#219](https://github.com/mstarks01/work-agent/issues/219)): a flow's
+    ([#219](https://github.com/mstarks01/katra/issues/219)): a flow's
     ``protocol`` can correctly read ``unknown`` while a process states that it
     presents a web interface. The applicability question is not a question
     about transport.

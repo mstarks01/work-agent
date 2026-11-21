@@ -1,6 +1,6 @@
 """How far the fields a claim already carries go towards identifying it.
 
-[#201](https://github.com/mstarks01/work-agent/issues/201) proposes resolving a
+[#201](https://github.com/mstarks01/katra/issues/201) proposes resolving a
 **Claim** to the parts that decide its identity, so that two spellings of one
 threat compare equal with no model call. Three of the four parts it names are
 already on the record — the lane, the affected **Element** IDs and the

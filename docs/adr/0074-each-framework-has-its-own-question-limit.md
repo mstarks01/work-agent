@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-09
-- **Effort**: [#1562](https://github.com/mstarks01/work-agent/issues/1562)
+- **Effort**: [#1562](https://github.com/mstarks01/katra/issues/1562)
 - **Relates to**: [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md),
   whose limits this applies to each framework, and
   [ADR 0071](0071-the-floor-exception-reads-each-framework-s-own-bands.md),

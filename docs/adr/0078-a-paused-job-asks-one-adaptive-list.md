@@ -5,7 +5,7 @@
   and its limit and its questions by
   [ADR 0081](0081-a-question-kind-is-asked-once-for-the-system.md)
 - **Date**: 2026-10-12
-- **Effort**: [#1632](https://github.com/mstarks01/work-agent/issues/1632)
+- **Effort**: [#1632](https://github.com/mstarks01/katra/issues/1632)
 - **Supersedes**: the rounds of
   [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md): the fixed number
   of questions a round shows, the next-round step, the box order and the

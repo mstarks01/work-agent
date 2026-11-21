@@ -222,7 +222,7 @@ class ModeRun:
     folded here for the same reason and one more: ``duration_ms`` is recorded
     per node run and read back by nothing, so a sweep that does not fold it
     measures the latency the Evaluation section of
-    [#115](https://github.com/mstarks01/work-agent/issues/115) asks for and
+    [#115](https://github.com/mstarks01/katra/issues/115) asks for and
     then throws it away.
 
     ``grounds`` and ``grounds_failures`` are the two halves of the same

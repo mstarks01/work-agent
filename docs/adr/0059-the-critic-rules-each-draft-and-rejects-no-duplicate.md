@@ -2,9 +2,9 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-03
-- **Effort**: [#1438](https://github.com/mstarks01/work-agent/issues/1438)
+- **Effort**: [#1438](https://github.com/mstarks01/katra/issues/1438)
 - **Supersedes**: the critic's duplicate step and the `same_action_as` pairs
-  that [#440](https://github.com/mstarks01/work-agent/issues/440) added to the
+  that [#440](https://github.com/mstarks01/katra/issues/440) added to the
   critic's view.
 - **Relates to**: [ADR 0031](0031-a-claim-identity-carries-no-direction.md),
   whose identity rule keyed the pairs.

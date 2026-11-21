@@ -496,7 +496,7 @@ class ExtractionScore:
     every Trust Boundary ``network`` scores exactly like one that picks
     ``privilege`` and ``tenant`` correctly, and a value the live pipeline
     stopped producing leaves every number here flat
-    ([#195](https://github.com/mstarks01/work-agent/issues/195)). It is
+    ([#195](https://github.com/mstarks01/katra/issues/195)). It is
     **reported, never gated**: it carries no threshold, because a low number is
     not a defect on its own, and adding a scored metric would move every
     baseline this repo tracks.
@@ -1232,7 +1232,7 @@ def aggregate_attributes(scores: Sequence[ExtractionScore]) -> dict[str, Any]:
 
     Both, because they answer different questions. The total says whether
     anything drifted; the split says *which value stopped arriving*, which is
-    the question [#184](https://github.com/mstarks01/work-agent/issues/184)
+    the question [#184](https://github.com/mstarks01/katra/issues/184)
     needed a hand-run count of candidates by lane to answer.
     """
     return attribute_agreement(
@@ -2585,7 +2585,7 @@ EXTRACTING_MODES: frozenset[SweepMode] = frozenset(
 #: The modes whose graph ends in a :class:`Report`. ``extraction`` stops at the
 #: validity gate and returns an :class:`ExtractionResult`, so a sweep of it has
 #: no report to persist and says so rather than writing an empty file
-#: ([#180](https://github.com/mstarks01/work-agent/issues/180)).
+#: ([#180](https://github.com/mstarks01/katra/issues/180)).
 REPORTING_MODES: frozenset[SweepMode] = frozenset(
     {"analysis", "answered", "direct-facts", "end-to-end", "withheld"}
 )
@@ -2602,7 +2602,7 @@ def render_extraction(scores: Sequence[ExtractionScore]) -> None:
 
     Every number here is **non-gating**. A low agreement is a question to take
     to the source text, not a defect on its own
-    ([#179](https://github.com/mstarks01/work-agent/issues/179)).
+    ([#179](https://github.com/mstarks01/katra/issues/179)).
     """
     for score in scores:
         agreed = len(score.attributes) - len(score.differing)

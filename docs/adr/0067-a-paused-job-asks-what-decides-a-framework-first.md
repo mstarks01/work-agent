@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-07
-- **Effort**: [#1542](https://github.com/mstarks01/work-agent/issues/1542) (F1)
+- **Effort**: [#1542](https://github.com/mstarks01/katra/issues/1542) (F1)
 - **Relates to**: [ADR 0048](0048-a-paused-job-ranks-its-open-facts-before-any-finding.md),
   whose ranking this keeps for a framework that will run, and
   [ADR 0053](0053-a-paused-job-asks-in-bounded-rounds.md), whose limits do

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-09
-- **Effort**: [#1231](https://github.com/mstarks01/work-agent/issues/1231)
+- **Effort**: [#1231](https://github.com/mstarks01/katra/issues/1231)
 - **Relates to**: [ADR 0036](0036-a-settled-assertion-is-evidence-a-lane-may-cite.md),
   which makes a settled row evidence that a lane may cite, and
   [ADR 0042](0042-every-predicate-states-its-reader.md), whose rules read the
