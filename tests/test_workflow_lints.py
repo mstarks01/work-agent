@@ -439,11 +439,10 @@ def test_the_federation_names_the_repository_by_its_id():
         "ATTRIBUTE_CONDITION"
     )
     assert "assertion.repository ==" not in _setup_assignment("ATTRIBUTE_CONDITION")
-    mapping = _setup_assignment("ATTRIBUTE_MAPPING")
-    assert "attribute.repository_id=assertion.repository_id" in mapping
-    assert "attribute.repository=" not in mapping, (
-        "a binding on the name would still match while the name maps"
-    )
+    assert _setup_assignment("ATTRIBUTE_MAPPING") == (
+        'ATTRIBUTE_MAPPING="google.subject=assertion.sub,'
+        'attribute.repository_id=assertion.repository_id"'
+    ), "a binding on any other attribute, such as the name, would still match"
     assert _setup_assignment("PRINCIPAL_SET").endswith(
         'attribute.repository_id/${REPO_ID}"'
     )

@@ -3,7 +3,8 @@
 - **Status**: accepted
 - **Date**: 2026-09-01
 - **Amended by**: [ADR 0131](0131-the-live-eval-federation-trusts-the-repository-by-its-id.md),
-  which names the repository by its ID in the condition.
+  which names the repository by its ID in the condition, the mapping and the
+  binding.
 - **Effort**: [#508 — Prevent PR-head code from receiving live provider
   credentials](https://github.com/mstarks01/work-agent/issues/508)
 
