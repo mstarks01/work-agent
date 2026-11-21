@@ -405,6 +405,15 @@ def test_the_offline_suite_still_covers_pull_requests():
 SETUP_SCRIPT = REPO_ROOT / ".github" / "scripts" / "setup-workload-identity.sh"
 
 
+def _setup_assignment(name: str) -> str:
+    """The line of the setup script that assigns ``name``."""
+    return next(
+        line
+        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
+        if line.startswith(f"{name}=")
+    )
+
+
 def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
     """Layer 2 has to fail for a different reason than layer 1 does.
 
@@ -416,14 +425,31 @@ def test_the_federation_pins_the_ref_claim_and_not_only_a_suffix():
 
     `ref` is the run's ref exactly, with no attacker-chosen tail.
     """
-    condition = next(
-        line
-        for line in SETUP_SCRIPT.read_text(encoding="utf-8").splitlines()
-        if line.startswith("ATTRIBUTE_CONDITION=")
-    )
+    condition = _setup_assignment("ATTRIBUTE_CONDITION")
 
     assert "assertion.ref == '${TRUSTED_REF}'" in condition, (
         "the ref claim must be compared, not matched as a suffix of another claim"
+    )
+
+
+def test_the_federation_names_the_repository_by_its_id():
+    """A rename keeps the ID, and a name can come back to another repository
+    (ADR 0131). The condition, the mapping and the binding all name the ID."""
+    assert "assertion.repository_id == '${REPO_ID}'" in _setup_assignment(
+        "ATTRIBUTE_CONDITION"
+    )
+    assert "assertion.repository ==" not in _setup_assignment("ATTRIBUTE_CONDITION")
+    assert _setup_assignment("ATTRIBUTE_MAPPING") == (
+        'ATTRIBUTE_MAPPING="google.subject=assertion.sub,'
+        'attribute.repository_id=assertion.repository_id"'
+    ), "a binding on any other attribute, such as the name, would still match"
+    assert _setup_assignment("PRINCIPAL_SET").endswith(
+        'attribute.repository_id/${REPO_ID}"'
+    )
+    script = SETUP_SCRIPT.read_text(encoding="utf-8")
+    assert script.count('--attribute-mapping="$ATTRIBUTE_MAPPING"') == 2, (
+        "a re-run must update the mapping, or the binding names an attribute"
+        " that an earlier provider never maps"
     )
 
 
