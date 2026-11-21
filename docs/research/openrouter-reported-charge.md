@@ -33,7 +33,7 @@ The last row is what `NodeRun.reported_charge_usd` is read from, so the figure
 crossed every seam: OpenRouter to litellm, litellm to the capturing client, the
 client to the adapter, and the adapter to the executor.
 
-The bound tier's client was `katra.charges.ChargeCapturingClient`,
+The bound tier's client was `analysis_service.charges.ChargeCapturingClient`,
 which is the wiring decision made from the registry and the declared
 arrangement rather than from a vendor's name.
 

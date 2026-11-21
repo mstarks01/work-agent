@@ -230,7 +230,11 @@ def changed_paths(root: Path) -> list[str]:
     cached = _DELTA.get(root)
     if cached is not None:
         return cached
-    tracked = run_command(["git", "diff", "--name-only", BASE_REF], root).splitlines()
+    # Without renames, a file moved into the allowlist names both ends rather
+    # than only the new one, so the stray check sees where it came from.
+    tracked = run_command(
+        ["git", "diff", "--name-only", "--no-renames", BASE_REF], root
+    ).splitlines()
     porcelain = run_command(
         ["git", "status", "--porcelain", "--untracked-files=all"], root
     ).splitlines()

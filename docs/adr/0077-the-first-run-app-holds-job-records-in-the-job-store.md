@@ -15,7 +15,7 @@
 The first-run app held one `Run` record per analysis and a registry of them.
 `Run` carried the same fields as a `JobRecord`, and the app re-derived the
 status, the lock and the revision rules that `JobStore` already implements.
-Every answer route existed twice, once in `katra.api` and once in
+Every answer route existed twice, once in `analysis_service.api` and once in
 `webapp/main.py`, with the same steps in the same order, and every ADR since
 ADR 0053 cited two test suites for one rule. The two files changed in the
 same commit 34 times in the 300 commits before this one, and a test existed

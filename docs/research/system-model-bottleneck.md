@@ -22,7 +22,7 @@ framework behaviour or public schema changed for this investigation.
 **Method.** Three kinds of evidence, kept apart, because they answer different
 questions and only one of them measures prevalence.
 
-1. **The repository, at `756b065`.** `src/katra/system_model.py`,
+1. **The repository, at `756b065`.** `src/analysis_service/system_model.py`,
    `validation.py`, `assertions.py`, `factbundle.py`, `patch.py`, `evidence.py`,
    and the two **Framework Package** rule modules.
 2. **Ten hand-authored shapes**, in `evals/harness/bottleneck.py`. Each one is a

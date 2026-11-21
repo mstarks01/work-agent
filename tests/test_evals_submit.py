@@ -611,6 +611,17 @@ class TestTheDeltaCache:
         assert "stray.txt" in after
         assert submit._DELTA == {}
 
+    def test_a_moved_file_names_both_ends(self, repo):
+        """A file moved into an allowed path still shows where it came from."""
+        git(repo, "fetch", "origin")
+        git(repo, "mv", "evals/review/voters.toml", "evals/review/moved.toml")
+
+        with submit._delta_cache(repo):
+            changed = submit.changed_paths(repo)
+
+        assert "evals/review/voters.toml" in changed
+        assert "evals/review/moved.toml" in changed
+
 
 class TestTheChecklistSurvivesAShapeNobodyListed:
     """Both crashes reported by run-6, both fail-closed and both a traceback."""
